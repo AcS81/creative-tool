@@ -39,7 +39,38 @@ const distanceOnMetaAxes = (
   return Math.sqrt(sumSq);
 };
 
-const fetchReferenceNeighbours = async (fingerprint: VideoFingerprintJson) => {
+const computeAverageMetaAxes = (
+  fingerprints: VideoFingerprintJson[],
+): VideoFingerprintJson["metaAxes"] | null => {
+  if (!fingerprints.length) return null;
+  const totals = fingerprints.reduce(
+    (acc, fp) => ({
+      voiceIntensity: acc.voiceIntensity + fp.metaAxes.voiceIntensity,
+      conceptualDepth: acc.conceptualDepth + fp.metaAxes.conceptualDepth,
+      narrativeStructureStrength:
+        acc.narrativeStructureStrength + fp.metaAxes.narrativeStructureStrength,
+      visualDynamism: acc.visualDynamism + fp.metaAxes.visualDynamism,
+      productionPolish: acc.productionPolish + fp.metaAxes.productionPolish,
+    }),
+    {
+      voiceIntensity: 0,
+      conceptualDepth: 0,
+      narrativeStructureStrength: 0,
+      visualDynamism: 0,
+      productionPolish: 0,
+    },
+  );
+  const count = fingerprints.length || 1;
+  return {
+    voiceIntensity: totals.voiceIntensity / count,
+    conceptualDepth: totals.conceptualDepth / count,
+    narrativeStructureStrength: totals.narrativeStructureStrength / count,
+    visualDynamism: totals.visualDynamism / count,
+    productionPolish: totals.productionPolish / count,
+  };
+};
+
+const fetchReferenceData = async (fingerprint: VideoFingerprintJson) => {
   const references = await prisma.videoAnalysis.findMany({
     where: { creator: { type: "reference" } },
     include: {
@@ -48,10 +79,13 @@ const fetchReferenceNeighbours = async (fingerprint: VideoFingerprintJson) => {
     },
   });
 
+  const parsedFingerprints: VideoFingerprintJson[] = [];
+
   const distances = references
     .map((analysis) => {
       const parsed = safeParseFingerprint(analysis.videoFingerprint?.fingerprint);
       if (!parsed) return null;
+      parsedFingerprints.push(parsed);
       return {
         creatorId: analysis.creatorId,
         displayName: analysis.creator.displayName,
@@ -60,7 +94,10 @@ const fetchReferenceNeighbours = async (fingerprint: VideoFingerprintJson) => {
     })
     .filter(Boolean) as Array<{ creatorId: string; displayName: string; distance: number }>;
 
-  return distances.sort((a, b) => a.distance - b.distance).slice(0, 3);
+  return {
+    nearestReferences: distances.sort((a, b) => a.distance - b.distance).slice(0, 3),
+    averageMetaAxes: computeAverageMetaAxes(parsedFingerprints),
+  };
 };
 
 export async function POST(request: Request) {
@@ -129,13 +166,16 @@ export async function POST(request: Request) {
       data: { status: "complete" },
     });
 
-    const nearestReferences = await fetchReferenceNeighbours(analysisResult.fingerprint);
+    const { nearestReferences, averageMetaAxes } = await fetchReferenceData(
+      analysisResult.fingerprint,
+    );
 
     return NextResponse.json({
       videoAnalysisId: completedAnalysis.id,
       fingerprint: analysisResult.fingerprint,
       overallArchetype: analysisResult.overallArchetype,
       nearestReferences,
+      nicheAverageMetaAxes: averageMetaAxes,
     });
   } catch (error) {
     console.error("Analyze API error:", error);

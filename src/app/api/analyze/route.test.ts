@@ -84,5 +84,6 @@ describe("POST /api/analyze", () => {
     expect(json.fingerprint?.version).toBe("1.0.0");
     expect(Array.isArray(json.nearestReferences)).toBe(true);
     expect(json.nearestReferences.length).toBeGreaterThan(0);
+    expect(json.nicheAverageMetaAxes).toBeDefined();
   });
 });

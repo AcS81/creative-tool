@@ -482,11 +482,11 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Install `recharts` (or similar) for radar chart visualization.  
-- [ ] Create `RadarChartOverview` component in `src/components/RadarChartOverview.tsx`:
+- [x] Install `recharts` (or similar) for radar chart visualization.  
+- [x] Create `RadarChartOverview` component in `src/components/RadarChartOverview.tsx`:
   - Props: meta axes from fingerprint + optional “niche-average polygon”.  
-- [ ] For this iteration, compute a simple **static “niche average”** polygon (e.g., mid-values or average of reference fingerprints).  
-- [ ] Integrate chart into Overview page:
+- [x] For this iteration, compute a simple **static “niche average”** polygon (e.g., mid-values or average of reference fingerprints).  
+- [x] Integrate chart into Overview page:
   - Show when analysis result is available.  
   - Label axes:
     1. Voice intensity  
@@ -504,10 +504,10 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] Radar chart renders without errors for the sample fingerprint.  
-- [ ] Axes labels match PRD meta axes exactly.  
-- [ ] The component handles missing or partial data gracefully (e.g., hide chart or show message).  
-- [ ] Works in mobile (chart fits available width, no overflow).
+- [x] Radar chart renders without errors for the sample fingerprint.  
+- [x] Axes labels match PRD meta axes exactly.  
+- [x] The component handles missing or partial data gracefully (e.g., hide chart or show message).  
+- [x] Works in mobile (chart fits available width, no overflow).
 
 **Manual Test**
 
@@ -518,7 +518,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] Radar chart integrated into Overview page with real data from fingerprint.
+- [x] Radar chart integrated into Overview page with real data from fingerprint.
 
 ---
 

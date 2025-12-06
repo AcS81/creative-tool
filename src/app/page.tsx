@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
+import { RadarChartOverview } from "../components/RadarChartOverview";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -10,6 +11,7 @@ type AnalyzeResponse = {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   nearestReferences: NearestReference[];
+  nicheAverageMetaAxes?: VideoFingerprintJson["metaAxes"] | null;
 };
 
 export default function Home() {
@@ -100,7 +102,7 @@ export default function Home() {
       </div>
 
       {result && (
-        <div className="w-full rounded-lg border border-border bg-white/80 p-8 shadow-[var(--shadow-soft)]">
+        <div className="w-full space-y-6 rounded-lg border border-border bg-white/80 p-8 shadow-[var(--shadow-soft)]">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
@@ -109,25 +111,15 @@ export default function Home() {
               <p className="text-2xl font-semibold">{result.overallArchetype}</p>
               <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
             </div>
-            <div className="flex flex-wrap gap-2 text-sm text-muted">
-              <span className="rounded-full border border-border px-3 py-1">
-                Voice: {Math.round(result.fingerprint.metaAxes.voiceIntensity)}
-              </span>
-              <span className="rounded-full border border-border px-3 py-1">
-                Conceptual: {Math.round(result.fingerprint.metaAxes.conceptualDepth)}
-              </span>
-              <span className="rounded-full border border-border px-3 py-1">
-                Narrative: {Math.round(result.fingerprint.metaAxes.narrativeStructureStrength)}
-              </span>
-              <span className="rounded-full border border-border px-3 py-1">
-                Visual: {Math.round(result.fingerprint.metaAxes.visualDynamism)}
-              </span>
-              <span className="rounded-full border border-border px-3 py-1">
-                Polish: {Math.round(result.fingerprint.metaAxes.productionPolish)}
-              </span>
-            </div>
           </div>
-          <div className="mt-6">
+
+          <RadarChartOverview
+            fingerprint={result.fingerprint}
+            comparisonValues={result.nicheAverageMetaAxes || undefined}
+            comparisonLabel="Reference avg"
+          />
+
+          <div className="mt-4">
             <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
             <div className="mt-2 grid gap-3 md:grid-cols-3">
               {result.nearestReferences.map((ref) => (
@@ -136,9 +128,7 @@ export default function Home() {
                   className="rounded-md border border-border bg-surface p-3 shadow-sm"
                 >
                   <p className="text-base font-semibold">{ref.displayName}</p>
-                  <p className="text-xs text-muted">
-                    Distance: {ref.distance.toFixed(2)}
-                  </p>
+                  <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
                 </div>
               ))}
               {result.nearestReferences.length === 0 && (
