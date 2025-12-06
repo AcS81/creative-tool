@@ -1,15 +1,20 @@
+import { getAppConfig, type AppConfig } from "../config";
 import { mockAnalyzeVideo } from "./mock";
 import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
 
 type AnalyzeOptions = {
+  config?: AppConfig;
   useMock?: boolean;
 };
 
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
-  options: AnalyzeOptions = { useMock: true },
+  options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
-  if (options.useMock !== false) {
+  const config = options.config ?? getAppConfig();
+  const useMock = options.useMock ?? config.analysisMode === "mock";
+
+  if (useMock !== false) {
     return mockAnalyzeVideo(input);
   }
 

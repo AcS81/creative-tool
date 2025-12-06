@@ -11,7 +11,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 ## Getting started
 1) Prerequisites: Node 18+ (tested on Node 24), npm.
 2) Install dependencies: `npm install`
-2) Copy envs: `cp .env.example .env` (adjust if you prefer a different DB path).
+2) Copy envs: `cp .env.example .env` (adjust if you prefer a different DB path). The default `ANALYSIS_MODE=mock` keeps everything local; switch to `gemini` when you have API keys set.
 3) Run the initial migration (keeps Prisma cache inside the repo):  
    - `npm run prisma:migrate -- --name init`  
    - or `CACHE_DIR=.prisma/cache npx prisma migrate dev --name init`
@@ -31,3 +31,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 - The analysis is mock/deterministic for this iteration (no Gemini or YouTube APIs yet).
 - `/` lets you paste a YouTube URL, calls the mock analysis API, and shows archetype, radar chart (with reference average), nearest references, and simple domain tabs.
 - Prisma models include core entities; more detail will arrive in later iterations.
+
+## Analysis modes
+- `mock` (default): deterministic, offline-friendly analysis. Works without any external API keys.
+- `gemini`: enables real Gemini + YouTube Data API analysis (coming in Iteration 2). Requires `GEMINI_API_KEY` and `YOUTUBE_API_KEY`; requests fail fast with a `MisconfiguredEnvironment` error if keys are missing.

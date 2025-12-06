@@ -57,11 +57,11 @@ New configuration:
 
 **Goals**
 
-- [ ] Add env wiring for:
+- [x] Add env wiring for:
   - `GEMINI_API_KEY`  
   - `YOUTUBE_API_KEY`  
   - `ANALYSIS_MODE` (default `mock`).  
-- [ ] Create `src/lib/config.ts` to:
+- [x] Create `src/lib/config.ts` to:
   - Read env vars.  
   - Assert required keys when `ANALYSIS_MODE === 'gemini'`.  
   - Expose a typed config object consumed by analysis services and API routes.  
@@ -73,12 +73,12 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] App runs with `ANALYSIS_MODE=mock` even if API keys are absent.  
-- [ ] If `ANALYSIS_MODE=gemini` and a required key is missing:
+- [x] App runs with `ANALYSIS_MODE=mock` even if API keys are absent.  
+- [x] If `ANALYSIS_MODE=gemini` and a required key is missing:
   - Server logs a clear error.  
   - `/api/analyze` returns a 500 with `{ error: 'MisconfiguredEnvironment', message: '...' }`.  
-- [ ] `.env.example` updated with `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, `ANALYSIS_MODE`.  
-- [ ] README updated with a short explanation of mock vs Gemini modes.
+- [x] `.env.example` updated with `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, `ANALYSIS_MODE`.  
+- [x] README updated with a short explanation of mock vs Gemini modes.
 
 ---
 
@@ -519,7 +519,7 @@ Use this checklist to confirm **Iteration 2** is complete before planning Iterat
 
 ### ✅ Phase 0 – External Services & Config
 
-- [ ] Env vars and config for Gemini + YouTube set up.  
+- [x] Env vars and config for Gemini + YouTube set up.  
 - [ ] YouTube Data API wrapper works for metadata.  
 
 ### ✅ Phase 1 – Fingerprint & Data Shape
@@ -563,4 +563,3 @@ Use this checklist to confirm **Iteration 2** is complete before planning Iterat
   - Fingerprints carry rich domain structures.  
   - Overview and domain tabs show real, qualitative insight aligned with the PRD.  
   - Mock mode remains available for local/dev and offline work.
-

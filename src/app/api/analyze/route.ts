@@ -4,6 +4,7 @@ import { analyzeVideo } from "../../../lib/analysis/service";
 import { parseYouTubeUrl } from "../../../lib/youtube";
 import type { VideoFingerprintJson } from "../../../lib/types";
 import { generateInsights } from "../../../lib/analysis/insights";
+import { ConfigError, getAppConfig } from "../../../lib/config";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -104,6 +105,7 @@ const fetchReferenceData = async (fingerprint: VideoFingerprintJson) => {
 
 export async function POST(request: Request) {
   try {
+    const config = getAppConfig();
     const body = (await request.json()) as AnalyzeRequestBody;
     const youtubeUrl = body?.url;
 
@@ -153,7 +155,7 @@ export async function POST(request: Request) {
 
     const analysisResult = await analyzeVideo(
       { videoId, title, durationSeconds, creatorDisplayName },
-      { useMock: true },
+      { config },
     );
 
     await prisma.videoFingerprint.create({
@@ -182,6 +184,14 @@ export async function POST(request: Request) {
       insights,
     });
   } catch (error) {
+    if (error instanceof ConfigError) {
+      console.error("Analyze API misconfigured environment:", error.message);
+      return NextResponse.json(
+        { error: error.code, message: error.message },
+        { status: 500 },
+      );
+    }
+
     console.error("Analyze API error:", error);
     return NextResponse.json(
       { error: "ServerError", message: "Could not analyze this URL. Please try again." },
