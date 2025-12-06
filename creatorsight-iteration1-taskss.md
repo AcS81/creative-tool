@@ -617,14 +617,14 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Expand `README.md` to include:
+- [x] Expand `README.md` to include:
   - Prerequisites (Node version).  
   - Setup steps (`npm install`, `prisma migrate`, `npm run seed`, `npm run dev`).  
   - Short explanation of mock analysis vs future Gemini integration.  
-- [ ] Add `.env.example` with:
+- [x] Add `.env.example` with:
   - `DATABASE_URL` (for SQLite).  
   - Placeholder keys for future: `GEMINI_API_KEY`, `YOUTUBE_API_KEY` (not used yet).  
-- [ ] Ensure `.env` is listed in `.gitignore`.
+- [x] Ensure `.env` is listed in `.gitignore`.
 
 **Constraints**
 
@@ -633,7 +633,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Acceptance Criteria**
 
 - [ ] Fresh checkout on another machine (or container) can follow README and get app running.  
-- [ ] No runtime errors due to missing env vars (for this iteration; Gemini keys not required yet).
+- [x] No runtime errors due to missing env vars (for this iteration; Gemini keys not required yet).
 
 **Manual Test**
 

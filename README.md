@@ -6,9 +6,11 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 - Next.js 16 (App Router, TypeScript, Tailwind CSS 4)
 - Prisma + SQLite (file-based)
 - ESLint + Prettier
+- Vitest for unit tests, Recharts for radar visualization
 
 ## Getting started
-1) Install dependencies: `npm install`
+1) Prerequisites: Node 18+ (tested on Node 24), npm.
+2) Install dependencies: `npm install`
 2) Copy envs: `cp .env.example .env` (adjust if you prefer a different DB path).
 3) Run the initial migration (keeps Prisma cache inside the repo):  
    - `npm run prisma:migrate -- --name init`  
@@ -23,7 +25,9 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 - `npm run prisma:migrate -- --name <label>` (SQLite)
 - `npm run prisma:studio` (opens Prisma Studio)
 - `npm run seed` (populate reference creators + fingerprints)
+- `npm run test` (Vitest)
 
 ## Notes
-- `/` currently shows the CreatorSight landing stub: “Paste a YouTube URL to get a creative fingerprint (coming soon).”
-- Prisma models are placeholder-only for now; later tasks will add real fields and relations.
+- The analysis is mock/deterministic for this iteration (no Gemini or YouTube APIs yet).
+- `/` lets you paste a YouTube URL, calls the mock analysis API, and shows archetype, radar chart (with reference average), nearest references, and simple domain tabs.
+- Prisma models include core entities; more detail will arrive in later iterations.
