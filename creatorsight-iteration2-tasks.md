@@ -209,7 +209,7 @@ New configuration:
     `{ transcriptSegments, sceneSegments }` where:
       - `transcriptSegments`: `{ startSeconds, endSeconds, text }[]`  
       - `sceneSegments`: `{ startSeconds, endSeconds, label, shortSummary }[]`  
-- [ ] Use a structured JSON-only prompt that:
+- [x] Use a structured JSON-only prompt that:
   - Describes the required shapes.  
   - Encourages coarse segmentation for longer videos.  
 
@@ -235,14 +235,14 @@ New configuration:
 
 **Goals**
 
-- [ ] Implement `src/lib/analysis/geminiDomains.ts` with functions:
+- [x] Implement `src/lib/analysis/geminiDomains.ts` with functions:
   - `analyzeVoice(input): VoiceProfile` (FR-6)  
   - `analyzeLanguage(input): LanguageProfile` (FR-7)  
   - `analyzeNarrative(input): NarrativeProfile` (FR-8)  
   - `analyzeVisual(input): VisualProfile` (FR-9)  
   - `analyzeEditing(input): EditingProfile` (FR-10)  
   - `analyzeSound(input): SoundProfile` (FR-11)  
-- [ ] Each function:
+- [x] Each function:
   - Accepts transcript + scenes (and optionally video URL).  
   - Sends a single Gemini prompt that:
     - Explains the domain.  
@@ -256,11 +256,11 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] All domain functions:
+- [x] All domain functions:
   - Use the shared Gemini client.  
   - Return objects that match `VideoFingerprint` domain types.  
   - Throw descriptive errors on malformed responses.  
-- [ ] Tests:
+- [x] Tests:
   - Mocked Gemini responses validate successfully.  
   - Deliberately malformed JSON fails with clear validation errors.
 
