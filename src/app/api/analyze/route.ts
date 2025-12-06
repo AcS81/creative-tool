@@ -128,6 +128,7 @@ export async function POST(request: Request) {
       insights: insights.bullets,
       insightDetails: insights,
       domainInsights,
+      diagnostics: analysisResult.diagnostics,
       metadata: {
         title: metadata.title,
         channelTitle: metadata.channelTitle,

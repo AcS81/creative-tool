@@ -15,5 +15,7 @@ export interface AnalyzeVideoResult {
     source: "mock" | "gemini";
     hashSeed?: number;
     performanceAttached?: boolean;
+    performanceErrorType?: string;
+    performanceErrorMessage?: string;
   };
 }

@@ -113,6 +113,10 @@ export async function analyzeVideo(
     hasPerformanceData: false,
   };
 
+  let performanceAttached = false;
+  let performanceErrorType: string | undefined;
+  let performanceErrorMessage: string | undefined;
+
   if (config.performanceEnabled && options.auth?.userId && input.channelId) {
     try {
       const analytics = await fetchVideoAnalytics(
@@ -131,8 +135,18 @@ export async function analyzeVideo(
         performanceProfile,
         hasPerformanceData: true,
       };
+      performanceAttached = true;
     } catch (error) {
       console.error("Performance analytics failed; continuing without performance data", error);
+      const err: any = error;
+      if (err && typeof err === "object") {
+        if (typeof err.type === "string") {
+          performanceErrorType = err.type;
+        }
+        if (typeof err.message === "string") {
+          performanceErrorMessage = err.message;
+        }
+      }
     }
   }
 
@@ -141,6 +155,11 @@ export async function analyzeVideo(
   return {
     fingerprint: validated,
     overallArchetype,
-    diagnostics: { source: "gemini" },
+    diagnostics: {
+      source: "gemini",
+      performanceAttached,
+      performanceErrorType,
+      performanceErrorMessage,
+    },
   };
 }
