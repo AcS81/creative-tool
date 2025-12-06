@@ -27,6 +27,14 @@ type AnalyzeResponse = {
     growthInsights: string[];
     bullets: string[];
   };
+  domainInsights?: {
+    voiceProfile?: string[];
+    languageProfile?: string[];
+    narrativeProfile?: string[];
+    visualProfile?: string[];
+    editingProfile?: string[];
+    soundProfile?: string[];
+  };
   metadata?: {
     title?: string;
     channelTitle?: string;
@@ -307,6 +315,7 @@ export default function Home() {
                     domain="voice"
                     profile={domainProfiles.voiceProfile}
                     visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
+                    insights={result.domainInsights?.voiceProfile}
                   />
                 )}
                 {activeTab === "language" && domainProfiles?.languageProfile && (
@@ -315,6 +324,7 @@ export default function Home() {
                     domain="language"
                     profile={domainProfiles.languageProfile}
                     visual={<DomainRadar profile={domainProfiles.languageProfile} />}
+                    insights={result.domainInsights?.languageProfile}
                   />
                 )}
                 {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
@@ -323,6 +333,7 @@ export default function Home() {
                     domain="narrative"
                     profile={domainProfiles.narrativeProfile}
                     visual={<DomainRadar profile={domainProfiles.narrativeProfile} />}
+                    insights={result.domainInsights?.narrativeProfile}
                     extra={
                       <DomainTimeline
                         beats={supporting?.beats}
@@ -337,6 +348,7 @@ export default function Home() {
                     domain="visual"
                     profile={domainProfiles.visualProfile}
                     visual={<DomainRadar profile={domainProfiles.visualProfile} />}
+                    insights={result.domainInsights?.visualProfile}
                   />
                 )}
                 {activeTab === "editing" && domainProfiles?.editingProfile && (
@@ -345,6 +357,7 @@ export default function Home() {
                     domain="editing"
                     profile={domainProfiles.editingProfile}
                     visual={<DomainRadar profile={domainProfiles.editingProfile} />}
+                    insights={result.domainInsights?.editingProfile}
                     extra={<DomainTimeline beats={supporting?.sceneSegments} />}
                   />
                 )}
@@ -354,6 +367,7 @@ export default function Home() {
                     domain="sound"
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
+                    insights={result.domainInsights?.soundProfile}
                   />
                 )}
                 {!domainProfiles && (

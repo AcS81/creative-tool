@@ -4,6 +4,7 @@ import { analyzeVideo } from "../../../lib/analysis/service";
 import { parseYouTubeUrl } from "../../../lib/youtube";
 import type { VideoFingerprintJson } from "../../../lib/types";
 import { generateInsights } from "../../../lib/analysis/insights";
+import { generateDomainInsights } from "../../../lib/analysis/domainInsights";
 import { ConfigError, getAppConfig } from "../../../lib/config";
 import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api";
 import { GeminiApiError } from "../../../lib/gemini/client";
@@ -135,6 +136,20 @@ export async function POST(request: Request) {
     );
     const insights = generateInsights(analysisResult.fingerprint.metaAxes, referenceMetaAxes);
 
+    let domainInsights: ReturnType<typeof generateDomainInsights> = {
+      voiceProfile: [],
+      languageProfile: [],
+      narrativeProfile: [],
+      visualProfile: [],
+      editingProfile: [],
+      soundProfile: [],
+    };
+    try {
+      domainInsights = generateDomainInsights(analysisResult.fingerprint, referenceMetaAxes);
+    } catch (e) {
+      console.warn("domainInsights generation failed, returning empty", e);
+    }
+
     return NextResponse.json({
       videoAnalysisId: completedAnalysis.id,
       fingerprint: analysisResult.fingerprint,
@@ -143,6 +158,7 @@ export async function POST(request: Request) {
       nicheAverageMetaAxes: averageMetaAxes,
       insights: insights.bullets,
       insightDetails: insights,
+      domainInsights,
       metadata: {
         title: metadata.title,
         channelTitle: metadata.channelTitle,

@@ -2,7 +2,7 @@ import type { VideoFingerprintJson } from "../types";
 
 type MetaAxes = VideoFingerprintJson["metaAxes"];
 
-const axisLabels: Record<keyof MetaAxes, string> = {
+export const axisLabels: Record<keyof MetaAxes, string> = {
   voiceIntensity: "Voice intensity",
   conceptualDepth: "Conceptual depth",
   narrativeStructureStrength: "Narrative structure strength",
@@ -43,7 +43,11 @@ const describeGrowth = (axis: keyof MetaAxes, pct: number) => {
 };
 
 export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]) {
-  if (!references.length) {
+  const refs = (references ?? []).filter(
+    (ref): ref is MetaAxes => !!ref && typeof ref.voiceIntensity === "number",
+  );
+
+  if (!refs.length) {
     return {
       unusualnessInsights: ["Not enough reference data yet."],
       strengthInsights: [],
@@ -55,7 +59,7 @@ export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]) {
   const insights: Insight[] = [];
 
   (Object.keys(userMeta) as Array<keyof MetaAxes>).forEach((axis) => {
-    const refSamples = references.map((ref) => ref[axis]);
+    const refSamples = refs.map((ref) => ref[axis]);
     const pct = percentile(userMeta[axis], refSamples);
     const unusual = describeUnusual(axis, pct);
     const strength = describeStrength(axis, pct);

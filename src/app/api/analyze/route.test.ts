@@ -4,16 +4,20 @@ import prisma from "../../../lib/db";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
 import type { VideoFingerprintJson } from "../../../lib/types";
 
-vi.mock("../../../lib/youtube/api", () => ({
-  fetchYoutubeMetadata: vi.fn().mockResolvedValue({
-    title: "Sample Test Video",
-    description: "Desc",
-    channelTitle: "Channel Name",
-    durationSeconds: 120,
-    publishedAt: "2024-01-01T00:00:00Z",
-    thumbnailUrl: "http://thumb",
-  }),
-}));
+vi.mock("../../../lib/youtube/api", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    fetchYoutubeMetadata: vi.fn().mockResolvedValue({
+      title: "Sample Test Video",
+      description: "Desc",
+      channelTitle: "Channel Name",
+      durationSeconds: 120,
+      publishedAt: "2024-01-01T00:00:00Z",
+      thumbnailUrl: "http://thumb",
+    }),
+  };
+});
 
 const sampleDomain = (label: string, value: number) => ({
   primaryArchetype: `${label} Archetype`,
