@@ -70,68 +70,64 @@ export default function Home() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-8 px-6 py-16">
-      <div className="w-full rounded-lg border border-border bg-surface/80 p-10 shadow-[var(--shadow-soft)] backdrop-blur">
-        <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
-          CreatorSight
-        </p>
-        <h1 className="mt-3 text-4xl font-semibold leading-tight">
+    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-14 lg:py-16">
+      <div className="cs-card w-full p-10 backdrop-blur">
+        <p className="cs-kicker">CreatorSight</p>
+        <h1 className="cs-heading mt-3 leading-tight">
           Paste a YouTube URL to get a creative fingerprint.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg text-muted">
-          We validate the link, run a mock analysis pipeline, and preview your archetype and nearest
-          reference creators.
+        <p className="cs-body mt-3 max-w-3xl text-muted">
+          We validate the link, run the configured analysis pipeline, and preview your archetype,
+          radar, and closest reference creators.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]">
-          <div className="rounded-md border border-border bg-white/70 p-6 shadow-sm">
-            <label className="block text-sm font-medium text-muted" htmlFor="url">
+          <div className="cs-panel p-6 shadow-sm">
+            <label className="cs-label" htmlFor="url">
               YouTube URL
             </label>
             <input
               id="url"
               type="url"
               placeholder="https://www.youtube.com/watch?v=..."
-              className="mt-2 w-full rounded-md border border-border bg-white/60 px-4 py-3 text-base text-foreground shadow-inner outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
+              className="cs-input mt-2"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
             />
             {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-            <button
-              type="submit"
-              className="mt-4 inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={loading}
-            >
+            <button type="submit" className="cs-button mt-4" disabled={loading}>
               {loading ? "Analyzing..." : "Analyze video"}
             </button>
           </div>
-          <div className="rounded-md border border-border bg-white/70 p-6 shadow-sm">
+          <div className="cs-panel p-6 shadow-sm">
             <p className="text-sm font-semibold text-muted">What to expect</p>
             <ul className="mt-3 space-y-2 text-sm text-foreground/80">
               <li>✅ Validate YouTube URL client-side</li>
-              <li>✅ Call mock analysis API</li>
+              <li>✅ Call mock or Gemini pipeline</li>
               <li>✅ Show archetype + nearest neighbours</li>
-              <li>🚧 Radar & domain tabs coming next</li>
+              <li>✅ Radar, unusual insights, domain tabs</li>
             </ul>
           </div>
         </form>
       </div>
 
       {result && (
-        <div className="w-full space-y-6 rounded-lg border border-border bg-white/80 p-8 shadow-[var(--shadow-soft)]">
+        <div className="cs-card w-full space-y-6 p-8">
           <AnalysisLayout activeTab={activeTab} onTabChange={setActiveTab}>
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
-                      Overall archetype
+                    <p className="cs-kicker text-[10px]">Overall archetype</p>
+                    <p className="text-2xl font-semibold text-foreground">
+                      {result.overallArchetype}
                     </p>
-                    <p className="text-2xl font-semibold">{result.overallArchetype}</p>
-                    <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
+                    <p className="mt-1 text-sm text-muted">
+                      Analysis ID: {result.videoAnalysisId}
+                    </p>
                   </div>
                   {result.metadata ? (
-                    <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted">
+                    <div className="cs-panel border-border/80 bg-surface px-4 py-3 text-sm text-muted shadow-sm">
                       <p className="font-semibold text-foreground">{result.metadata.title}</p>
                       <p>{result.metadata.channelTitle}</p>
                       <p>
@@ -187,31 +183,34 @@ export default function Home() {
 
             {activeTab !== "overview" && (
               <div className="space-y-3">
-            {activeTab === "voice" && domainProfiles?.voiceProfile && (
-              <DomainCard name="Your Voice" profile={domainProfiles.voiceProfile} />
-            )}
-            {activeTab === "language" && domainProfiles?.languageProfile && (
-              <DomainCard name="Your Language" profile={domainProfiles.languageProfile} />
-            )}
-            {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
-              <div className="space-y-4">
-                <DomainCard name="Your Narrative" profile={domainProfiles.narrativeProfile} />
-                <DomainTimeline beats={supporting?.beats} transcriptSegments={supporting?.transcriptSegments} />
-              </div>
-            )}
-            {activeTab === "visual" && domainProfiles?.visualProfile && (
-              <DomainCard name="Your Visuals" profile={domainProfiles.visualProfile} />
-            )}
-            {activeTab === "editing" && domainProfiles?.editingProfile && (
-              <div className="space-y-4">
-                <DomainCard name="Your Editing" profile={domainProfiles.editingProfile} />
-                <DomainTimeline beats={supporting?.sceneSegments} />
-              </div>
-            )}
-            {activeTab === "sound" && domainProfiles?.soundProfile && (
-              <DomainCard name="Your Sound" profile={domainProfiles.soundProfile} />
-            )}
-            {!domainProfiles && (
+                {activeTab === "voice" && domainProfiles?.voiceProfile && (
+                  <DomainCard name="Your Voice" profile={domainProfiles.voiceProfile} />
+                )}
+                {activeTab === "language" && domainProfiles?.languageProfile && (
+                  <DomainCard name="Your Language" profile={domainProfiles.languageProfile} />
+                )}
+                {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
+                  <div className="space-y-4">
+                    <DomainCard name="Your Narrative" profile={domainProfiles.narrativeProfile} />
+                    <DomainTimeline
+                      beats={supporting?.beats}
+                      transcriptSegments={supporting?.transcriptSegments}
+                    />
+                  </div>
+                )}
+                {activeTab === "visual" && domainProfiles?.visualProfile && (
+                  <DomainCard name="Your Visuals" profile={domainProfiles.visualProfile} />
+                )}
+                {activeTab === "editing" && domainProfiles?.editingProfile && (
+                  <div className="space-y-4">
+                    <DomainCard name="Your Editing" profile={domainProfiles.editingProfile} />
+                    <DomainTimeline beats={supporting?.sceneSegments} />
+                  </div>
+                )}
+                {activeTab === "sound" && domainProfiles?.soundProfile && (
+                  <DomainCard name="Your Sound" profile={domainProfiles.soundProfile} />
+                )}
+                {!domainProfiles && (
                   <p className="text-sm text-muted">Run an analysis first.</p>
                 )}
               </div>

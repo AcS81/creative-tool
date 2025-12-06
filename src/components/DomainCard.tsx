@@ -3,9 +3,9 @@ import { DomainRadar } from "./DomainRadar";
 
 export function DomainCard({ name, profile }: { name: string; profile: DomainProfile }) {
   return (
-    <div className="rounded-lg border border-border bg-white/80 p-6 shadow-sm">
-      <p className="text-sm font-semibold uppercase tracking-[0.12em] text-muted">{name}</p>
-      <p className="mt-1 text-lg font-semibold">{profile.primaryArchetype}</p>
+    <div className="cs-card p-6">
+      <p className="cs-kicker text-[11px]">{name}</p>
+      <p className="mt-1 text-lg font-semibold text-foreground">{profile.primaryArchetype}</p>
       {profile.secondaryArchetype ? (
         <p className="text-sm text-muted">Secondary: {profile.secondaryArchetype}</p>
       ) : null}

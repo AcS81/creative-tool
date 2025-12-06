@@ -30,10 +30,10 @@ export function AnalysisLayout({
             <button
               key={tab.key}
               onClick={() => onTabChange(tab.key)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              className={`cs-pill text-sm font-semibold transition ${
                 isActive
-                  ? "bg-accent text-accent-foreground shadow-sm"
-                  : "border border-border bg-white/70 text-foreground hover:border-accent"
+                  ? "border-transparent bg-accent text-white shadow-sm"
+                  : "hover:border-accent/70 hover:text-foreground"
               }`}
               type="button"
             >

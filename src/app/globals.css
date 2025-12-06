@@ -1,14 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8fb;
+  --background: #f6f8fb;
   --foreground: #0f172a;
   --surface: #ffffff;
-  --muted: #64748b;
+  --surface-strong: #f1f5f9;
+  --muted: #5f6b7a;
+  --muted-strong: #334155;
   --border: #e2e8f0;
-  --accent: #0ea5e9;
-  --accent-foreground: #e0f2fe;
+  --accent: #2563eb;
+  --accent-foreground: #e8f0ff;
+  --accent-contrast: #0b1f4a;
   --shadow-soft: 0 22px 54px rgba(15, 23, 42, 0.08);
+  --shadow-strong: 0 18px 40px rgba(15, 23, 42, 0.16);
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-md: 18px;
+  --text-lg: 20px;
+  --text-xl: 28px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
 }
 
 @theme inline {
@@ -20,6 +38,7 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --shadow-soft: var(--shadow-soft);
+  --shadow-strong: var(--shadow-strong);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-lg: 16px;
@@ -32,10 +51,13 @@
     --background: #0b1220;
     --foreground: #e2e8f0;
     --surface: #0f172a;
+    --surface-strong: #0b1628;
     --muted: #cbd5e1;
+    --muted-strong: #e2e8f0;
     --border: #1e293b;
     --accent: #38bdf8;
     --accent-foreground: #0b1220;
+    --accent-contrast: #e0f2fe;
     --shadow-soft: 0 22px 54px rgba(0, 0, 0, 0.45);
   }
 }
@@ -46,4 +68,124 @@ body {
     var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans, "Inter"), system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.01em;
+  }
+
+  .cs-heading {
+    font-size: var(--text-xl);
+    font-weight: 700;
+    color: var(--foreground);
+  }
+
+  .cs-subheading {
+    font-size: var(--text-lg);
+    font-weight: 600;
+    color: var(--foreground);
+  }
+
+  .cs-body {
+    font-size: var(--text-base);
+    color: var(--foreground);
+  }
+
+  .cs-muted {
+    color: var(--muted);
+  }
+
+  .cs-kicker {
+    font-size: var(--text-xs);
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .cs-card {
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.92));
+    box-shadow: var(--shadow-soft);
+  }
+
+  .cs-panel {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.92);
+  }
+
+  .cs-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 9999px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.85);
+    padding: 8px 14px;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--muted-strong);
+  }
+
+  .cs-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-radius: var(--radius-md);
+    border: 1px solid transparent;
+    background: linear-gradient(120deg, var(--accent), #1d4ed8);
+    color: #f8fbff;
+    font-weight: 700;
+    font-size: var(--text-sm);
+    box-shadow: var(--shadow-strong);
+    transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  }
+
+  .cs-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 18px 38px rgba(37, 99, 235, 0.24);
+  }
+
+  .cs-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+  }
+
+  .cs-input {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.9);
+    padding: 12px 14px;
+    font-size: var(--text-base);
+    color: var(--foreground);
+    outline: none;
+    transition: border-color 120ms ease, box-shadow 120ms ease;
+  }
+
+  .cs-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+
+  .cs-label {
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--muted-strong);
+  }
+
+  .cs-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
 }
