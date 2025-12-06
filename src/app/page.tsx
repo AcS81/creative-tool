@@ -21,6 +21,12 @@ type AnalyzeResponse = {
   nearestReferences: NearestReference[];
   nicheAverageMetaAxes?: VideoFingerprintJson["metaAxes"] | null;
   insights?: string[];
+  insightDetails?: {
+    unusualnessInsights: string[];
+    strengthInsights: string[];
+    growthInsights: string[];
+    bullets: string[];
+  };
   metadata?: {
     title?: string;
     channelTitle?: string;
@@ -247,21 +253,33 @@ export default function Home() {
                       </div>
                     </div>
                   ) : null}
+              </div>
+
+              <RadarChartOverview
+                fingerprint={result.fingerprint}
+                comparisonValues={result.nicheAverageMetaAxes || undefined}
+                comparisonLabel="Reference avg"
+              />
+
+              <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
+                <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+                  <p className="text-sm font-semibold text-muted">Insights</p>
+                  <ul className="list-disc space-y-1 pl-4 text-sm text-foreground/85">
+                    {(result.insightDetails?.bullets ?? result.insights ?? []).map((insight, idx) => (
+                      <li key={idx}>{insight}</li>
+                    ))}
+                    {(!result.insights || result.insights.length === 0) && (
+                      <li className="text-muted">Not enough reference data yet.</li>
+                    )}
+                  </ul>
                 </div>
-
-                <RadarChartOverview
-                  fingerprint={result.fingerprint}
-                  comparisonValues={result.nicheAverageMetaAxes || undefined}
-                  comparisonLabel="Reference avg"
-                />
-
-                <div className="mt-4">
+                <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
                   <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
-                  <div className="mt-2 grid gap-3 md:grid-cols-3">
+                  <div className="grid gap-3">
                     {result.nearestReferences.map((ref) => (
                       <div
                         key={ref.creatorId}
-                        className="rounded-md border border-border bg-surface p-3 shadow-sm"
+                        className="rounded-md border border-border bg-surface-strong p-3 shadow-sm"
                       >
                         <p className="text-base font-semibold">{ref.displayName}</p>
                         <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
@@ -277,20 +295,9 @@ export default function Home() {
                     )}
                   </div>
                 </div>
-
-                <div className="mt-4">
-                  <p className="text-sm font-semibold text-muted">Where you’re unusual</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/80">
-                    {(result.insights ?? []).map((insight, idx) => (
-                      <li key={idx}>{insight}</li>
-                    ))}
-                    {(!result.insights || result.insights.length === 0) && (
-                      <li className="text-muted">Not enough reference data yet.</li>
-                    )}
-                  </ul>
-                </div>
               </div>
-            )}
+            </div>
+          )}
 
             {activeTab !== "overview" && (
               <div className="space-y-3">
