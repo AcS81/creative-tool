@@ -172,7 +172,7 @@ New configuration:
 
 **Goals**
 
-- [ ] Update `prisma/seed.ts` so reference creators’ fingerprints conform to the new schema:
+- [x] Update `prisma/seed.ts` so reference creators’ fingerprints conform to the new schema:
   - For each reference:
     - Populate `metaAxes` coherently.  
     - Populate each domain’s `scores` and `primaryArchetype`.  

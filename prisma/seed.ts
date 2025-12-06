@@ -3,6 +3,13 @@ import { validateFingerprint } from "../src/lib/schemas/fingerprint";
 
 const prisma = new PrismaClient();
 
+type DomainConfig = {
+  base: number;
+  archetype: string;
+  summaryText: string;
+  highlights?: string[];
+};
+
 type SeedCreator = {
   key: string;
   displayName: string;
@@ -10,6 +17,21 @@ type SeedCreator = {
   youtubeVideoId: string;
   title: string;
   durationSeconds: number;
+  metaAxes: {
+    voiceIntensity: number;
+    conceptualDepth: number;
+    narrativeStructureStrength: number;
+    visualDynamism: number;
+    productionPolish: number;
+  };
+  domains: {
+    voice: DomainConfig;
+    language: DomainConfig;
+    narrative: DomainConfig;
+    visual: DomainConfig;
+    editing: DomainConfig;
+    sound: DomainConfig;
+  };
 };
 
 const referenceCreators: SeedCreator[] = [
@@ -20,6 +42,45 @@ const referenceCreators: SeedCreator[] = [
     youtubeVideoId: "vid-high-energy",
     title: "High Energy Breakdown",
     durationSeconds: 720,
+    metaAxes: {
+      voiceIntensity: 82,
+      conceptualDepth: 52,
+      narrativeStructureStrength: 60,
+      visualDynamism: 74,
+      productionPolish: 68,
+    },
+    domains: {
+      voice: {
+        base: 80,
+        archetype: "Hyperactive Commentator",
+        summaryText: "Fast-paced delivery with sharp emphasis and frequent resets to keep attention high.",
+      },
+      language: {
+        base: 55,
+        archetype: "Concise Commentator",
+        summaryText: "Short, punchy phrasing that favors takes and reactions over long exposition.",
+      },
+      narrative: {
+        base: 60,
+        archetype: "Segmented Explainer",
+        summaryText: "Moves through quick beats with mini-hooks every few minutes.",
+      },
+      visual: {
+        base: 70,
+        archetype: "Dynamic Desk Setup",
+        summaryText: "Constant framing tweaks and hand movement keep the scene lively.",
+      },
+      editing: {
+        base: 78,
+        archetype: "Cut-Heavy Pacing",
+        summaryText: "Frequent jump cuts and pattern interrupts to maintain speed.",
+      },
+      sound: {
+        base: 62,
+        archetype: "Upbeat Underscore",
+        summaryText: "Light music bed that lifts energy without overpowering voice.",
+      },
+    },
   },
   {
     key: "calm-storyteller",
@@ -28,6 +89,45 @@ const referenceCreators: SeedCreator[] = [
     youtubeVideoId: "vid-calm-story",
     title: "Slow Burn Narrative",
     durationSeconds: 900,
+    metaAxes: {
+      voiceIntensity: 52,
+      conceptualDepth: 64,
+      narrativeStructureStrength: 72,
+      visualDynamism: 48,
+      productionPolish: 58,
+    },
+    domains: {
+      voice: {
+        base: 50,
+        archetype: "Warm Narrator",
+        summaryText: "Measured pace with gentle cadence and low filler.",
+      },
+      language: {
+        base: 66,
+        archetype: "Reflective Essayist",
+        summaryText: "Balances concrete detail with introspective framing.",
+      },
+      narrative: {
+        base: 76,
+        archetype: "Arc-Driven Storyteller",
+        summaryText: "Builds setups and payoffs with clear act breaks.",
+      },
+      visual: {
+        base: 46,
+        archetype: "Stable Frame",
+        summaryText: "Minimal camera movement; relies on presence and props.",
+      },
+      editing: {
+        base: 55,
+        archetype: "Measured Cuts",
+        summaryText: "Longer takes with purposeful trims at beat changes.",
+      },
+      sound: {
+        base: 50,
+        archetype: "Subtle Underscore",
+        summaryText: "Sparse music used only to mark transitions.",
+      },
+    },
   },
   {
     key: "polished-analyst",
@@ -36,40 +136,122 @@ const referenceCreators: SeedCreator[] = [
     youtubeVideoId: "vid-polished-analyst",
     title: "Deep Dive Analysis",
     durationSeconds: 840,
+    metaAxes: {
+      voiceIntensity: 68,
+      conceptualDepth: 78,
+      narrativeStructureStrength: 70,
+      visualDynamism: 60,
+      productionPolish: 82,
+    },
+    domains: {
+      voice: {
+        base: 66,
+        archetype: "Measured Host",
+        summaryText: "Clear articulation with confident pacing and controlled emphasis.",
+      },
+      language: {
+        base: 78,
+        archetype: "Analytical Explainer",
+        summaryText: "Dense with insights, examples, and structured argumentation.",
+      },
+      narrative: {
+        base: 72,
+        archetype: "Structured Deep Dive",
+        summaryText: "Outlines, defends, and recaps with clean section markers.",
+      },
+      visual: {
+        base: 58,
+        archetype: "Composed Studio",
+        summaryText: "Steady framing with occasional illustrative overlays.",
+      },
+      editing: {
+        base: 80,
+        archetype: "Polished Post",
+        summaryText: "Tight cuts, subtle motion graphics, and minimal dead air.",
+      },
+      sound: {
+        base: 64,
+        archetype: "Balanced Mix",
+        summaryText: "Voice-forward mix with restrained music and light SFX.",
+      },
+    },
   },
 ];
 
-const makeDomain = (label: string, value: number) => ({
-  primaryArchetype: `${label} Archetype`,
-  summaryText: `${label} summary`,
-  scores: [
-    {
-      key: `${label.toLowerCase()}-axis`,
-      label: `${label} Axis`,
-      value,
-    },
-  ],
-  highlights: [`Notable ${label.toLowerCase()} trait`],
+const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
+
+const scoreSet = (base: number, entries: Array<{ key: string; label: string; offset: number }>) =>
+  entries.map(({ key, label, offset }) => ({
+    key,
+    label,
+    value: clamp(base + offset),
+  }));
+
+const domainScores = (domain: keyof SeedCreator["domains"], base: number) => {
+  switch (domain) {
+    case "voice":
+      return scoreSet(base, [
+        { key: "energy", label: "Energy", offset: 2 },
+        { key: "expressiveness", label: "Expressiveness", offset: 0 },
+        { key: "clarity", label: "Clarity", offset: -1 },
+        { key: "warmth", label: "Warmth", offset: 1 },
+        { key: "flow", label: "Flow/Resets", offset: -2 },
+      ]);
+    case "language":
+      return scoreSet(base, [
+        { key: "abstract", label: "Abstract", offset: 2 },
+        { key: "concrete", label: "Concrete", offset: -2 },
+        { key: "storyRatio", label: "Story Ratio", offset: 1 },
+        { key: "explanation", label: "Explanation", offset: 0 },
+      ]);
+    case "narrative":
+      return scoreSet(base, [
+        { key: "structure", label: "Structure Strength", offset: 2 },
+        { key: "hooks", label: "Hooks", offset: 1 },
+        { key: "callbacks", label: "Callbacks", offset: -1 },
+      ]);
+    case "visual":
+      return scoreSet(base, [
+        { key: "movement", label: "Movement", offset: 1 },
+        { key: "expression", label: "Expression", offset: 0 },
+        { key: "stability", label: "Background Stability", offset: -1 },
+      ]);
+    case "editing":
+      return scoreSet(base, [
+        { key: "cutPace", label: "Cut Pace", offset: 2 },
+        { key: "patternInterrupts", label: "Pattern Interrupts", offset: 0 },
+        { key: "broll", label: "B-roll Presence", offset: -1 },
+      ]);
+    case "sound":
+      return scoreSet(base, [
+        { key: "musicCoverage", label: "Music Coverage", offset: 0 },
+        { key: "musicBalance", label: "Music vs Voice", offset: -1 },
+        { key: "sfxPurpose", label: "SFX Purposefulness", offset: 1 },
+      ]);
+    default:
+      return scoreSet(base, [{ key: "default", label: "Default", offset: 0 }]);
+  }
+};
+
+const makeDomain = (config: DomainConfig, domainKey: keyof SeedCreator["domains"]) => ({
+  primaryArchetype: config.archetype,
+  summaryText: config.summaryText,
+  scores: domainScores(domainKey, config.base),
+  highlights: config.highlights ?? [`Notable ${domainKey} trait`],
 });
 
 const makeFingerprint = (seed: SeedCreator, base: number) => {
   const fingerprint = {
     version: "1.1.0" as const,
     createdAt: new Date().toISOString(),
-    metaAxes: {
-      voiceIntensity: 60 + base,
-      conceptualDepth: 55 + base,
-      narrativeStructureStrength: 58 + base,
-      visualDynamism: 50 + base,
-      productionPolish: 62 + base,
-    },
+    metaAxes: seed.metaAxes,
     perDomain: {
-      voiceProfile: makeDomain("Voice", 60 + base),
-      languageProfile: makeDomain("Language", 55 + base),
-      narrativeProfile: makeDomain("Narrative", 58 + base),
-      visualProfile: makeDomain("Visual", 50 + base),
-      editingProfile: makeDomain("Editing", 62 + base),
-      soundProfile: makeDomain("Sound", 54 + base),
+      voiceProfile: makeDomain(seed.domains.voice, "voice"),
+      languageProfile: makeDomain(seed.domains.language, "language"),
+      narrativeProfile: makeDomain(seed.domains.narrative, "narrative"),
+      visualProfile: makeDomain(seed.domains.visual, "visual"),
+      editingProfile: makeDomain(seed.domains.editing, "editing"),
+      soundProfile: makeDomain(seed.domains.sound, "sound"),
     },
     overallArchetype: seed.displayName,
   };
