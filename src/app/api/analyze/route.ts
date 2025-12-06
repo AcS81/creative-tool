@@ -10,6 +10,7 @@ import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api"
 import { GeminiApiError } from "../../../lib/gemini/client";
 import { computeAverageMetaAxes, findNearestReferences } from "../../../lib/analysis/similarity";
 import { getAuthContext } from "../../../lib/auth/context";
+import { buildSessionCookie, ensureSessionId, parseSessionIdFromCookieHeader } from "../../../lib/session";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -81,6 +82,9 @@ export async function POST(request: Request) {
       );
     }
 
+    const cookieHeader = request.headers.get("cookie");
+    const { sessionId, isNew } = ensureSessionId(cookieHeader);
+
     const metadata = await fetchYoutubeMetadata(videoId, { config });
     const creatorDisplayName = body.creatorDisplayName || metadata.channelTitle || "Local Anonymous";
     const title = metadata.title || body.title || "Untitled video";
@@ -111,6 +115,7 @@ export async function POST(request: Request) {
         title,
         durationSeconds,
         status: "pending",
+        sessionId,
       },
     });
     videoAnalysisId = videoAnalysis.id;
@@ -153,7 +158,7 @@ export async function POST(request: Request) {
       console.warn("domainInsights generation failed, returning empty", e);
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       videoAnalysisId: completedAnalysis.id,
       fingerprint: analysisResult.fingerprint,
       overallArchetype: analysisResult.overallArchetype,
@@ -170,6 +175,10 @@ export async function POST(request: Request) {
         thumbnailUrl: metadata.thumbnailUrl,
       },
     });
+    if (isNew) {
+      response.headers.append("Set-Cookie", buildSessionCookie(sessionId));
+    }
+    return response;
   } catch (error) {
     if (error instanceof ConfigError) {
       console.error("Analyze API misconfigured environment:", error.message);
