@@ -47,8 +47,8 @@ type GetTranscriptAndScenesOptions = {
   config?: AppConfig;
 };
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-pro-exp-02-05";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const buildPrompt = (videoUrl: string) =>
   [
@@ -110,11 +110,11 @@ export async function getTranscriptAndScenes(
   }
 
   if (!response.ok) {
-    throw new GeminiApiError(
-      "UpstreamError",
-      `Gemini API returned ${response.status}`,
-      response.status,
-    );
+    const msg =
+      response.status === 404
+        ? `Gemini API returned 404 for model "${GEMINI_MODEL}". Check GEMINI_MODEL, API enablement, and key access.`
+        : `Gemini API returned ${response.status}`;
+    throw new GeminiApiError("UpstreamError", msg, response.status);
   }
 
   let payload: any;

@@ -315,10 +315,10 @@ New configuration:
 
 **Goals**
 
-- [ ] Keep POST `/api/analyze` contract:
+- [x] Keep POST `/api/analyze` contract:
   - Input: `{ url: string, creatorDisplayName?: string }`.  
   - Output: `{ videoAnalysisId, fingerprint, overallArchetype, nearestReferences }`.  
-- [ ] On valid URL:
+- [x] On valid URL:
   - Use `parseYouTubeUrl` to extract `videoId`.  
   - Use `fetchYoutubeMetadata(videoId)` to populate `VideoAnalysis` fields:
     - `title`, `durationSeconds`, `channelId` (if available), `status`.  
@@ -327,7 +327,7 @@ New configuration:
   - Compute nearest reference creators based on updated fingerprints.  
 - [ ] On errors from Gemini/YouTube:
   - Mark `VideoAnalysis.status = 'failed'`.  
-  - Add `failureReason` field describing the issue.
+  - Add `failureReason` field describing the issue. *(status flag implemented; failureReason persistence pending schema support)*  
 
 **Constraints**
 

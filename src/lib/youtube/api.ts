@@ -3,6 +3,7 @@ import { ConfigError, getAppConfig, type AppConfig } from "../config";
 export type YoutubeMetadata = {
   title: string;
   description: string;
+  channelId?: string;
   channelTitle: string;
   publishedAt: string;
   durationSeconds: number;
@@ -104,6 +105,7 @@ export async function fetchYoutubeMetadata(
   const contentDetails = item?.contentDetails;
   const title = snippet?.title;
   const description = snippet?.description ?? "";
+  const channelId = snippet?.channelId ?? undefined;
   const channelTitle = snippet?.channelTitle ?? "";
   const publishedAt = snippet?.publishedAt;
   const durationIso = contentDetails?.duration;
@@ -115,6 +117,7 @@ export async function fetchYoutubeMetadata(
   return {
     title,
     description,
+    channelId,
     channelTitle,
     publishedAt,
     durationSeconds: parseIsoDurationSeconds(durationIso),

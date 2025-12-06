@@ -1,7 +1,18 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "./route";
 import prisma from "../../../lib/db";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
+import type { VideoFingerprintJson } from "../../../lib/types";
+
+vi.mock("../../../lib/youtube/api", () => ({
+  fetchYoutubeMetadata: vi.fn().mockResolvedValue({
+    title: "Sample Test Video",
+    description: "Desc",
+    channelTitle: "Channel Name",
+    durationSeconds: 120,
+    publishedAt: "2024-01-01T00:00:00Z",
+  }),
+}));
 
 const sampleDomain = (label: string, value: number) => ({
   primaryArchetype: `${label} Archetype`,
@@ -61,6 +72,14 @@ beforeAll(async () => {
 });
 
 describe("POST /api/analyze", () => {
+  beforeEach(() => {
+    process.env.ANALYSIS_MODE = "mock";
+  });
+
+  afterEach(async () => {
+    delete process.env.ANALYSIS_MODE;
+  });
+
   it("returns analysis result with nearest references", async () => {
     const body = {
       url: "https://youtu.be/testvideo123",
@@ -84,5 +103,6 @@ describe("POST /api/analyze", () => {
     expect(Array.isArray(json.nearestReferences)).toBe(true);
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();
+    expect((json.fingerprint as VideoFingerprintJson).metaAxes.voiceIntensity).toBeGreaterThanOrEqual(0);
   });
 });

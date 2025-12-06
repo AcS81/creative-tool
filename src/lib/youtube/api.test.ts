@@ -29,6 +29,7 @@ describe("fetchYoutubeMetadata", () => {
             snippet: {
               title: "Test Video",
               description: "Desc",
+              channelId: "channel-1",
               channelTitle: "Channel",
               publishedAt: "2024-01-01T00:00:00Z",
             },
@@ -44,6 +45,7 @@ describe("fetchYoutubeMetadata", () => {
     expect(result).toEqual({
       title: "Test Video",
       description: "Desc",
+      channelId: "channel-1",
       channelTitle: "Channel",
       publishedAt: "2024-01-01T00:00:00Z",
       durationSeconds: 3723,

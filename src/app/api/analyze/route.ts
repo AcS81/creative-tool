@@ -5,6 +5,8 @@ import { parseYouTubeUrl } from "../../../lib/youtube";
 import type { VideoFingerprintJson } from "../../../lib/types";
 import { generateInsights } from "../../../lib/analysis/insights";
 import { ConfigError, getAppConfig } from "../../../lib/config";
+import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api";
+import { GeminiApiError } from "../../../lib/gemini/client";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -12,10 +14,6 @@ type AnalyzeRequestBody = {
   title?: string;
   durationSeconds?: number;
 };
-
-const DEFAULT_TITLE = "Untitled video";
-const DEFAULT_DURATION = 0;
-const DEFAULT_CREATOR = "Local Anonymous";
 
 const safeParseFingerprint = (fingerprintText?: string | null): VideoFingerprintJson | null => {
   if (!fingerprintText) return null;
@@ -104,6 +102,8 @@ const fetchReferenceData = async (fingerprint: VideoFingerprintJson) => {
 };
 
 export async function POST(request: Request) {
+  let videoAnalysisId: string | null = null;
+
   try {
     const config = getAppConfig();
     const body = (await request.json()) as AnalyzeRequestBody;
@@ -124,11 +124,14 @@ export async function POST(request: Request) {
       );
     }
 
-    const creatorDisplayName = body.creatorDisplayName || DEFAULT_CREATOR;
-    const title = body.title || DEFAULT_TITLE;
-    const durationSeconds = Number.isFinite(body.durationSeconds)
-      ? Number(body.durationSeconds)
-      : DEFAULT_DURATION;
+    const metadata = await fetchYoutubeMetadata(videoId, { config });
+    const creatorDisplayName = body.creatorDisplayName || metadata.channelTitle || "Local Anonymous";
+    const title = metadata.title || body.title || "Untitled video";
+    const durationSeconds = Number.isFinite(metadata.durationSeconds)
+      ? metadata.durationSeconds
+      : Number.isFinite(body.durationSeconds)
+        ? Number(body.durationSeconds)
+        : 0;
 
     const existingCreator = await prisma.creatorProfile.findFirst({
       where: { displayName: creatorDisplayName, type: "user" },
@@ -140,6 +143,7 @@ export async function POST(request: Request) {
         data: {
           displayName: creatorDisplayName,
           type: "user",
+          channelId: metadata.channelId || undefined,
         },
       }));
 
@@ -152,6 +156,7 @@ export async function POST(request: Request) {
         status: "pending",
       },
     });
+    videoAnalysisId = videoAnalysis.id;
 
     const analysisResult = await analyzeVideo(
       { videoId, title, durationSeconds, creatorDisplayName },
@@ -192,9 +197,21 @@ export async function POST(request: Request) {
       );
     }
 
-    console.error("Analyze API error:", error);
+    if (error instanceof YoutubeApiError || error instanceof GeminiApiError) {
+      console.error("Analyze API upstream error:", error);
+    } else {
+      console.error("Analyze API error:", error);
+    }
+
+    if (videoAnalysisId) {
+      await prisma.videoAnalysis.update({
+        where: { id: videoAnalysisId },
+        data: { status: "failed" },
+      });
+    }
+
     return NextResponse.json(
-      { error: "ServerError", message: "Could not analyze this URL. Please try again." },
+      { error: "AnalysisFailed", message: "Could not analyze this URL. Please try again." },
       { status: 500 },
     );
   }
