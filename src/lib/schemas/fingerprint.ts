@@ -28,6 +28,34 @@ const segmentSchema = z.object({
   endSeconds: z.number().min(0),
 });
 
+const retentionPointSchema = z.object({
+  timeRatio: z.number().min(0).max(1),
+  audienceRetention: z.number().min(0).max(100),
+});
+
+const performanceScoresSchema = z.object({
+  hookRetention: z.number().min(0).max(100),
+  midVideoRetentionStability: z.number().min(0).max(100),
+  lateDropOffSeverity: z.number().min(0).max(100),
+  clickThroughRateQuality: z.number().min(0).max(100),
+});
+
+const performanceMetricsSchema = z.object({
+  views: z.number().nonnegative().optional(),
+  likes: z.number().nonnegative().optional(),
+  comments: z.number().nonnegative().optional(),
+  ctr: z.number().min(0).max(100).optional(),
+  avgViewDurationSeconds: z.number().nonnegative().optional(),
+  retentionSeries: z.array(retentionPointSchema).max(200).optional(),
+});
+
+const performanceProfileSchema = z.object({
+  scores: performanceScoresSchema,
+  metrics: performanceMetricsSchema,
+  summaryText: z.string().min(1, "summaryText is required"),
+  insights: z.array(z.string().min(1)).optional(),
+});
+
 export const fingerprintSchema = z.object({
   version: z.literal("1.1.0"),
   createdAt: z
@@ -70,6 +98,8 @@ export const fingerprintSchema = z.object({
         .optional(),
     })
     .optional(),
+  performanceProfile: performanceProfileSchema.optional(),
+  hasPerformanceData: z.boolean().optional().default(false),
 });
 
 export type FingerprintSchema = z.infer<typeof fingerprintSchema>;

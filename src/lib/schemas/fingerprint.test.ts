@@ -42,6 +42,7 @@ describe("fingerprint schema", () => {
     const validated = validateFingerprint(baseFingerprint);
     expect(validated.version).toBe("1.1.0");
     expect(validated.perDomain.voiceProfile.primaryArchetype).toContain("Voice");
+    expect(validated.hasPerformanceData).toBe(false);
   });
 
   it("rejects missing required sections with a helpful error", () => {
@@ -63,5 +64,57 @@ describe("fingerprint schema", () => {
   it("throws descriptive error for unsupported version", () => {
     const legacy = { ...baseFingerprint, version: "1.0.0" };
     expect(() => validateFingerprint(legacy)).toThrow(/unsupported version 1.0.0/i);
+  });
+
+  it("accepts an optional performance profile", () => {
+    const withPerformance = {
+      ...baseFingerprint,
+      hasPerformanceData: true,
+      performanceProfile: {
+        scores: {
+          hookRetention: 72,
+          midVideoRetentionStability: 64,
+          lateDropOffSeverity: 35,
+          clickThroughRateQuality: 55,
+        },
+        metrics: {
+          views: 120000,
+          likes: 4500,
+          comments: 320,
+          ctr: 8.5,
+          avgViewDurationSeconds: 320,
+          retentionSeries: [
+            { timeRatio: 0, audienceRetention: 100 },
+            { timeRatio: 0.5, audienceRetention: 64 },
+            { timeRatio: 1, audienceRetention: 42 },
+          ],
+        },
+        summaryText: "Solid early retention with mild late drop-off.",
+        insights: ["Hook retention is above average for similar channels."],
+      },
+    };
+    const validated = validateFingerprint(withPerformance);
+    expect(validated.performanceProfile?.metrics.retentionSeries?.length).toBe(3);
+    expect(validated.performanceProfile?.scores.hookRetention).toBe(72);
+    expect(validated.hasPerformanceData).toBe(true);
+  });
+
+  it("rejects performance profiles with invalid retention points", () => {
+    const bad = {
+      ...baseFingerprint,
+      performanceProfile: {
+        scores: {
+          hookRetention: 72,
+          midVideoRetentionStability: 64,
+          lateDropOffSeverity: 35,
+          clickThroughRateQuality: 55,
+        },
+        metrics: {
+          retentionSeries: [{ timeRatio: 1.2, audienceRetention: 50 }],
+        },
+        summaryText: "Invalid retention point",
+      },
+    };
+    expect(() => validateFingerprint(bad)).toThrow(/timeRatio/);
   });
 });

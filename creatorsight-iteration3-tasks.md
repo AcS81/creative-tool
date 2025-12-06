@@ -57,7 +57,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Verify and complete the following from Iteration 2:
+- [x] Verify and complete the following from Iteration 2:
   - Seeded reference fingerprints:
     - Updated to the latest fingerprint schema (all domains populated with scores + summaries).  
     - Pass `validateFingerprint` and match TypeScript/Zod types.  
@@ -78,13 +78,13 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] All Iteration 2 checkboxes that impact analysis, fingerprints, similarity, or insights are either:
+- [x] All Iteration 2 checkboxes that impact analysis, fingerprints, similarity, or insights are either:
   - Implemented and verified, or  
   - Explicitly deferred with justification in comments/docs.  
-- [ ] `/api/analyze`:
+- [x] `/api/analyze`:
   - Returns consistent, typed success and error structures.  
   - Never leaves `VideoAnalysis` rows in ambiguous states.  
-- [ ] Nearest-reference and “Where you’re unusual” outputs are stable and reproducible for the same inputs.
+- [x] Nearest-reference and “Where you’re unusual” outputs are stable and reproducible for the same inputs.
 
 ---
 
@@ -99,11 +99,11 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Define or refine a small design token set in Tailwind / CSS:
+- [x] Define or refine a small design token set in Tailwind / CSS:
   - Typography scale (e.g. `text-xs`–`text-3xl`) with semantic usage (`heading`, `subheading`, `body`, `caption`).  
   - Spacing scale (`gap`, `padding`, `margin`), focusing on consistent vertical rhythm.  
   - Color palette tuned for analysis dashboards (backgrounds, neutrals, accent colors for charts and archetypes).  
-- [ ] Apply tokens to:
+- [x] Apply tokens to:
   - Top-level app layout.  
   - Buttons, inputs, cards used in analysis pages.  
 
@@ -114,8 +114,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Overview and domain pages use a consistent typography, spacing, and color system.  
-- [ ] No obvious one-off styles where shared tokens/components would be appropriate.
+- [x] Overview and domain pages use a consistent typography, spacing, and color system.  
+- [x] No obvious one-off styles where shared tokens/components would be appropriate.
 
 ---
 
@@ -128,10 +128,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Implement or refine an app shell that includes:
+- [x] Implement or refine an app shell that includes:
   - Top navigation with product name, simple logo, and link back to the landing/home page.  
   - Entry point for analysis (URL input) and a way to get back to the last analysis.  
-- [ ] For analysis views:
+- [x] For analysis views:
   - Provide persistent domain navigation (tabs or pill-nav) for:
     - `Overview`, `Voice`, `Language`, `Narrative`, `Visual`, `Editing`, `Sound`.  
   - Ensure tab state is reflected in the URL or at least in client-side state so deep linking is possible later.
@@ -141,12 +141,12 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 - Keep navigation lightweight; no complex auth flows yet.  
 - Layout must work on desktop and mobile.
 
-**Acceptance Criteria**
+- **Acceptance Criteria**
 
-- [ ] A user can:
+- [x] A user can:
   - Land on home, paste a URL, run analysis.  
   - Navigate between Overview and domain tabs without losing current analysis data.  
-- [ ] The shell feels like a single product, not disjointed pages.
+- [x] The shell feels like a single product, not disjointed pages.
 
 ---
 
@@ -161,26 +161,26 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Redesign the top section of Overview to include:
+- [x] Redesign the top section of Overview to include:
   - Video metadata card:
     - Thumbnail, title, channel, duration, publish date.  
   - Primary archetype card:
     - Overall archetype name.  
     - 2–3 line description.  
     - Chips showing per-domain archetypes (Voice, Language, Narrative, Visual, Editing, Sound).  
-- [ ] Use clear headings and subtle dividers to separate metadata from creative fingerprint content.
+- [x] Use clear headings and subtle dividers to separate metadata from creative fingerprint content.
 
 **Constraints**
 
 - Use existing data from Iteration 2 (YouTube metadata + fingerprint).  
 - Avoid overwhelming users with text; keep the hero section scannable.
 
-**Acceptance Criteria**
+- **Acceptance Criteria**
 
-- [ ] Overview hero shows:
+- [x] Overview hero shows:
   - Video metadata.  
   - Overall archetype card with domain chips.  
-- [ ] Layout is responsive and readable on both mobile and desktop.
+- [x] Layout is responsive and readable on both mobile and desktop.
 
 ---
 
@@ -193,7 +193,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Refine the Overview radar chart:
+- [x] Refine the Overview radar chart:
   - Clear axis labels matching PRD meta axes:
     - Voice intensity  
     - Conceptual depth  
@@ -202,7 +202,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
     - Production polish  
   - Legend explaining user vs niche-average polygon.  
   - Tooltips or hover/press states that show numeric values and short copy for each axis.  
-- [ ] Improve “Closest neighbours” section:
+- [x] Improve “Closest neighbours” section:
   - Show a small row of reference creators with:
     - Display name.  
     - Domain-specific closeness labels (e.g. “Voice closest to X”).  
@@ -215,10 +215,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Radar chart and neighbours:
+- [x] Radar chart and neighbours:
   - Render reliably for a valid fingerprint.  
   - Provide enough context (labels, legend) for a new user to interpret them.  
-- [ ] On mobile, chart and neighbours remain usable without horizontal scrolling.
+- [x] On mobile, chart and neighbours remain usable without horizontal scrolling.
 
 ---
 
@@ -231,11 +231,11 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Implement explicit UI states on Overview for:
+- [x] Implement explicit UI states on Overview for:
   - No analysis yet (prompt user to paste a URL).  
   - Analysis in progress (skeletons/spinners with short explanations).  
   - Analysis failed (clear error message, surface of `failureReason` if appropriate, and a “Try again” affordance).  
-- [ ] Ensure these states are wired to real backend statuses from `/api/analyze`.
+- [x] Ensure these states are wired to real backend statuses from `/api/analyze`.
 
 **Constraints**
 
@@ -244,8 +244,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Manual tests confirm each state appears correctly under the corresponding backend conditions.  
-- [ ] Overview never shows half-rendered content; there is always a meaningful state.
+- [x] Manual tests confirm each state appears correctly under the corresponding backend conditions.  
+- [x] Overview never shows half-rendered content; there is always a meaningful state.
 
 ---
 
@@ -260,13 +260,13 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Create a reusable `DomainView` layout component (e.g. `src/components/analysis/DomainView.tsx`) that provides:
+- [x] Create a reusable `DomainView` layout component (e.g. `src/components/analysis/DomainView.tsx`) that provides:
   - Header (“Your {Domain}”).  
   - Primary archetype + optional secondary archetype.  
   - Short summary paragraph.  
   - Slot for domain-specific visual (radar or bar chart).  
   - Slot for domain-specific tags or metrics.  
-- [ ] Refactor each domain tab (`Voice`, `Language`, `Narrative`, `Visual`, `Editing`, `Sound`) to use this template.
+- [x] Refactor each domain tab (`Voice`, `Language`, `Narrative`, `Visual`, `Editing`, `Sound`) to use this template.
 
 **Constraints**
 
@@ -275,8 +275,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] All domain tabs render via the shared layout component.  
-- [ ] The UI across domains feels cohesive (same basic structure, domain-specific content).
+- [x] All domain tabs render via the shared layout component.  
+- [x] The UI across domains feels cohesive (same basic structure, domain-specific content).
 
 ---
 
@@ -287,13 +287,13 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 - PRD Sections 4.2–4.3 (radar/pentagram per domain, small supporting visuals).  
 - We want domains to feel more than just text.
 
-**Goals**
+- **Goals**
 
-- [ ] For each domain:
+- [x] For each domain:
   - Implement a small visual representation of key scores:
     - Radar chart or bar chart with 4–6 axes relevant to the domain (e.g. Voice = Energy, Expressiveness, Clarity, Warmth, Flow).  
   - Render a set of tags/badges summarizing key qualitative descriptors (e.g. “High energy”, “Abstract-heavy”, “Pattern interrupts often”).  
-- [ ] Ensure visuals and tags are driven by fingerprint domain scores and summary fields, not hardcoded placeholders.
+- [x] Ensure visuals and tags are driven by fingerprint domain scores and summary fields, not hardcoded placeholders.
 
 **Constraints**
 
@@ -302,10 +302,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Each domain tab shows:
+- [x] Each domain tab shows:
   - A domain-specific visual.  
   - Tags summarizing the domain style.  
-- [ ] Visuals render correctly even when some scores are missing (e.g. fallback to text-only state).
+- [x] Visuals render correctly even when some scores are missing (e.g. fallback to text-only state).
 
 ---
 
@@ -316,12 +316,12 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 - PRD Sections 4.2–4.3 (domain descriptions, archetype explanations).  
 - The PRD emphasizes short, human-readable explanations.
 
-**Goals**
+- **Goals**
 
-- [ ] Create a small, hand-authored library of archetype descriptions per domain (config or JSON in `src/lib/archetypes/`), e.g.:
+- [x] Create a small, hand-authored library of archetype descriptions per domain (config or JSON in `src/lib/archetypes/`), e.g.:
   - Voice: “Reflective Analyst”, “Storyteller Host”, “Hyperactive Commentator”.  
   - Narrative: “Essayist with Beats”, “Linear Explainer”, etc.  
-- [ ] Wire domain views to:
+- [x] Wire domain views to:
   - Display these archetype descriptions based on the fingerprint’s `primaryArchetype` / `secondaryArchetype`.  
   - Fallback gracefully when an archetype name has no defined description.
 
@@ -332,8 +332,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] For common archetypes, domain views show meaningful descriptions.  
-- [ ] For unknown archetypes, the UI shows a simple, generic fallback.
+- [x] For common archetypes, domain views show meaningful descriptions.  
+- [x] For unknown archetypes, the UI shows a simple, generic fallback.
 
 ---
 
@@ -348,7 +348,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Extend `src/lib/analysis/insights.ts` (or equivalent) to:
+- [x] Extend `src/lib/analysis/insights.ts` (or equivalent) to:
   - Compute:
     - Global meta-axis comparisons vs reference library (percentiles).  
     - Simple domain-level comparisons (e.g. “Your narrative structure is stronger than X% of reference videos in this archetype”).  
@@ -356,7 +356,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
     - `unusualnessInsights` (where you deviate from typical).  
     - `strengthInsights` (what you’re particularly strong at).  
     - `growthInsights` (where you’re relatively weak).  
-- [ ] Keep logic rule-based and transparent; document high-level rules.
+- [x] Keep logic rule-based and transparent; document high-level rules.
 
 **Constraints**
 
@@ -365,8 +365,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] For a set of sample fingerprints, the engine returns 3–8 insights total, distributed across unusualness/strength/growth.  
-- [ ] Insights are stable and grounded in numeric differences, not random text.
+- [x] For a set of sample fingerprints, the engine returns 3–8 insights total, distributed across unusualness/strength/growth.  
+- [x] Insights are stable and grounded in numeric differences, not random text.
 
 ---
 
@@ -379,12 +379,12 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Add an “Insights” section on Overview that:
+- [x] Add an “Insights” section on Overview that:
   - Surfaces 3–5 bullets combining:
     - “Where you’re unusual vs typical”.  
     - 1–2 “growth” suggestions phrased as actions.  
   - Keeps copy short, concrete, and clearly tied to axes/domains (e.g. “Your conceptual depth is in the top 10% of our reference set; consider pairing it with more visual examples to stay accessible.”).  
-- [ ] Ensure section degrades nicely when reference data is missing (fallback message).
+- [x] Ensure section degrades nicely when reference data is missing (fallback message).
 
 **Constraints**
 
@@ -393,10 +393,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] After an analysis, Overview always shows either:
+- [x] After an analysis, Overview always shows either:
   - 3–5 concise, meaningful insights, or  
   - A clear explanation that reference data is insufficient.  
-- [ ] Insights reference specific axes or domains rather than generic “make better videos” advice.
+- [x] Insights reference specific axes or domains rather than generic “make better videos” advice.
 
 ---
 
@@ -409,10 +409,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] For each domain view, add a small “Domain Insights” block that:
+- [x] For each domain view, add a small “Domain Insights” block that:
   - Shows 2–3 domain-specific observations derived from the generalized insights engine.  
   - Optionally includes one suggestion aligned with the archetype (e.g. Voice: “You have high warmth but low dynamism; try varying your pacing in key moments.”).  
-- [ ] Reuse the same underlying insights logic to avoid duplication.
+- [x] Reuse the same underlying insights logic to avoid duplication.
 
 **Constraints**
 
@@ -421,10 +421,10 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Each domain tab shows:
+- [x] Each domain tab shows:
   - At least one domain-specific insight when data is available.  
   - A gentle fallback when insights cannot be computed.  
-- [ ] Insights and suggestions feel coherent with the Overview “Insights” section.
+- [x] Insights and suggestions feel coherent with the Overview “Insights” section.
 
 ---
 
@@ -439,9 +439,9 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Add a simple “Try a sample analysis” button on the landing or Overview empty state that:
+- [x] Add a simple “Try a sample analysis” button on the landing or Overview empty state that:
   - Loads a pre-seeded `VideoAnalysis` + `VideoFingerprint` from the DB (or a static JSON) and renders it as if the user had just analyzed that video.  
-- [ ] Ensure this sample uses:
+- [x] Ensure this sample uses:
   - Realistic fingerprints.  
   - Archetypes and insights that showcase the UI.
 
@@ -452,8 +452,8 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Clicking “Try a sample analysis” on a fresh setup yields a fully populated Overview + domain views without entering a URL.  
-- [ ] The sample path works even if external API keys are missing (mock mode).
+- [x] Clicking “Try a sample analysis” on a fresh setup yields a fully populated Overview + domain views without entering a URL.  
+- [x] The sample path works even if external API keys are missing (mock mode).
 
 ---
 
@@ -466,7 +466,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Goals**
 
-- [ ] Update `README.md` and/or add `docs/iteration_3_e2e.md` to describe:
+- [x] Update `README.md` and/or add `docs/iteration_3_e2e.md` to describe:
   - Current analysis capabilities (Gemini-powered creative fingerprint).  
   - New UX features: Overview 2.0, domain views, insights.  
   - How to run:
@@ -475,7 +475,7 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
   - How to trigger and explore:
     - A real analysis run.  
     - The sample/demo analysis.  
-- [ ] Perform a manual E2E run following the docs and adjust any misleading steps.
+- [x] Perform a manual E2E run following the docs and adjust any misleading steps.
 
 **Constraints**
 
@@ -484,11 +484,11 @@ Those become the focus of Iteration 4 (“Performance-Aware Coaching Slice”).
 
 **Acceptance Criteria**
 
-- [ ] Fresh environment can follow docs to:
+- [x] Fresh environment can follow docs to:
   - Run the app.  
   - Trigger either a real or sample analysis.  
   - Explore Overview and domain views with insights.  
-- [ ] All existing tests still pass; any new tests for UX behavior (where applicable) are green.
+- [x] All existing tests still pass; any new tests for UX behavior (where applicable) are green.
 
 ---
 
@@ -498,31 +498,31 @@ Use this checklist to confirm **Iteration 3** is complete before moving on.
 
 ### ✅ Base Stability
 
-- [ ] Iteration 2 gaps impacting analysis, fingerprints, similarity, or insights are closed or explicitly deferred.  
-- [ ] Seeded reference fingerprints align with the current schema and validation.
+- [x] Iteration 2 gaps impacting analysis, fingerprints, similarity, or insights are closed or explicitly deferred.  
+- [x] Seeded reference fingerprints align with the current schema and validation.
 
 ### ✅ UX & Layout
 
-- [ ] App shell, typography, spacing, and color usage feel cohesive.  
-- [ ] Navigation between Overview and domain tabs is smooth on desktop and mobile.
+- [x] App shell, typography, spacing, and color usage feel cohesive.  
+- [x] Navigation between Overview and domain tabs is smooth on desktop and mobile.
 
 ### ✅ Overview & Domains
 
-- [ ] Overview hero shows video metadata and archetype card with domain chips.  
-- [ ] Radar + neighbours are clearly labeled and interpretable.  
-- [ ] Domain views share a consistent layout and each includes a visual + tags + archetype descriptions.
+- [x] Overview hero shows video metadata and archetype card with domain chips.  
+- [x] Radar + neighbours are clearly labeled and interpretable.  
+- [x] Domain views share a consistent layout and each includes a visual + tags + archetype descriptions.
 
 ### ✅ Insights & Coaching v1
 
-- [ ] “Insights” section on Overview surfaces 3–5 grounded insights per analysis when reference data exists.  
-- [ ] Each domain tab has at least one domain-specific micro-insight where data allows.  
-- [ ] Insights are rule-based, deterministic, and grounded in the fingerprint vs references.
+- [x] “Insights” section on Overview surfaces 3–5 grounded insights per analysis when reference data exists.  
+- [x] Each domain tab has at least one domain-specific micro-insight where data allows.  
+- [x] Insights are rule-based, deterministic, and grounded in the fingerprint vs references.
 
 ### ✅ Dev & E2E
 
-- [ ] Demo/sample analysis works without external keys.  
-- [ ] README / iteration 3 docs describe the polished UX and how to experience it.  
-- [ ] Manual E2E flows succeed on a fresh environment.
+- [x] Demo/sample analysis works without external keys.  
+- [x] README / iteration 3 docs describe the polished UX and how to experience it.  
+- [x] Manual E2E flows succeed on a fresh environment.
 
 ---
 
@@ -534,4 +534,3 @@ Use this checklist to confirm **Iteration 3** is complete before moving on.
   - Polishing the UX and visual design across Overview and domain views.  
   - Deepening “Where you’re unusual” into a small but meaningful insights/coaching layer—purely from creative fingerprints and references, without yet requiring Analytics.  
   - Setting a strong experiential foundation for a future Iteration 4 focused on **Performance / YouTube Analytics** and richer coaching.
-

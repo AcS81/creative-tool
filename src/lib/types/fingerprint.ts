@@ -76,6 +76,36 @@ export interface BeatSegment {
   devices: string[];
 }
 
+export interface RetentionPoint {
+  timeRatio: number; // 0-1 ratio of video progress
+  audienceRetention: number; // normalized percentage 0-100
+  beatLabel?: string;
+  sceneLabel?: string;
+}
+
+export interface PerformanceScores {
+  hookRetention: number;
+  midVideoRetentionStability: number;
+  lateDropOffSeverity: number;
+  clickThroughRateQuality: number;
+}
+
+export interface PerformanceMetrics {
+  views?: number;
+  likes?: number;
+  comments?: number;
+  ctr?: number;
+  avgViewDurationSeconds?: number;
+  retentionSeries?: RetentionPoint[];
+}
+
+export interface PerformanceProfile {
+  scores: PerformanceScores;
+  metrics: PerformanceMetrics;
+  summaryText: string;
+  insights?: string[];
+}
+
 export interface VideoFingerprintJson {
   version: "1.1.0";
   createdAt: string;
@@ -87,6 +117,8 @@ export interface VideoFingerprintJson {
     sceneSegments?: SceneSegment[];
     beats?: BeatSegment[];
   };
+  performanceProfile?: PerformanceProfile;
+  hasPerformanceData?: boolean;
 }
 
 export interface VideoFingerprint {
