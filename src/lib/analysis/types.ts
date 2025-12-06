@@ -5,6 +5,7 @@ export interface AnalyzeVideoInput {
   title?: string;
   durationSeconds?: number;
   creatorDisplayName?: string;
+  channelId?: string;
 }
 
 export interface AnalyzeVideoResult {
@@ -13,5 +14,6 @@ export interface AnalyzeVideoResult {
   diagnostics?: {
     source: "mock" | "gemini";
     hashSeed?: number;
+    performanceAttached?: boolean;
   };
 }

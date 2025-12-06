@@ -12,10 +12,15 @@ import {
 } from "./geminiDomains";
 import type { DomainProfile, MetaAxes, VideoFingerprintJson } from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
+import { fetchVideoAnalytics } from "../youtube/analytics";
+import { buildPerformanceTimeline } from "./performanceTimeline";
+import { buildPerformanceProfile } from "./performanceProfile";
+import type { AuthContext } from "../auth/context";
 
 type AnalyzeOptions = {
   config?: AppConfig;
   useMock?: boolean;
+  auth?: AuthContext | null;
 };
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -88,7 +93,7 @@ export async function analyzeVideo(
 
   const overallArchetype = archetypeForMeta(metaAxes);
 
-  const fingerprint: VideoFingerprintJson = validateFingerprint({
+  let fingerprint: VideoFingerprintJson = {
     version: "1.1.0",
     createdAt: new Date().toISOString(),
     metaAxes,
@@ -105,10 +110,36 @@ export async function analyzeVideo(
       transcriptSegments: transcriptAndScenes.transcriptSegments,
       sceneSegments: transcriptAndScenes.sceneSegments,
     },
-  });
+    hasPerformanceData: false,
+  };
+
+  if (config.performanceEnabled && options.auth?.userId && input.channelId) {
+    try {
+      const analytics = await fetchVideoAnalytics(
+        { videoId: input.videoId, channelId: input.channelId, auth: options.auth },
+        { config },
+      );
+      const timeline = buildPerformanceTimeline({
+        retentionSeries: analytics.retentionSeries,
+        beats: fingerprint.supporting?.beats,
+        scenes: fingerprint.supporting?.sceneSegments,
+        durationSeconds: input.durationSeconds,
+      });
+      const performanceProfile = buildPerformanceProfile({ analytics, timeline });
+      fingerprint = {
+        ...fingerprint,
+        performanceProfile,
+        hasPerformanceData: true,
+      };
+    } catch (error) {
+      console.error("Performance analytics failed; continuing without performance data", error);
+    }
+  }
+
+  const validated = validateFingerprint(fingerprint);
 
   return {
-    fingerprint,
+    fingerprint: validated,
     overallArchetype,
     diagnostics: { source: "gemini" },
   };

@@ -9,6 +9,7 @@ import { ConfigError, getAppConfig } from "../../../lib/config";
 import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api";
 import { GeminiApiError } from "../../../lib/gemini/client";
 import { computeAverageMetaAxes, findNearestReferences } from "../../../lib/analysis/similarity";
+import { getAuthContext } from "../../../lib/auth/context";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -114,9 +115,11 @@ export async function POST(request: Request) {
     });
     videoAnalysisId = videoAnalysis.id;
 
+    const authContext = await getAuthContext();
+
     const analysisResult = await analyzeVideo(
-      { videoId, title, durationSeconds, creatorDisplayName },
-      { config },
+      { videoId, title, durationSeconds, creatorDisplayName, channelId: metadata.channelId },
+      { config, auth: authContext ?? undefined },
     );
 
     await prisma.videoFingerprint.create({
