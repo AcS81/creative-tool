@@ -275,7 +275,7 @@ New configuration:
 
 **Goals**
 
-- [ ] In `src/lib/analysis/service.ts`, extend `analyzeVideo(input, options)` to support:
+- [x] In `src/lib/analysis/service.ts`, extend `analyzeVideo(input, options)` to support:
   - `ANALYSIS_MODE=mock`: current behavior (Iteration 1).  
   - `ANALYSIS_MODE=gemini`: new behavior:
     1. Call `getTranscriptAndScenes`.  
@@ -283,7 +283,7 @@ New configuration:
     3. Aggregate into a full `VideoFingerprint`.  
     4. Compute meta axes from domain scores (or accept them directly if domain functions supply them).  
     5. Derive an overall archetype name from meta axes (similar to mock, but now based on real outputs).  
-- [ ] Keep function’s external `AnalyzeVideoResult` shape stable:
+- [x] Keep function’s external `AnalyzeVideoResult` shape stable:
   - `{ fingerprint, overallArchetype, diagnostics }`.
 
 **Constraints**
@@ -293,11 +293,11 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] `ANALYSIS_MODE=mock` -> unchanged behavior from Iteration 1.  
-- [ ] `ANALYSIS_MODE=gemini`:
+- [x] `ANALYSIS_MODE=mock` -> unchanged behavior from Iteration 1.  
+- [x] `ANALYSIS_MODE=gemini`:
   - For a sample video, returns a valid `VideoFingerprint` + archetype.  
   - `validateFingerprint` passes.  
-- [ ] At least one integration-style test (with mocked Gemini + YouTube API) runs the full pipeline and asserts:
+- [x] At least one integration-style test (with mocked Gemini + YouTube API) runs the full pipeline and asserts:
   - Meta axes are within 0–100.  
   - Domain profiles populated.  
   - Archetype string present.
@@ -529,9 +529,9 @@ Use this checklist to confirm **Iteration 2** is complete before planning Iterat
 
 ### ✅ Phase 2 – Gemini Pipeline
 
-- [ ] Gemini client returns transcript and scenes.  
-- [ ] Domain analysis functions produce valid domain profiles.  
-- [ ] `analyzeVideo` supports both mock and Gemini modes.  
+- [x] Gemini client returns transcript and scenes.  
+- [x] Domain analysis functions produce valid domain profiles.  
+- [x] `analyzeVideo` supports both mock and Gemini modes.  
 
 ### ✅ Phase 3 – API & Persistence
 

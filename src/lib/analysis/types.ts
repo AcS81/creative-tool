@@ -11,7 +11,7 @@ export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   diagnostics?: {
-    source: "mock";
-    hashSeed: number;
+    source: "mock" | "gemini";
+    hashSeed?: number;
   };
 }
