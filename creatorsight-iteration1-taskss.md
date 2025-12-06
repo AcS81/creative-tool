@@ -316,14 +316,14 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Define an interface in `src/lib/analysis/types.ts`:
+- [x] Define an interface in `src/lib/analysis/types.ts`:
   - `AnalyzeVideoInput` (includes `videoId`, optional metadata).  
   - `AnalyzeVideoResult` (includes `fingerprint`, high-level archetype name, diagnostic info).  
-- [ ] Implement `mockAnalyzeVideo(input)` that:
+- [x] Implement `mockAnalyzeVideo(input)` that:
   - Uses the fingerprint Zod schema to output **valid** fingerprints.  
   - Generates deterministic values from `videoId` (e.g., via a simple hash) so re-runs are stable.  
   - Assigns a plausible overall archetype name based on meta axes (e.g., high intensity + high dynamism = “Hyperactive Commentator”).  
-- [ ] Wrap this in a service in `src/lib/analysis/service.ts`:
+- [x] Wrap this in a service in `src/lib/analysis/service.ts`:
   - `analyzeVideo(input, { useMock: boolean })` → currently only `mock`, but shaped to later plug in Gemini.
 
 **Constraints**
@@ -334,10 +334,10 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] `mockAnalyzeVideo` returns a result within ~100ms.  
-- [ ] Two calls with same `videoId` produce identical results.  
-- [ ] The returned fingerprint passes `validateFingerprint`.  
-- [ ] At least 3–4 distinct archetype labels possible, determined by meta axes.
+- [x] `mockAnalyzeVideo` returns a result within ~100ms.  
+- [x] Two calls with same `videoId` produce identical results.  
+- [x] The returned fingerprint passes `validateFingerprint`.  
+- [x] At least 3–4 distinct archetype labels possible, determined by meta axes.
 
 **Manual Test**
 
@@ -350,7 +350,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Task Complete When**
 
 - [ ] Service & interface committed with tests.  
-- [ ] This service is ready for API integration.
+- [x] This service is ready for API integration.
 
 ---
 
