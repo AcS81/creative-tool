@@ -104,5 +104,7 @@ describe("POST /api/analyze", () => {
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();
     expect((json.fingerprint as VideoFingerprintJson).metaAxes.voiceIntensity).toBeGreaterThanOrEqual(0);
+    expect(json.metadata?.title).toBe("Sample Test Video");
+    expect(json.metadata?.durationSeconds).toBe(120);
   });
 });

@@ -142,6 +142,12 @@ export async function POST(request: Request) {
       nearestReferences,
       nicheAverageMetaAxes: averageMetaAxes,
       insights,
+      metadata: {
+        title: metadata.title,
+        channelTitle: metadata.channelTitle,
+        publishedAt: metadata.publishedAt,
+        durationSeconds,
+      },
     });
   } catch (error) {
     if (error instanceof ConfigError) {

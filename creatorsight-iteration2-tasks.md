@@ -381,13 +381,13 @@ New configuration:
 
 **Goals**
 
-- [ ] On successful analysis, show basic YouTube metadata on the Overview:
+- [x] On successful analysis, show basic YouTube metadata on the Overview:
   - Title  
   - Channel name  
   - Publish date  
   - Duration  
-- [ ] Use the real `overallArchetype` from the Gemini-powered pipeline.  
-- [ ] Keep the existing radar chart but ensure it uses the updated meta axes.
+- [x] Use the real `overallArchetype` from the Gemini-powered pipeline.  
+- [x] Keep the existing radar chart but ensure it uses the updated meta axes.
 
 **Constraints**
 
@@ -395,9 +395,9 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] After an analysis in Gemini mode:
+- [x] After an analysis in Gemini mode:
   - Overview shows metadata + radar chart + archetype.  
-- [ ] In mock mode, Overview behavior remains as in Iteration 1 (metadata may be stubbed or omitted).
+- [x] In mock mode, Overview behavior remains as in Iteration 1 (metadata may be stubbed or omitted).
 
 ---
 

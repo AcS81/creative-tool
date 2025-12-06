@@ -15,6 +15,12 @@ type AnalyzeResponse = {
   nearestReferences: NearestReference[];
   nicheAverageMetaAxes?: VideoFingerprintJson["metaAxes"] | null;
   insights?: string[];
+  metadata?: {
+    title?: string;
+    channelTitle?: string;
+    publishedAt?: string;
+    durationSeconds?: number;
+  };
 };
 
 export default function Home() {
@@ -122,6 +128,21 @@ export default function Home() {
                     <p className="text-2xl font-semibold">{result.overallArchetype}</p>
                     <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
                   </div>
+                  {result.metadata ? (
+                    <div className="rounded-md border border-border bg-surface px-4 py-3 text-sm text-muted">
+                      <p className="font-semibold text-foreground">{result.metadata.title}</p>
+                      <p>{result.metadata.channelTitle}</p>
+                      <p>
+                        {result.metadata.publishedAt
+                          ? new Date(result.metadata.publishedAt).toLocaleDateString()
+                          : "Publish date unknown"}
+                        {" • "}
+                        {typeof result.metadata.durationSeconds === "number"
+                          ? formatDuration(result.metadata.durationSeconds)
+                          : "Duration unknown"}
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 <RadarChartOverview
@@ -192,4 +213,16 @@ export default function Home() {
       )}
     </main>
   );
+}
+
+function formatDuration(totalSeconds: number): string {
+  if (!Number.isFinite(totalSeconds)) return "Unknown";
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = Math.floor(totalSeconds % 60);
+  const parts = [];
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  parts.push(`${seconds}s`);
+  return parts.join(" ");
 }
