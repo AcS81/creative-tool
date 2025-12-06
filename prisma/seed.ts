@@ -40,10 +40,9 @@ const referenceCreators: SeedCreator[] = [
 ];
 
 const makeDomain = (label: string, value: number) => ({
-  archetype: `${label} Archetype`,
-  summary: `${label} summary`,
-  description: `${label} description`,
-  axes: [
+  primaryArchetype: `${label} Archetype`,
+  summaryText: `${label} summary`,
+  scores: [
     {
       key: `${label.toLowerCase()}-axis`,
       label: `${label} Axis`,
@@ -55,7 +54,7 @@ const makeDomain = (label: string, value: number) => ({
 
 const makeFingerprint = (seed: SeedCreator, base: number) => {
   const fingerprint = {
-    version: "1.0.0" as const,
+    version: "1.1.0" as const,
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: 60 + base,

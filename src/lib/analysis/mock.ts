@@ -1,6 +1,6 @@
 import { validateFingerprint } from "../schemas/fingerprint";
 import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
-import type { AxisScore, DomainProfile, VideoFingerprintJson } from "../types";
+import type { DomainScore, DomainProfile, VideoFingerprintJson } from "../types";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -15,17 +15,17 @@ const hashStringToNumber = (input: string) => {
 const deriveScore = (seed: number, salt: number) =>
   clamp(((seed + salt * 9973) % 101) + (salt % 7) - 3);
 
-const axis = (key: string, label: string, value: number): AxisScore => ({
+const score = (key: string, label: string, value: number): DomainScore => ({
   key,
   label,
   value,
 });
 
 const buildDomain = (label: string, base: number): DomainProfile => ({
-  archetype: `${label} Archetype`,
-  summary: `${label} summary based on mock analysis.`,
-  description: `${label} description placeholder.`,
-  axes: [axis(`${label.toLowerCase()}-axis`, `${label} Axis`, clamp(base))],
+  primaryArchetype: `${label} Archetype`,
+  secondaryArchetype: `Alt ${label} Archetype`,
+  summaryText: `${label} summary based on mock analysis.`,
+  scores: [score(`${label.toLowerCase()}-axis`, `${label} Axis`, clamp(base))],
   highlights: [`Mock highlight for ${label.toLowerCase()}`],
 });
 
@@ -40,7 +40,7 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   const seed = hashStringToNumber(input.videoId);
 
   const fingerprint: VideoFingerprintJson = {
-    version: "1.0.0",
+    version: "1.1.0",
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: deriveScore(seed, 1),
@@ -58,6 +58,18 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
       soundProfile: buildDomain("Sound", deriveScore(seed, 11)),
     },
     overallArchetype: "",
+    supporting: {
+      transcriptSegments: [
+        { startSeconds: 0, endSeconds: 30, text: "Intro segment" },
+        { startSeconds: 30, endSeconds: 60, text: "Body segment" },
+      ],
+      sceneSegments: [
+        { startSeconds: 0, endSeconds: 30, label: "Intro", shortSummary: "Opening remarks" },
+      ],
+      beats: [
+        { startSeconds: 5, endSeconds: 25, label: "Hook", devices: ["contrast"] },
+      ],
+    },
   };
 
   const overallArchetype = archetypeForMeta(fingerprint.metaAxes);

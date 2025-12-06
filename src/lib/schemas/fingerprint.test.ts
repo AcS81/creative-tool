@@ -2,15 +2,15 @@ import { describe, expect, it } from "vitest";
 import { fingerprintSchema, isValidFingerprint, validateFingerprint } from "./fingerprint";
 
 const sampleDomain = (label: string) => ({
-  archetype: `${label} Archetype`,
-  summary: `${label} summary`,
-  description: `${label} description`,
-  axes: [{ key: `${label.toLowerCase()}-axis`, label: `${label} Axis`, value: 72 }],
+  primaryArchetype: `${label} Archetype`,
+  secondaryArchetype: `Alt ${label} Archetype`,
+  summaryText: `${label} summary`,
+  scores: [{ key: `${label.toLowerCase()}-axis`, label: `${label} Axis`, value: 72 }],
   highlights: ["Consistent pacing"],
 });
 
 const baseFingerprint = {
-  version: "1.0.0",
+  version: "1.1.0",
   createdAt: new Date().toISOString(),
   metaAxes: {
     voiceIntensity: 65,
@@ -28,13 +28,20 @@ const baseFingerprint = {
     soundProfile: sampleDomain("Sound"),
   },
   overallArchetype: "Reflective Analyst",
+  supporting: {
+    transcriptSegments: [{ startSeconds: 0, endSeconds: 10, text: "Intro" }],
+    sceneSegments: [
+      { startSeconds: 0, endSeconds: 10, label: "Intro", shortSummary: "Opening" },
+    ],
+    beats: [{ startSeconds: 0, endSeconds: 10, label: "Hook", devices: ["contrast"] }],
+  },
 };
 
 describe("fingerprint schema", () => {
   it("accepts a valid fingerprint", () => {
     const validated = validateFingerprint(baseFingerprint);
-    expect(validated.version).toBe("1.0.0");
-    expect(validated.perDomain.voiceProfile.archetype).toContain("Voice");
+    expect(validated.version).toBe("1.1.0");
+    expect(validated.perDomain.voiceProfile.primaryArchetype).toContain("Voice");
   });
 
   it("rejects missing required sections with a helpful error", () => {
@@ -43,13 +50,18 @@ describe("fingerprint schema", () => {
   });
 
   it("flags invalid objects via isValidFingerprint", () => {
-    const withBadVersion = { ...baseFingerprint, version: "0.9.0" };
+    const withBadVersion = { ...baseFingerprint, version: "1.0.0" };
     expect(isValidFingerprint(withBadVersion)).toBe(false);
     expect(isValidFingerprint(baseFingerprint)).toBe(true);
   });
 
   it("matches the zod schema inference", () => {
     const parsed = fingerprintSchema.parse(baseFingerprint);
-    expect(parsed.perDomain.editingProfile.axes[0].value).toBeTypeOf("number");
+    expect(parsed.perDomain.editingProfile.scores[0].value).toBeTypeOf("number");
+  });
+
+  it("throws descriptive error for unsupported version", () => {
+    const legacy = { ...baseFingerprint, version: "1.0.0" };
+    expect(() => validateFingerprint(legacy)).toThrow(/unsupported version 1.0.0/i);
   });
 });

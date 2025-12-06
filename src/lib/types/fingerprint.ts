@@ -28,11 +28,13 @@ export interface AxisScore {
   value: number;
 }
 
+export type DomainScore = AxisScore;
+
 export interface DomainProfile {
-  archetype: string;
-  summary: string;
-  description: string;
-  axes: AxisScore[];
+  primaryArchetype: string;
+  secondaryArchetype?: string;
+  summaryText: string;
+  scores: DomainScore[];
   highlights?: string[];
 }
 
@@ -53,12 +55,37 @@ export interface FingerprintPerDomain {
   soundProfile: DomainProfile;
 }
 
+export interface TranscriptSegment {
+  startSeconds: number;
+  endSeconds: number;
+  text: string;
+}
+
+export interface SceneSegment {
+  startSeconds: number;
+  endSeconds: number;
+  label: string;
+  shortSummary: string;
+}
+
+export interface BeatSegment {
+  startSeconds: number;
+  endSeconds: number;
+  label: string;
+  devices: string[];
+}
+
 export interface VideoFingerprintJson {
-  version: "1.0.0";
+  version: "1.1.0";
   createdAt: string;
   metaAxes: MetaAxes;
   perDomain: FingerprintPerDomain;
   overallArchetype?: string;
+  supporting?: {
+    transcriptSegments?: TranscriptSegment[];
+    sceneSegments?: SceneSegment[];
+    beats?: BeatSegment[];
+  };
 }
 
 export interface VideoFingerprint {

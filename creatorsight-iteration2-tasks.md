@@ -97,8 +97,8 @@ New configuration:
     - `channelTitle`  
     - `publishedAt`  
     - `durationSeconds`  
-- [ ] Use YouTube Data API v3 `videos.list` (or equivalent) under the hood.  
-- [ ] Normalize errors (invalid ID, quota exceeded, not found, etc.) into a typed error object.
+- [x] Use YouTube Data API v3 `videos.list` (or equivalent) under the hood.  
+- [x] Normalize errors (invalid ID, quota exceeded, not found, etc.) into a typed error object.
 
 **Constraints**
 
@@ -127,7 +127,7 @@ New configuration:
 
 **Goals**
 
-- [ ] In `src/lib/types/` and `src/lib/schemas/fingerprint.ts`, extend `VideoFingerprint` to include:
+- [x] In `src/lib/types/` and `src/lib/schemas/fingerprint.ts`, extend `VideoFingerprint` to include:
   - **Meta axes** (Overview radar) – already present:
     - `voiceIntensity`  
     - `conceptualDepth`  
@@ -144,7 +144,7 @@ New configuration:
     - `supporting.transcriptSegments`: `{ startSeconds, endSeconds, text }[]` (FR-5).  
     - `supporting.sceneSegments`: `{ startSeconds, endSeconds, label, shortSummary }[]`.  
     - `supporting.beats`: `{ startSeconds, endSeconds, label, devices: string[] }[]` (FR-8).  
-- [ ] Ensure schema remains JSON-friendly and compact.
+- [x] Ensure schema remains JSON-friendly and compact.
 
 **Constraints**
 
@@ -155,11 +155,11 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] TypeScript types compile and match Zod schemas.  
-- [ ] New tests:
+- [x] TypeScript types compile and match Zod schemas.  
+- [x] New tests:
   - Valid fingerprint (with new domain fields) passes.  
   - Old-style fingerprint behavior is understood and documented (either still passes or fails with a descriptive `version`-related message).  
-- [ ] `version` is mandatory and checked in `validateFingerprint`.
+- [x] `version` is mandatory and checked in `validateFingerprint`.
 
 ---
 
@@ -524,7 +524,7 @@ Use this checklist to confirm **Iteration 2** is complete before planning Iterat
 
 ### ✅ Phase 1 – Fingerprint & Data Shape
 
-- [ ] Fingerprint schema extended with real domain structures and supporting data.  
+- [x] Fingerprint schema extended with real domain structures and supporting data.  
 - [ ] Seeded reference fingerprints updated to new schema.  
 
 ### ✅ Phase 2 – Gemini Pipeline

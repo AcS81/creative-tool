@@ -4,15 +4,14 @@ import prisma from "../../../lib/db";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
 
 const sampleDomain = (label: string, value: number) => ({
-  archetype: `${label} Archetype`,
-  summary: `${label} summary`,
-  description: `${label} description`,
-  axes: [{ key: `${label.toLowerCase()}-axis`, label: `${label} Axis`, value }],
+  primaryArchetype: `${label} Archetype`,
+  summaryText: `${label} summary`,
+  scores: [{ key: `${label.toLowerCase()}-axis`, label: `${label} Axis`, value }],
 });
 
 const buildFingerprint = (offset: number) =>
   validateFingerprint({
-    version: "1.0.0",
+    version: "1.1.0",
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: 50 + offset,
@@ -81,7 +80,7 @@ describe("POST /api/analyze", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.videoAnalysisId).toBeTruthy();
-    expect(json.fingerprint?.version).toBe("1.0.0");
+    expect(json.fingerprint?.version).toBe("1.1.0");
     expect(Array.isArray(json.nearestReferences)).toBe(true);
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();

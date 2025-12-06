@@ -17,7 +17,7 @@ describe("mockAnalyzeVideo", () => {
 
   it("validates fingerprint shape", () => {
     const result = mockAnalyzeVideo({ videoId: "valid123" });
-    expect(result.fingerprint.version).toBe("1.0.0");
-    expect(result.fingerprint.perDomain.voiceProfile.axes[0].value).toBeGreaterThanOrEqual(0);
+    expect(result.fingerprint.version).toBe("1.1.0");
+    expect(result.fingerprint.perDomain.voiceProfile.scores[0].value).toBeGreaterThanOrEqual(0);
   });
 });
