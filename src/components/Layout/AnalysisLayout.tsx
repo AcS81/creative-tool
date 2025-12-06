@@ -1,6 +1,14 @@
 import { ReactNode } from "react";
 
-type TabKey = "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound";
+type TabKey =
+  | "overview"
+  | "voice"
+  | "language"
+  | "narrative"
+  | "visual"
+  | "editing"
+  | "sound"
+  | "performance";
 
 const tabs: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -10,6 +18,7 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: "visual", label: "Visual" },
   { key: "editing", label: "Editing" },
   { key: "sound", label: "Sound" },
+  { key: "performance", label: "Performance" },
 ];
 
 export function AnalysisLayout({

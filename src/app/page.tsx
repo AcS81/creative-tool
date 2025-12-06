@@ -13,6 +13,7 @@ import { Chip } from "../components/Chip";
 import { DomainView } from "../components/DomainView";
 import { DomainRadar } from "../components/DomainRadar";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
+import { PerformanceView } from "../components/PerformanceView";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -53,6 +54,7 @@ const tabKeys = [
   "visual",
   "editing",
   "sound",
+  "performance",
 ] as const;
 
 export default function Home() {
@@ -61,7 +63,7 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound"
+    "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound" | "performance"
   >("overview");
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -91,7 +93,10 @@ export default function Home() {
     setLoading(false);
     setResult({
       videoAnalysisId: "sample-analysis",
-      fingerprint: sampleAnalysisResult.fingerprint,
+      fingerprint: {
+        ...sampleAnalysisResult.fingerprint,
+        hasPerformanceData: false,
+      } as VideoFingerprintJson,
       overallArchetype: sampleAnalysisResult.overallArchetype,
       nearestReferences: [],
       nicheAverageMetaAxes: null,
@@ -420,6 +425,12 @@ export default function Home() {
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
                     insights={result.domainInsights?.soundProfile}
+                  />
+                )}
+                {activeTab === "performance" && (
+                  <PerformanceView
+                    performanceProfile={result.fingerprint.performanceProfile}
+                    hasPerformanceData={result.fingerprint.hasPerformanceData}
                   />
                 )}
                 {!domainProfiles && (

@@ -1,0 +1,106 @@
+import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import type { PerformanceProfile } from "../lib/types";
+
+type Props = {
+  performanceProfile?: PerformanceProfile;
+  hasPerformanceData?: boolean;
+};
+
+const formatPercent = (value?: number) =>
+  typeof value === "number" ? `${value.toFixed(1)}%` : "—";
+
+export function PerformanceView({ performanceProfile, hasPerformanceData }: Props) {
+  if (!hasPerformanceData || !performanceProfile) {
+    return (
+      <div className="space-y-3 rounded-md border border-border bg-surface p-6 text-sm">
+        <p className="font-semibold text-foreground">Performance data unavailable</p>
+        <p className="text-muted">
+          Connect YouTube via OAuth to pull retention, CTR, and engagement for owned videos.
+        </p>
+        <a
+          href="/api/auth/youtube/start"
+          className="cs-button inline-flex w-fit justify-center text-xs"
+        >
+          Connect YouTube
+        </a>
+      </div>
+    );
+  }
+
+  const metrics = performanceProfile.metrics;
+  const series = metrics.retentionSeries ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+        <div>
+          <p className="cs-kicker text-[10px]">Performance summary</p>
+          <p className="text-base text-foreground">{performanceProfile.summaryText}</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Metric label="Views" value={metrics.views?.toLocaleString() ?? "—"} />
+          <Metric label="CTR" value={formatPercent(metrics.ctr)} />
+          <Metric label="Avg view duration" value={formatSeconds(metrics.avgViewDurationSeconds)} />
+          <Metric label="Likes" value={metrics.likes?.toLocaleString() ?? "—"} />
+          <Metric label="Comments" value={metrics.comments?.toLocaleString() ?? "—"} />
+          <Metric label="Late drop-off" value={`${Math.round(performanceProfile.scores.lateDropOffSeverity)} pts`} />
+        </div>
+      </div>
+
+      <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-sm font-semibold text-muted">Retention over time</p>
+          <p className="text-xs text-muted">0–100% of video</p>
+        </div>
+        {series.length === 0 ? (
+          <p className="text-sm text-muted">No retention samples available.</p>
+        ) : (
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={series}>
+                <XAxis
+                  dataKey="timeRatio"
+                  tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
+                  stroke="#94a3b8"
+                  tick={{ fontSize: 12 }}
+                />
+                <YAxis
+                  domain={[0, 100]}
+                  stroke="#94a3b8"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(v) => `${v}%`}
+                />
+                <Tooltip
+                  formatter={(value: any) => `${value.toFixed ? value.toFixed(1) : value}%`}
+                  labelFormatter={(label) => `${Math.round(Number(label) * 100)}% of video`}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="audienceRetention"
+                  stroke="#6366f1"
+                  strokeWidth={2}
+                  dot={false}
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+const Metric = ({ label, value }: { label: string; value: string }) => (
+  <div className="rounded-md border border-border/70 bg-surface-strong p-3">
+    <p className="text-xs uppercase tracking-wide text-muted">{label}</p>
+    <p className="text-base font-semibold text-foreground">{value}</p>
+  </div>
+);
+
+const formatSeconds = (value?: number) => {
+  if (!Number.isFinite(value)) return "—";
+  const mins = Math.floor((value as number) / 60);
+  const secs = Math.floor((value as number) % 60);
+  return `${mins}m ${secs}s`;
+};
