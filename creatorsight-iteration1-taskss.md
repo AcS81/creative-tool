@@ -148,7 +148,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] Types + schemas + tests committed.  
+- [x] Types + schemas + tests committed.  
 - [x] No TypeScript or linting errors.
 
 ---
@@ -254,7 +254,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 - **Task Complete When**
 
-- [ ] Seed script and documentation committed.  
+- [x] Seed script and documentation committed.  
 - [x] Validation of seeded fingerprints confirmed.
 
 ---
@@ -270,12 +270,12 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Implement `parseYouTubeUrl(url: string)` in `src/lib/youtube.ts` to:
+- [x] Implement `parseYouTubeUrl(url: string)` in `src/lib/youtube.ts` to:
   - Accept full YouTube URLs (`watch?v=…`, `youtu.be/...`, etc.).  
   - Extract the canonical `videoId`.  
   - Reject non-YouTube URLs.  
-- [ ] Add a small utility `isValidYouTubeUrl(url: string)` for client-side checks.  
-- [ ] Add unit tests for edge cases.
+- [x] Add a small utility `isValidYouTubeUrl(url: string)` for client-side checks.  
+- [x] Add unit tests for edge cases.
 
 **Constraints**
 
@@ -284,9 +284,9 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] Valid YouTube URLs return a non-empty `videoId`.  
-- [ ] Non-YouTube URLs (or malformed ones) return an error or `null`.  
-- [ ] Unit tests cover at least:
+- [x] Valid YouTube URLs return a non-empty `videoId`.  
+- [x] Non-YouTube URLs (or malformed ones) return an error or `null`.  
+- [x] Unit tests cover at least:
   - `https://www.youtube.com/watch?v=abc123`  
   - `https://youtu.be/abc123`  
   - URLs with timestamps and extra params.  
@@ -299,7 +299,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] YouTube utilities ready and tested.  
+- [x] YouTube utilities ready and tested.  
 - [ ] Used by later tasks (e.g. analysis API).
 
 ---
