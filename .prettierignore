@@ -1,0 +1,8 @@
+.next
+node_modules
+.turbo
+pnpm-lock.yaml
+package-lock.json
+*.log
+*.db
+prisma/migrations
