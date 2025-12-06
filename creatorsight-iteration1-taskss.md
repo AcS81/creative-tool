@@ -94,7 +94,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Task Complete When**
 
 - [x] All acceptance criteria met.  
-- [ ] Code committed (excluding `.env`).  
+- [x] Code committed (excluding `.env`).  
 - [x] Short “Getting started” section in `README.md` added.
 
 ---

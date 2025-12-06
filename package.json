@@ -10,7 +10,8 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prisma:migrate": "CACHE_DIR=.prisma/cache prisma migrate dev",
-    "prisma:studio": "CACHE_DIR=.prisma/cache prisma studio"
+    "prisma:studio": "CACHE_DIR=.prisma/cache prisma studio",
+    "test": "vitest run"
   },
   "dependencies": {
     "@prisma/client": "^7.1.0",
@@ -29,6 +30,7 @@
     "prettier": "^3.7.4",
     "prisma": "^7.1.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.0.15"
   }
 }
