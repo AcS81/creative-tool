@@ -18,12 +18,15 @@ const refs = [
 
 describe("generateInsights", () => {
   it("returns fallback when no references available", () => {
-    expect(generateInsights(sampleMeta, [])).toEqual(["Not enough reference data yet."]);
+    const result = generateInsights(sampleMeta, []);
+    expect(result.unusualnessInsights).toContain("Not enough reference data yet.");
+    expect(result.bullets[0]).toMatch(/Not enough reference data/);
   });
 
   it("produces ranked insights with readable text", () => {
     const result = generateInsights(sampleMeta, refs);
-    expect(result.length).toBeGreaterThan(0);
-    expect(result[0]).toMatch(/reference creators/);
+    expect(result.bullets.length).toBeGreaterThan(0);
+    expect(result.bullets[0]).toMatch(/reference videos/);
+    expect(result.strengthInsights.length).toBeGreaterThan(0);
   });
 });

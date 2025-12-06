@@ -10,38 +10,81 @@ const axisLabels: Record<keyof MetaAxes, string> = {
   productionPolish: "Production polish",
 };
 
+export type Insight = {
+  category: "unusualness" | "strength" | "growth";
+  axis: keyof MetaAxes;
+  text: string;
+};
+
 const percentile = (value: number, samples: number[]) => {
   if (!samples.length) return 0.5;
   const below = samples.filter((s) => s <= value).length;
   return below / samples.length;
 };
 
-const describeDelta = (axis: keyof MetaAxes, pct: number, score: number) => {
+const describeUnusual = (axis: keyof MetaAxes, pct: number) => {
   const label = axisLabels[axis];
-  if (pct === 50) return `${label}: about typical vs reference creators.`;
-  if (pct > 70) return `${label}: higher than ${pct}% of reference creators (standout strength).`;
-  if (pct > 50) return `${label}: above ${pct}% of reference creators.`;
-  if (pct < 30) return `${label}: lower than ${100 - pct}% of reference creators (unusual softness).`;
-  return `${label}: below ${100 - pct}% of reference creators.`;
+  if (pct > 0.8) return `${label} sits in the top ${Math.round(pct * 100)}% of reference videos.`;
+  if (pct < 0.2)
+    return `${label} is unusually low vs reference videos (bottom ${Math.round((1 - pct) * 100)}%).`;
+  return null;
 };
 
-export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]): string[] {
-  if (!references.length) return ["Not enough reference data yet."];
+const describeStrength = (axis: keyof MetaAxes, pct: number) => {
+  const label = axisLabels[axis];
+  if (pct > 0.65) return `${label} is a clear strength compared to most reference videos.`;
+  return null;
+};
 
-  const insights: { axis: keyof MetaAxes; score: number; pct: number }[] = [];
+const describeGrowth = (axis: keyof MetaAxes, pct: number) => {
+  const label = axisLabels[axis];
+  if (pct < 0.35) return `${label} is an area to raise; most reference videos sit higher here.`;
+  return null;
+};
+
+export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]) {
+  if (!references.length) {
+    return {
+      unusualnessInsights: ["Not enough reference data yet."],
+      strengthInsights: [],
+      growthInsights: [],
+      bullets: ["Not enough reference data yet."],
+    };
+  }
+
+  const insights: Insight[] = [];
 
   (Object.keys(userMeta) as Array<keyof MetaAxes>).forEach((axis) => {
     const refSamples = references.map((ref) => ref[axis]);
     const pct = percentile(userMeta[axis], refSamples);
-    const distanceFromMid = Math.abs(pct - 0.5);
-    insights.push({ axis, score: userMeta[axis], pct, distanceFromMid });
+    const unusual = describeUnusual(axis, pct);
+    const strength = describeStrength(axis, pct);
+    const growth = describeGrowth(axis, pct);
+
+    if (unusual) insights.push({ category: "unusualness", axis, text: unusual });
+    if (strength) insights.push({ category: "strength", axis, text: strength });
+    if (growth) insights.push({ category: "growth", axis, text: growth });
   });
 
-  insights.sort((a, b) => b.distanceFromMid - a.distanceFromMid);
-  const top = insights.slice(0, 4);
+  const unusualnessInsights = insights
+    .filter((i) => i.category === "unusualness")
+    .slice(0, 4)
+    .map((i) => i.text);
+  const strengthInsights = insights
+    .filter((i) => i.category === "strength")
+    .slice(0, 3)
+    .map((i) => i.text);
+  const growthInsights = insights
+    .filter((i) => i.category === "growth")
+    .slice(0, 3)
+    .map((i) => i.text);
 
-  return top.map((item) => {
-    const pct = Math.round(item.pct * 100);
-    return describeDelta(item.axis, pct, item.score);
-  });
+  const bullets = [...unusualnessInsights, ...strengthInsights, ...growthInsights].slice(0, 6);
+
+  return {
+    unusualnessInsights,
+    strengthInsights,
+    growthInsights,
+    bullets,
+  };
 }

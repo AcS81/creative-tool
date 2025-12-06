@@ -141,7 +141,8 @@ export async function POST(request: Request) {
       overallArchetype: analysisResult.overallArchetype,
       nearestReferences,
       nicheAverageMetaAxes: averageMetaAxes,
-      insights,
+      insights: insights.bullets,
+      insightDetails: insights,
       metadata: {
         title: metadata.title,
         channelTitle: metadata.channelTitle,
