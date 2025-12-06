@@ -10,6 +10,8 @@ import { DomainTimeline } from "../components/DomainTimeline";
 import { AppShell } from "../components/AppShell";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Chip } from "../components/Chip";
+import { DomainView } from "../components/DomainView";
+import { DomainRadar } from "../components/DomainRadar";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -293,31 +295,53 @@ export default function Home() {
             {activeTab !== "overview" && (
               <div className="space-y-3">
                 {activeTab === "voice" && domainProfiles?.voiceProfile && (
-                  <DomainCard name="Your Voice" profile={domainProfiles.voiceProfile} />
+                  <DomainView
+                    name="Your Voice"
+                    profile={domainProfiles.voiceProfile}
+                    visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
+                  />
                 )}
                 {activeTab === "language" && domainProfiles?.languageProfile && (
-                  <DomainCard name="Your Language" profile={domainProfiles.languageProfile} />
+                  <DomainView
+                    name="Your Language"
+                    profile={domainProfiles.languageProfile}
+                    visual={<DomainRadar profile={domainProfiles.languageProfile} />}
+                  />
                 )}
                 {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
-                  <div className="space-y-4">
-                    <DomainCard name="Your Narrative" profile={domainProfiles.narrativeProfile} />
-                    <DomainTimeline
-                      beats={supporting?.beats}
-                      transcriptSegments={supporting?.transcriptSegments}
-                    />
-                  </div>
+                  <DomainView
+                    name="Your Narrative"
+                    profile={domainProfiles.narrativeProfile}
+                    visual={<DomainRadar profile={domainProfiles.narrativeProfile} />}
+                    extra={
+                      <DomainTimeline
+                        beats={supporting?.beats}
+                        transcriptSegments={supporting?.transcriptSegments}
+                      />
+                    }
+                  />
                 )}
                 {activeTab === "visual" && domainProfiles?.visualProfile && (
-                  <DomainCard name="Your Visuals" profile={domainProfiles.visualProfile} />
+                  <DomainView
+                    name="Your Visuals"
+                    profile={domainProfiles.visualProfile}
+                    visual={<DomainRadar profile={domainProfiles.visualProfile} />}
+                  />
                 )}
                 {activeTab === "editing" && domainProfiles?.editingProfile && (
-                  <div className="space-y-4">
-                    <DomainCard name="Your Editing" profile={domainProfiles.editingProfile} />
-                    <DomainTimeline beats={supporting?.sceneSegments} />
-                  </div>
+                  <DomainView
+                    name="Your Editing"
+                    profile={domainProfiles.editingProfile}
+                    visual={<DomainRadar profile={domainProfiles.editingProfile} />}
+                    extra={<DomainTimeline beats={supporting?.sceneSegments} />}
+                  />
                 )}
                 {activeTab === "sound" && domainProfiles?.soundProfile && (
-                  <DomainCard name="Your Sound" profile={domainProfiles.soundProfile} />
+                  <DomainView
+                    name="Your Sound"
+                    profile={domainProfiles.soundProfile}
+                    visual={<DomainRadar profile={domainProfiles.soundProfile} />}
+                  />
                 )}
                 {!domainProfiles && (
                   <p className="text-sm text-muted">Run an analysis first.</p>
