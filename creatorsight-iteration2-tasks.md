@@ -493,7 +493,7 @@ New configuration:
 
 **Goals**
 
-- [ ] Add `docs/iteration_2_e2e.md` (or update existing E2E doc) to describe:
+- [x] Add `docs/iteration_2_e2e.md` (or update existing E2E doc) to describe:
   - E2E flow in **mock mode** (unchanged from Iteration 1).  
   - E2E flow in **gemini mode**:
     1. Configure env with real keys and `ANALYSIS_MODE=gemini`.  
@@ -509,7 +509,7 @@ New configuration:
 **Acceptance Criteria**
 
 - [ ] Manual E2E run in both modes succeeds on your machine.  
-- [ ] All existing tests still pass; new tests for Gemini pipeline (with mocks) are green.
+- [x] All existing tests still pass; new tests for Gemini pipeline (with mocks) are green.
 
 ---
 
