@@ -338,6 +338,28 @@ export default function Home() {
                       <li className="text-muted">Not enough reference data yet.</li>
                     )}
                   </ul>
+                  {result.fingerprint.hasPerformanceData && result.fingerprint.performanceProfile && (
+                    <div className="mt-4 rounded-md border border-border/80 bg-surface-strong p-3">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                        Performance at a glance
+                      </p>
+                      <p className="mt-1 text-sm text-foreground">
+                        {result.fingerprint.performanceProfile.summaryText}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
+                        <span>
+                          Hook retention: {Math.round(result.fingerprint.performanceProfile.scores.hookRetention)}%
+                        </span>
+                        <span>•</span>
+                        <span>
+                          CTR:{" "}
+                          {typeof result.fingerprint.performanceProfile.metrics.ctr === "number"
+                            ? `${result.fingerprint.performanceProfile.metrics.ctr.toFixed(1)}%`
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
                   <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
