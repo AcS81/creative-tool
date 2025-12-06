@@ -1,6 +1,6 @@
-# CreatorSight (Iteration 3 – Experience & Coaching polish)
+# CreatorSight – PRD MVP (Iterations 1–5)
 
-CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 adds UX polish, richer insights, and a sample/demo run alongside Gemini + YouTube Data support.
+CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterations 1–5 it has reached the PRD MVP: URL input, creative fingerprint, reference similarity, Performance domain, and lightweight sessions/history.
 
 ## Stack
 - Next.js 16 (App Router, TypeScript, Tailwind CSS 4)
@@ -12,10 +12,12 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 ad
 1) Prerequisites: Node 18+ (tested on Node 24), npm.
 2) Install dependencies: `npm install`
 3) Copy envs: `cp .env.example .env` (adjust DB path if needed). The default `ANALYSIS_MODE=mock` keeps everything local.
-4) Run migrations (includes latest columns such as `failureReason`, auth tables):  
+4) Run migrations (includes latest columns such as `failureReason`, auth tables, sessions, video metadata):  
    - `npm run prisma:migrate -- --name init` (first time)  
    - `npm run prisma:migrate -- --name add-failure-reason` (if you pulled after that change)  
-   - `npm run prisma:migrate -- --name add-oauth-auth-tables` (if not already applied)
+   - `npm run prisma:migrate -- --name add-oauth-auth-tables` (if not already applied)  
+   - `npm run prisma:migrate -- --name add-session-id` (if not already applied)  
+   - `npm run prisma:migrate -- --name add-video-metadata` (if not already applied)
 5) (Optional) Seed reference creators: `npm run seed`
 6) Start the app: `npm run dev` then open http://localhost:3000.
 7) Optional demo: click “Try a sample analysis” on the landing card to see the full experience without external keys.
@@ -31,17 +33,28 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 ad
 
 ## Notes
 - `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, overview insights, and domain tabs (radars + score bars + micro-insights). A sample analysis button is available for instant demo.
-- Prisma models include core entities; more detail will arrive in later iterations.
+- The Overview now also includes a “Recent analyses (this browser)” panel, powered by an anonymous `sessionId`, so you can reopen recent runs without re-calling Gemini/YouTube.
+- Prisma models include core entities (`CreatorProfile`, `VideoAnalysis`, `VideoFingerprint`, `User`, `YoutubeAuthToken`); see `docs/iteration_5_prd_mvp_status.md` for a PRD FR‑1–FR‑18 mapping.
+
+## What’s included in the MVP (PRD)
+
+The current app covers the PRD MVP features:
+- **URL input (FR‑1–FR‑2)** – Paste any public/unlisted YouTube URL; we validate it, fetch metadata, and show title/channel/thumbnail/duration.
+- **Creative fingerprint (FR‑5–FR‑11, FR‑14)** – Gemini-powered transcript + domain analysis (Voice, Language, Narrative, Visual, Editing, Sound) produces a structured fingerprint used throughout the UI.
+- **Reference similarity (FR‑3–FR‑4, FR‑15)** – Seeded reference creators and a similarity engine drive the “Nearest reference creators” card and “Where you’re unusual” insights.
+- **Performance domain (FR‑12–FR‑13)** – Optional YouTube OAuth + Analytics attach a `performanceProfile` (retention curve, CTR, views, likes, comments) and unlock the Performance tab and “Performance at a glance.”
+- **Sessions & history (FR‑18)** – Anonymous `sessionId` (cookie-based) tags each `VideoAnalysis`; the Overview screen shows a recent-analyses list so you can reopen past runs in this browser.
 
 ## Analysis modes
-- `mock` (default): deterministic, offline-friendly analysis. Works without external API keys.
-- `gemini`: real Gemini + YouTube Data API. Requires `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, and optional `GEMINI_MODEL` (default `gemini-2.5-pro`). Requests fail fast with `MisconfiguredEnvironment` if keys are missing.
+- **Mock only** (`ANALYSIS_MODE=mock`, default): deterministic, offline-friendly analysis that exercises the full fingerprint + UI without external APIs. Good for local dev and quick demos.
+- **Gemini creative-only** (`ANALYSIS_MODE=gemini` with `GEMINI_API_KEY`, `YOUTUBE_API_KEY`): real Gemini + YouTube Data API, covering transcript, domains, fingerprints, and reference similarity (no Analytics/performance overlay).
+- **Gemini + Analytics** (`ANALYSIS_MODE=gemini` + performance envs): adds YouTube Analytics (retention, CTR, engagement) and computes a performance domain + coaching on top of the creative fingerprint.
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.
 2) `npm run dev` and analyze any YouTube URL (data is deterministic). Or click “Try a sample analysis” to load prebuilt results instantly.
 
-### Run in gemini mode
+### Run in gemini mode (creative-only)
 1) Set in `.env`:  
    - `ANALYSIS_MODE=gemini`  
    - `GEMINI_API_KEY=<your key>`  
@@ -57,12 +70,14 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 ad
 ### Privacy
 - No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. When performance is enabled, only YouTube Analytics metrics are stored; OAuth tokens are encrypted and can be revoked via the UI (Disconnect YouTube) or by deleting token rows.
 
-### Performance / Analytics mode (Iteration 4)
+### Performance / Analytics mode
 - Set `ENABLE_PERFORMANCE=true` and provide: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL`, `TOKEN_ENCRYPTION_KEY`. Use a Web OAuth client with redirect whitelisted (e.g., `http://localhost:3000/api/auth/youtube/callback`).
 - Connect YouTube from the landing page. Running an analysis for a video on the connected channel will attach `performanceProfile` (retention, CTR, views, likes, comments) and show the Performance tab + “Performance at a glance.”
 - Disconnect YouTube at any time via the landing page (tokens revoked/deleted).
 
-### E2E flows
-- Mock mode: set `ANALYSIS_MODE=mock`, run `npm run dev`, paste any URL, or click sample. Expect archetype, radar, insights, domain tabs.
-- Gemini mode: set `ANALYSIS_MODE=gemini` with `GEMINI_API_KEY`/`YOUTUBE_API_KEY`; run a real URL to see live fingerprints.
-- Gemini + Performance: set performance envs above, connect YouTube, analyze a video you own. Expect performance summary on Overview, Performance tab with retention + metrics + coaching.
+### E2E flows and iteration docs
+- **Iteration 1**: `docs/iteration_1_e2e.md` – mock-only URL → Overview → domain tabs.
+- **Iteration 2**: `docs/iteration_2_e2e.md` – Gemini + YouTube Data integration, creative fingerprint end-to-end.
+- **Iteration 3**: `docs/iteration_3_e2e.md` – UX/coaching polish, sample/demo flow.
+- **Iteration 4**: `docs/iteration_4_e2e.md` – Performance mode (YouTube OAuth + Analytics) end-to-end.
+- **Iteration 5**: `docs/iteration_5_e2e.md` – quick checklist that combines running an analysis, revisiting it via “Recent analyses”, and (optionally) seeing the Performance tab with live data.
