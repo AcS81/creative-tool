@@ -2,61 +2,20 @@ import { NextResponse } from "next/server";
 import prisma from "../../../lib/db";
 import { analyzeVideo } from "../../../lib/analysis/service";
 import { parseYouTubeUrl } from "../../../lib/youtube";
-import type { VideoFingerprintJson } from "../../../lib/types";
 import { generateInsights } from "../../../lib/analysis/insights";
 import { generateDomainInsights } from "../../../lib/analysis/domainInsights";
 import { ConfigError, getAppConfig } from "../../../lib/config";
 import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api";
 import { GeminiApiError } from "../../../lib/gemini/client";
-import { computeAverageMetaAxes, findNearestReferences } from "../../../lib/analysis/similarity";
 import { getAuthContext } from "../../../lib/auth/context";
-import { buildSessionCookie, ensureSessionId, parseSessionIdFromCookieHeader } from "../../../lib/session";
+import { buildSessionCookie, ensureSessionId } from "../../../lib/session";
+import { fetchReferenceData } from "./utils";
 
 type AnalyzeRequestBody = {
   url: string;
   creatorDisplayName?: string;
   title?: string;
   durationSeconds?: number;
-};
-
-const safeParseFingerprint = (fingerprintText?: string | null): VideoFingerprintJson | null => {
-  if (!fingerprintText) return null;
-  try {
-    return JSON.parse(fingerprintText) as VideoFingerprintJson;
-  } catch {
-    return null;
-  }
-};
-
-const fetchReferenceData = async (fingerprint: VideoFingerprintJson) => {
-  const references = await prisma.videoAnalysis.findMany({
-    where: { creator: { type: "reference" } },
-    include: {
-      creator: true,
-      videoFingerprint: true,
-    },
-  });
-
-  const parsedFingerprints: VideoFingerprintJson[] = [];
-
-  const validReferences = references
-    .map((analysis) => {
-      const parsed = safeParseFingerprint(analysis.videoFingerprint?.fingerprint);
-      if (!parsed) return null;
-      parsedFingerprints.push(parsed);
-      return {
-        creatorId: analysis.creatorId,
-        displayName: analysis.creator.displayName,
-        fingerprint: parsed,
-      };
-    })
-    .filter(Boolean) as Array<{ creatorId: string; displayName: string; fingerprint: VideoFingerprintJson }>;
-
-  return {
-    nearestReferences: findNearestReferences(fingerprint, validReferences, 3),
-    averageMetaAxes: computeAverageMetaAxes(parsedFingerprints),
-    referenceMetaAxes: parsedFingerprints.map((fp) => fp.metaAxes),
-  };
 };
 
 export async function POST(request: Request) {
@@ -113,6 +72,8 @@ export async function POST(request: Request) {
         creatorId: creatorProfile.id,
         youtubeVideoId: videoId,
         title,
+        channelTitle: metadata.channelTitle || null,
+        thumbnailUrl: metadata.thumbnailUrl || null,
         durationSeconds,
         status: "pending",
         sessionId,

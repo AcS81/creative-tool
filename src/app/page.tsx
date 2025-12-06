@@ -47,6 +47,17 @@ type AnalyzeResponse = {
   };
 };
 
+type RecentAnalysisSummary = {
+  id: string;
+  youtubeVideoId: string;
+  title: string;
+  channelTitle?: string | null;
+  thumbnailUrl?: string | null;
+  createdAt: string;
+  status: string;
+  durationSeconds: number;
+};
+
 const tabKeys = [
   "overview",
   "voice",
@@ -74,6 +85,10 @@ export default function Home() {
   const domainProfiles = result?.fingerprint.perDomain;
   const supporting = result?.fingerprint.supporting;
 
+  const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisSummary[]>([]);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
   useEffect(() => {
     const tabParam = searchParams.get("tab");
     const validTabs = new Set(tabKeys);
@@ -82,6 +97,29 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        setHistoryLoading(true);
+        setHistoryError(null);
+        const res = await fetch("/api/history");
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setHistoryError(body?.message ?? "Could not load recent analyses.");
+          return;
+        }
+        const body = (await res.json()) as { items: RecentAnalysisSummary[] };
+        setRecentAnalyses(body.items ?? []);
+      } catch {
+        setHistoryError("Could not load recent analyses.");
+      } finally {
+        setHistoryLoading(false);
+      }
+    };
+
+    void loadHistory();
+  }, []);
 
   const handleTabChange = (tab: typeof activeTab) => {
     setActiveTab(tab);
@@ -148,6 +186,16 @@ export default function Home() {
 
       const body = (await res.json()) as AnalyzeResponse;
       setResult(body);
+      // Refresh recent analyses to include the new result.
+      try {
+        const historyRes = await fetch("/api/history");
+        if (historyRes.ok) {
+          const historyBody = (await historyRes.json()) as { items: RecentAnalysisSummary[] };
+          setRecentAnalyses(historyBody.items ?? []);
+        }
+      } catch {
+        // Ignore history refresh errors; main analysis already succeeded.
+      }
     } catch {
       setError("Could not analyze this URL. Please try again.");
     } finally {
@@ -360,16 +408,16 @@ export default function Home() {
                       </div>
                     </div>
                   ) : null}
-              </div>
+                </div>
 
-              <RadarChartOverview
-                fingerprint={result.fingerprint}
-                comparisonValues={result.nicheAverageMetaAxes || undefined}
-                comparisonLabel="Reference avg"
-              />
+                <RadarChartOverview
+                  fingerprint={result.fingerprint}
+                  comparisonValues={result.nicheAverageMetaAxes || undefined}
+                  comparisonLabel="Reference avg"
+                />
 
-              <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
-                <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+                <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
+                  <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
                   <p className="text-sm font-semibold text-muted">Insights</p>
                   <ul className="list-disc space-y-1 pl-4 text-sm text-foreground/85">
                     {(result.insightDetails?.bullets ?? result.insights ?? []).map((insight, idx) => (
@@ -422,6 +470,93 @@ export default function Home() {
                     {result.nearestReferences.length === 0 && (
                       <p className="text-sm text-muted">No reference data available yet.</p>
                     )}
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-[minmax(0,2fr),minmax(0,1.1fr)]">
+                  <div className="cs-panel p-4 shadow-sm">
+                    <h3 className="text-sm font-semibold text-muted">Recent analyses (this browser)</h3>
+                    {historyLoading && (
+                      <p className="mt-2 text-sm text-muted">Loading recent analyses…</p>
+                    )}
+                    {!historyLoading && historyError && (
+                      <p className="mt-2 text-sm text-red-600">{historyError}</p>
+                    )}
+                    {!historyLoading && !historyError && recentAnalyses.length === 0 && (
+                      <p className="mt-2 text-sm text-muted">
+                        Run an analysis to see it listed here.
+                      </p>
+                    )}
+                    {!historyLoading && !historyError && recentAnalyses.length > 0 && (
+                      <ul className="mt-3 space-y-2">
+                        {recentAnalyses.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-surface-strong p-3 text-sm"
+                          >
+                            <div className="flex items-center gap-3">
+                              {item.thumbnailUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.thumbnailUrl}
+                                  alt={item.title}
+                                  className="h-10 w-16 rounded-md object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-10 w-16 items-center justify-center rounded-md bg-accent/10 text-[10px] font-semibold text-accent">
+                                  {item.youtubeVideoId.slice(0, 6)}
+                                </div>
+                              )}
+                              <div className="space-y-0.5">
+                                <p className="text-sm font-semibold text-foreground line-clamp-2">
+                                  {item.title}
+                                </p>
+                                <p className="text-xs text-muted">
+                                  {item.channelTitle ?? "Unknown channel"}
+                                </p>
+                                <p className="text-[11px] text-muted">
+                                  {new Date(item.createdAt).toLocaleString()}
+                                </p>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className="cs-button-secondary shrink-0 text-xs"
+                              onClick={async () => {
+                                try {
+                                  setLoading(true);
+                                  setError(null);
+                                  const res = await fetch(`/api/history/${item.id}`);
+                                  if (!res.ok) {
+                                    const body = await res.json().catch(() => ({}));
+                                    setError(
+                                      body?.message ?? "Could not load this past analysis.",
+                                    );
+                                    return;
+                                  }
+                                  const loaded = (await res.json()) as AnalyzeResponse;
+                                  setResult(loaded);
+                                  setActiveTab("overview");
+                                } catch {
+                                  setError("Could not load this past analysis.");
+                                } finally {
+                                  setLoading(false);
+                                }
+                              }}
+                            >
+                              View analysis
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                  <div className="cs-panel p-4 shadow-sm">
+                    <p className="cs-kicker text-[10px]">Tip</p>
+                    <p className="mt-1 text-sm text-muted">
+                      History is kept anonymously in this browser only. Clearing cookies or using
+                      another browser starts a fresh session.
+                    </p>
                   </div>
                 </div>
               </div>

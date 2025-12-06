@@ -22,6 +22,8 @@ model VideoAnalysis {
   creatorId        String
   youtubeVideoId   String
   title            String
+  channelTitle     String?
+  thumbnailUrl     String?
   durationSeconds  Int
   status           String
   failureReason    String?
