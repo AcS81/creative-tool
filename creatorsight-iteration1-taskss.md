@@ -366,7 +366,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Create POST handler at `app/api/analyze/route.ts`:
+- [x] Create POST handler at `app/api/analyze/route.ts`:
   - Accept JSON: `{ url: string, creatorDisplayName?: string }`.  
   - Validate URL (using `parseYouTubeUrl`).  
   - Resolve or create a `CreatorProfile` for this “session”:
@@ -376,7 +376,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
   - Store the `VideoFingerprint` row.  
   - Update `VideoAnalysis.status = 'complete'`.  
   - Compute basic “nearest reference creators” by Euclidean distance on meta axes vs seeded reference fingerprints.  
-- [ ] Return response:
+- [x] Return response:
 
   ```ts
   {
@@ -397,11 +397,11 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] POST `/api/analyze` with valid YouTube URL returns 200 and the shape above.  
-- [ ] DB rows for `CreatorProfile`, `VideoAnalysis`, `VideoFingerprint` are created.  
-- [ ] Repeated analyses with same URL create new `VideoAnalysis` rows (history).  
-- [ ] Invalid URL returns 400 with `{ error: 'InvalidYouTubeUrl', message: … }`.  
-- [ ] Nearest reference creators array has at least 1 element from seed data.
+- [x] POST `/api/analyze` with valid YouTube URL returns 200 and the shape above.  
+- [x] DB rows for `CreatorProfile`, `VideoAnalysis`, `VideoFingerprint` are created.  
+- [x] Repeated analyses with same URL create new `VideoAnalysis` rows (history).  
+- [x] Invalid URL returns 400 with `{ error: 'InvalidYouTubeUrl', message: … }`.  
+- [x] Nearest reference creators array has at least 1 element from seed data.
 
 **Manual Test**
 
@@ -415,8 +415,8 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] API route wired to mock analysis and DB.  
-- [ ] At least one happy-path end-to-end test (API-only) exists.
+- [x] API route wired to mock analysis and DB.  
+- [x] At least one happy-path end-to-end test (API-only) exists.
 
 ---
 
