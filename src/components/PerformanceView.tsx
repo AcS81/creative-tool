@@ -4,12 +4,13 @@ import type { PerformanceProfile } from "../lib/types";
 type Props = {
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
+  insights?: string[];
 };
 
 const formatPercent = (value?: number) =>
   typeof value === "number" ? `${value.toFixed(1)}%` : "—";
 
-export function PerformanceView({ performanceProfile, hasPerformanceData }: Props) {
+export function PerformanceView({ performanceProfile, hasPerformanceData, insights }: Props) {
   if (!hasPerformanceData || !performanceProfile) {
     return (
       <div className="space-y-3 rounded-md border border-border bg-surface p-6 text-sm">
@@ -29,6 +30,7 @@ export function PerformanceView({ performanceProfile, hasPerformanceData }: Prop
 
   const metrics = performanceProfile.metrics;
   const series = metrics.retentionSeries ?? [];
+  const performanceInsights = insights ?? performanceProfile.insights ?? [];
 
   return (
     <div className="space-y-4">
@@ -46,6 +48,17 @@ export function PerformanceView({ performanceProfile, hasPerformanceData }: Prop
           <Metric label="Late drop-off" value={`${Math.round(performanceProfile.scores.lateDropOffSeverity)} pts`} />
         </div>
       </div>
+
+      {performanceInsights.length > 0 && (
+        <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
+          <p className="text-sm font-semibold text-muted">Performance coaching</p>
+          <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/85">
+            {performanceInsights.map((insight, idx) => (
+              <li key={idx}>{insight}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">

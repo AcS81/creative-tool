@@ -14,6 +14,7 @@ import { DomainView } from "../components/DomainView";
 import { DomainRadar } from "../components/DomainRadar";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 import { PerformanceView } from "../components/PerformanceView";
+import { performanceCoaching } from "../lib/analysis/performanceCoaching";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -431,6 +432,11 @@ export default function Home() {
                   <PerformanceView
                     performanceProfile={result.fingerprint.performanceProfile}
                     hasPerformanceData={result.fingerprint.hasPerformanceData}
+                    insights={
+                      result.fingerprint.performanceProfile
+                        ? performanceCoaching(result.fingerprint.performanceProfile, result.fingerprint.metaAxes)
+                        : []
+                    }
                   />
                 )}
                 {!domainProfiles && (
