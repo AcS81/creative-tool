@@ -1,54 +1,153 @@
+"use client";
+
+import { useState } from "react";
+import { isValidYouTubeUrl } from "../lib/youtube";
+import type { VideoFingerprintJson } from "../lib/types";
+
+type NearestReference = { creatorId: string; displayName: string; distance: number };
+type AnalyzeResponse = {
+  videoAnalysisId: string;
+  fingerprint: VideoFingerprintJson;
+  overallArchetype: string;
+  nearestReferences: NearestReference[];
+};
+
 export default function Home() {
+  const [url, setUrl] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AnalyzeResponse | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setResult(null);
+
+    if (!isValidYouTubeUrl(url)) {
+      setError("Please enter a valid YouTube URL.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.message ?? "Could not analyze this URL. Please try again.");
+        return;
+      }
+
+      const body = (await res.json()) as AnalyzeResponse;
+      setResult(body);
+    } catch {
+      setError("Could not analyze this URL. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-4xl items-center px-6 py-16">
+    <main className="mx-auto flex min-h-screen max-w-4xl flex-col gap-8 px-6 py-16">
       <div className="w-full rounded-lg border border-border bg-surface/80 p-10 shadow-[var(--shadow-soft)] backdrop-blur">
         <p className="text-sm font-semibold uppercase tracking-[0.2em] text-accent">
           CreatorSight
         </p>
         <h1 className="mt-3 text-4xl font-semibold leading-tight">
-          Paste a YouTube URL to get a creative fingerprint (coming soon).
+          Paste a YouTube URL to get a creative fingerprint.
         </h1>
         <p className="mt-4 max-w-2xl text-lg text-muted">
-          This locally runnable MVP will validate URLs, run a mock analysis pipeline, and
-          show an overview radar of your style. We&apos;re wiring up the experience now,
-          starting from this foundation.
+          We validate the link, run a mock analysis pipeline, and preview your archetype and nearest
+          reference creators.
         </p>
 
-        <div className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]">
+        <form onSubmit={handleSubmit} className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]">
           <div className="rounded-md border border-border bg-white/70 p-6 shadow-sm">
             <label className="block text-sm font-medium text-muted" htmlFor="url">
-              YouTube URL (disabled while we finish the pipeline)
+              YouTube URL
             </label>
             <input
               id="url"
               type="url"
               placeholder="https://www.youtube.com/watch?v=..."
               className="mt-2 w-full rounded-md border border-border bg-white/60 px-4 py-3 text-base text-foreground shadow-inner outline-none focus:border-accent focus:ring-2 focus:ring-accent/40"
-              disabled
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
             />
-            <div className="mt-3 flex items-center gap-3">
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
-                Overview radar
-              </span>
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
-                Archetype card
-              </span>
-              <span className="inline-flex items-center rounded-full bg-accent/10 px-3 py-1 text-sm font-semibold text-accent">
-                Nearest neighbours
-              </span>
-            </div>
+            {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+            <button
+              type="submit"
+              className="mt-4 inline-flex items-center justify-center rounded-md bg-accent px-4 py-2 text-sm font-semibold text-accent-foreground shadow-sm transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={loading}
+            >
+              {loading ? "Analyzing..." : "Analyze video"}
+            </button>
           </div>
           <div className="rounded-md border border-border bg-white/70 p-6 shadow-sm">
             <p className="text-sm font-semibold text-muted">What to expect</p>
             <ul className="mt-3 space-y-2 text-sm text-foreground/80">
-              <li>✅ Next.js 16 + App Router + Tailwind 4 baseline</li>
-              <li>✅ Prisma + SQLite ready for migrations</li>
-              <li>✅ ESLint + Prettier tooling</li>
-              <li>🚧 Mock analysis pipeline landing next</li>
+              <li>✅ Validate YouTube URL client-side</li>
+              <li>✅ Call mock analysis API</li>
+              <li>✅ Show archetype + nearest neighbours</li>
+              <li>🚧 Radar & domain tabs coming next</li>
             </ul>
           </div>
-        </div>
+        </form>
       </div>
+
+      {result && (
+        <div className="w-full rounded-lg border border-border bg-white/80 p-8 shadow-[var(--shadow-soft)]">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
+                Overall archetype
+              </p>
+              <p className="text-2xl font-semibold">{result.overallArchetype}</p>
+              <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
+            </div>
+            <div className="flex flex-wrap gap-2 text-sm text-muted">
+              <span className="rounded-full border border-border px-3 py-1">
+                Voice: {Math.round(result.fingerprint.metaAxes.voiceIntensity)}
+              </span>
+              <span className="rounded-full border border-border px-3 py-1">
+                Conceptual: {Math.round(result.fingerprint.metaAxes.conceptualDepth)}
+              </span>
+              <span className="rounded-full border border-border px-3 py-1">
+                Narrative: {Math.round(result.fingerprint.metaAxes.narrativeStructureStrength)}
+              </span>
+              <span className="rounded-full border border-border px-3 py-1">
+                Visual: {Math.round(result.fingerprint.metaAxes.visualDynamism)}
+              </span>
+              <span className="rounded-full border border-border px-3 py-1">
+                Polish: {Math.round(result.fingerprint.metaAxes.productionPolish)}
+              </span>
+            </div>
+          </div>
+          <div className="mt-6">
+            <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
+            <div className="mt-2 grid gap-3 md:grid-cols-3">
+              {result.nearestReferences.map((ref) => (
+                <div
+                  key={ref.creatorId}
+                  className="rounded-md border border-border bg-surface p-3 shadow-sm"
+                >
+                  <p className="text-base font-semibold">{ref.displayName}</p>
+                  <p className="text-xs text-muted">
+                    Distance: {ref.distance.toFixed(2)}
+                  </p>
+                </div>
+              ))}
+              {result.nearestReferences.length === 0 && (
+                <p className="text-sm text-muted">No reference data available yet.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

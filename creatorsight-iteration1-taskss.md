@@ -431,16 +431,16 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Implement `/app/page.tsx` or `/app/analyze/page.tsx` as the main UI:
+- [x] Implement `/app/page.tsx` or `/app/analyze/page.tsx` as the main UI:
   - A card with:
     - Input field for YouTube URL.  
     - “Analyze video” button.  
     - Basic validation (client-side using `isValidYouTubeUrl`).  
-- [ ] On submit:
+- [x] On submit:
   - Call `POST /api/analyze`.  
   - Show loading state (“Analyzing your creative fingerprint…”).  
   - On success, store the response in local state.  
-- [ ] Display a simple summary panel:
+- [x] Display a simple summary panel:
   - Overall archetype name.  
   - List of 2–3 nearest reference creators with distance.  
 
@@ -452,11 +452,11 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] Visiting `/` shows URL input + analyze button.  
-- [ ] Pasting invalid/non-YouTube URL shows inline error and no API call.  
-- [ ] Valid URL triggers API call and loading UI.  
-- [ ] On success, archetype + neighbours appear below the form.  
-- [ ] Errors from API are shown as simple messages (“Could not analyze this URL. Please check and try again.”).
+- [x] Visiting `/` shows URL input + analyze button.  
+- [x] Pasting invalid/non-YouTube URL shows inline error and no API call.  
+- [x] Valid URL triggers API call and loading UI.  
+- [x] On success, archetype + neighbours appear below the form.  
+- [x] Errors from API are shown as simple messages (“Could not analyze this URL. Please check and try again.”).
 
 **Manual Test**
 
@@ -469,7 +469,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] UI and API integrated for a working basic “Analyze my video” flow.
+- [x] UI and API integrated for a working basic “Analyze my video” flow.
 
 ---
 
