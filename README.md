@@ -1,6 +1,6 @@
-# CreatorSight (Iteration 2 – Gemini/YouTube slice)
+# CreatorSight (Iteration 3 – Experience & Coaching polish)
 
-CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 2 adds Gemini + YouTube Data API support alongside the existing mock mode.
+CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 adds UX polish, richer insights, and a sample/demo run alongside Gemini + YouTube Data support.
 
 ## Stack
 - Next.js 16 (App Router, TypeScript, Tailwind CSS 4)
@@ -17,6 +17,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 2 ad
    - `npm run prisma:migrate -- --name add-failure-reason` (if you pulled after that change)
 5) (Optional) Seed reference creators: `npm run seed`
 6) Start the app: `npm run dev` then open http://localhost:3000.
+7) Optional demo: click “Try a sample analysis” on the landing card to see the full experience without external keys.
 
 ## Useful scripts
 - `npm run dev` / `npm run build` / `npm start`
@@ -28,7 +29,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 2 ad
 - `npm run test` (Vitest)
 
 ## Notes
-- `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, and domain tabs with radars/timelines/highlights.
+- `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, overview insights, and domain tabs (radars + score bars + micro-insights). A sample analysis button is available for instant demo.
 - Prisma models include core entities; more detail will arrive in later iterations.
 
 ## Analysis modes
@@ -37,7 +38,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 2 ad
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.
-2) `npm run dev` and analyze any YouTube URL (data is deterministic).
+2) `npm run dev` and analyze any YouTube URL (data is deterministic). Or click “Try a sample analysis” to load prebuilt results instantly.
 
 ### Run in gemini mode
 1) Set in `.env`:  
