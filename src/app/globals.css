@@ -1,13 +1,13 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f6f8fb;
+  --background: #eef2f8;
   --foreground: #0f172a;
   --surface: #ffffff;
-  --surface-strong: #f1f5f9;
-  --muted: #5f6b7a;
-  --muted-strong: #334155;
-  --border: #e2e8f0;
+  --surface-strong: #f4f7fd;
+  --muted: #4b5563;
+  --muted-strong: #1f2937;
+  --border: #d0d9e6;
   --accent: #2563eb;
   --accent-foreground: #e8f0ff;
   --accent-contrast: #0b1f4a;
@@ -46,26 +46,8 @@
   --radius-sm: 8px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0b1220;
-    --foreground: #e2e8f0;
-    --surface: #0f172a;
-    --surface-strong: #0b1628;
-    --muted: #cbd5e1;
-    --muted-strong: #e2e8f0;
-    --border: #1e293b;
-    --accent: #38bdf8;
-    --accent-foreground: #0b1220;
-    --accent-contrast: #e0f2fe;
-    --shadow-soft: 0 22px 54px rgba(0, 0, 0, 0.45);
-  }
-}
-
 body {
-  background: radial-gradient(circle at 20% 20%, #e0f2fe 0, rgba(224, 242, 254, 0) 30%),
-    radial-gradient(circle at 80% 10%, #fef3c7 0, rgba(254, 243, 199, 0) 26%),
-    var(--background);
+  background: linear-gradient(180deg, #f6f8fc 0%, #eef2f8 35%, #eef2f8 100%);
   color: var(--foreground);
   font-family: var(--font-geist-sans, "Inter"), system-ui, -apple-system, sans-serif;
 }
@@ -109,14 +91,14 @@ body {
   .cs-card {
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
-    background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(241, 245, 249, 0.92));
+    background: var(--surface);
     box-shadow: var(--shadow-soft);
   }
 
   .cs-panel {
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--surface-strong);
   }
 
   .cs-pill {

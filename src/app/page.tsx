@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
 import { AnalysisLayout } from "../components/Layout/AnalysisLayout";
 import { DomainCard } from "../components/DomainCard";
 import { DomainTimeline } from "../components/DomainTimeline";
+import { AppShell } from "../components/AppShell";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -24,6 +26,16 @@ type AnalyzeResponse = {
   };
 };
 
+const tabKeys = [
+  "overview",
+  "voice",
+  "language",
+  "narrative",
+  "visual",
+  "editing",
+  "sound",
+] as const;
+
 export default function Home() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +44,28 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound"
   >("overview");
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const domainProfiles = result?.fingerprint.perDomain;
   const supporting = result?.fingerprint.supporting;
+
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    const validTabs = new Set(tabKeys);
+    if (tabParam && validTabs.has(tabParam as (typeof tabKeys)[number]) && tabParam !== activeTab) {
+      setActiveTab(tabParam as typeof activeTab);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  const handleTabChange = (tab: typeof activeTab) => {
+    setActiveTab(tab);
+    const next = new URLSearchParams(searchParams.toString());
+    next.set("tab", tab);
+    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,7 +101,8 @@ export default function Home() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 px-6 py-14 lg:py-16">
+    <AppShell>
+      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 py-4 lg:py-6">
       <div className="cs-card w-full p-10 backdrop-blur">
         <p className="cs-kicker">CreatorSight</p>
         <h1 className="cs-heading mt-3 leading-tight">
@@ -81,7 +113,11 @@ export default function Home() {
           radar, and closest reference creators.
         </p>
 
-        <form onSubmit={handleSubmit} className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]">
+        <form
+          id="analysis"
+          onSubmit={handleSubmit}
+          className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]"
+        >
           <div className="cs-panel p-6 shadow-sm">
             <label className="cs-label" htmlFor="url">
               YouTube URL
@@ -113,7 +149,7 @@ export default function Home() {
 
       {result && (
         <div className="cs-card w-full space-y-6 p-8">
-          <AnalysisLayout activeTab={activeTab} onTabChange={setActiveTab}>
+          <AnalysisLayout activeTab={activeTab} onTabChange={handleTabChange}>
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="flex flex-wrap items-center justify-between gap-4">
@@ -218,7 +254,8 @@ export default function Home() {
           </AnalysisLayout>
         </div>
       )}
-    </main>
+      </div>
+    </AppShell>
   );
 }
 
