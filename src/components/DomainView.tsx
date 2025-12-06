@@ -2,9 +2,11 @@ import type { ReactNode } from "react";
 import type { DomainProfile } from "../lib/types";
 import { Chip } from "./Chip";
 import { DomainScoreBars } from "./DomainScoreBars";
+import { describeArchetype, type DomainKey } from "../lib/archetypes/descriptions";
 
 type Props = {
   name: string;
+  domain: DomainKey;
   profile: DomainProfile;
   visual?: ReactNode;
   tags?: string[];
@@ -12,7 +14,7 @@ type Props = {
   extra?: ReactNode;
 };
 
-export function DomainView({ name, profile, visual, tags, insights, extra }: Props) {
+export function DomainView({ name, domain, profile, visual, tags, insights, extra }: Props) {
   const derivedTags = profile.scores
     .sort((a, b) => b.value - a.value)
     .slice(0, 3)
@@ -23,16 +25,24 @@ export function DomainView({ name, profile, visual, tags, insights, extra }: Pro
     });
 
   const tagList = tags && tags.length > 0 ? tags : [...derivedTags, ...(profile.highlights ?? [])];
+  const archetypeDescription = describeArchetype(domain, profile.primaryArchetype);
+  const secondaryDescription = describeArchetype(domain, profile.secondaryArchetype);
   return (
     <div className="cs-card p-6 space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
         <div>
           <p className="cs-kicker text-[11px]">{name}</p>
-          <p className="text-xl font-semibold text-foreground">{profile.primaryArchetype}</p>
+          <p className="text-xl font-semibold text-foreground">
+            {archetypeDescription?.title ?? profile.primaryArchetype}
+          </p>
           {profile.secondaryArchetype ? (
-            <p className="text-sm text-muted">Secondary: {profile.secondaryArchetype}</p>
+            <p className="text-sm text-muted">
+              Secondary: {secondaryDescription?.title ?? profile.secondaryArchetype}
+            </p>
           ) : null}
-          <p className="mt-2 text-sm text-muted">{profile.summaryText}</p>
+          <p className="mt-2 text-sm text-muted">
+            {archetypeDescription?.description ?? profile.summaryText}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Chip label="Domain scores" />

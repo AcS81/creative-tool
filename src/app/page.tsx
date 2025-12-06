@@ -297,6 +297,7 @@ export default function Home() {
                 {activeTab === "voice" && domainProfiles?.voiceProfile && (
                   <DomainView
                     name="Your Voice"
+                    domain="voice"
                     profile={domainProfiles.voiceProfile}
                     visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
                   />
@@ -304,6 +305,7 @@ export default function Home() {
                 {activeTab === "language" && domainProfiles?.languageProfile && (
                   <DomainView
                     name="Your Language"
+                    domain="language"
                     profile={domainProfiles.languageProfile}
                     visual={<DomainRadar profile={domainProfiles.languageProfile} />}
                   />
@@ -311,6 +313,7 @@ export default function Home() {
                 {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
                   <DomainView
                     name="Your Narrative"
+                    domain="narrative"
                     profile={domainProfiles.narrativeProfile}
                     visual={<DomainRadar profile={domainProfiles.narrativeProfile} />}
                     extra={
@@ -324,6 +327,7 @@ export default function Home() {
                 {activeTab === "visual" && domainProfiles?.visualProfile && (
                   <DomainView
                     name="Your Visuals"
+                    domain="visual"
                     profile={domainProfiles.visualProfile}
                     visual={<DomainRadar profile={domainProfiles.visualProfile} />}
                   />
@@ -331,6 +335,7 @@ export default function Home() {
                 {activeTab === "editing" && domainProfiles?.editingProfile && (
                   <DomainView
                     name="Your Editing"
+                    domain="editing"
                     profile={domainProfiles.editingProfile}
                     visual={<DomainRadar profile={domainProfiles.editingProfile} />}
                     extra={<DomainTimeline beats={supporting?.sceneSegments} />}
@@ -339,6 +344,7 @@ export default function Home() {
                 {activeTab === "sound" && domainProfiles?.soundProfile && (
                   <DomainView
                     name="Your Sound"
+                    domain="sound"
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
                   />
