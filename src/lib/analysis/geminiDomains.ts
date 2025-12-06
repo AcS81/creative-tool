@@ -31,8 +31,8 @@ const domainProfileSchema = z.object({
   highlights: z.array(z.string().min(1)).optional(),
 });
 
-const GEMINI_ENDPOINT =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
+const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const truncate = <T>(items: T[], limit = 10): T[] => items.slice(0, limit);
 

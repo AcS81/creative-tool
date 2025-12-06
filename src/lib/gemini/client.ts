@@ -47,7 +47,7 @@ type GetTranscriptAndScenesOptions = {
   config?: AppConfig;
 };
 
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-pro-exp-02-05";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const buildPrompt = (videoUrl: string) =>
