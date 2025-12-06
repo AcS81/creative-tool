@@ -656,7 +656,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Document a minimal E2E test flow in `docs/iteration_1_e2e.md`:
+- [x] Document a minimal E2E test flow in `docs/iteration_1_e2e.md`:
   1. Start dev server.  
   2. Paste YouTube URL.  
   3. Click “Analyze video”.  
@@ -672,7 +672,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] Manual E2E test steps documented and reproducible.  
+- [x] Manual E2E test steps documented and reproducible.  
 - [ ] If using automated test, it passes locally via `npm run test:e2e` or similar.
 
 **Manual Test**
@@ -720,7 +720,7 @@ Use this checklist to confirm **Iteration 1** is complete before planning Iterat
 ### ✅ Phase 5 – Local Dev & E2E
 
 - [x] README describes local setup clearly.  
-- [ ] A full end-to-end flow (URL → Overview) works reliably on a fresh machine.  
+- [x] A full end-to-end flow (URL → Overview) works reliably on a fresh machine.  
 
 ---
 
