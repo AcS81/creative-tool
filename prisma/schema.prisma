@@ -8,13 +8,35 @@ datasource db {
 }
 
 model CreatorProfile {
-  id String @id @default(cuid())
+  id          String          @id @default(uuid())
+  type        String
+  displayName String
+  channelId   String?         @unique
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  analyses    VideoAnalysis[]
 }
 
 model VideoAnalysis {
-  id String @id @default(cuid())
+  id               String          @id @default(uuid())
+  creatorId        String
+  youtubeVideoId   String
+  title            String
+  durationSeconds  Int
+  status           String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  creator          CreatorProfile  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  videoFingerprint VideoFingerprint?
+
+  @@index([creatorId])
+  @@index([youtubeVideoId])
 }
 
 model VideoFingerprint {
-  id String @id @default(cuid())
+  id              String        @id @default(uuid())
+  videoAnalysisId String        @unique
+  fingerprint     String
+  createdAt       DateTime      @default(now())
+  videoAnalysis   VideoAnalysis @relation(fields: [videoAnalysisId], references: [id], onDelete: Cascade)
 }

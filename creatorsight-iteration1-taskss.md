@@ -167,7 +167,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Update `schema.prisma` with:
+- [x] Update `schema.prisma` with:
   - `CreatorProfile`:
     - `id` (string, uuid)  
     - `type` (`user` | `reference`)  
@@ -185,10 +185,10 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
   - `VideoFingerprint`:
     - `id` (uuid)  
     - `videoAnalysisId` (FK → VideoAnalysis, 1:1)  
-    - `fingerprint` (JSON)  
+    - `fingerprint` (JSON stored as text for SQLite)  
     - `createdAt`  
-- [ ] Run Prisma migrate.  
-- [ ] Add `src/lib/db.ts` with a singleton Prisma client.
+- [x] Run Prisma migrate.  
+- [x] Add `src/lib/db.ts` with a singleton Prisma client.
 
 **Constraints**
 
@@ -198,8 +198,8 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] Prisma schema validates (`npx prisma validate` passes).  
-- [ ] `npx prisma migrate dev --name init_core_models` succeeds.  
+- [x] Prisma schema validates (`npx prisma validate` passes).  
+- [x] `npx prisma migrate dev --name init_core_models` succeeds.  
 - [ ] `npx prisma studio` shows all three tables.  
 - [ ] Foreign keys set and working.
 
@@ -213,7 +213,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Task Complete When**
 
 - [ ] All acceptance criteria met.  
-- [ ] `db.ts` helper committed and used in at least one small script or test.
+- [x] `db.ts` helper committed and used in at least one small script or test.
 
 ---
 
@@ -697,7 +697,7 @@ Use this checklist to confirm **Iteration 1** is complete before planning Iterat
 
 ### ✅ Phase 1 – Data Layer
 
-- [ ] `CreatorProfile`, `VideoAnalysis`, `VideoFingerprint` models exist.  
+- [x] `CreatorProfile`, `VideoAnalysis`, `VideoFingerprint` models exist.  
 - [ ] Seeded reference creators and fingerprints exist.  
 
 ### ✅ Phase 2 – Mock Pipeline
