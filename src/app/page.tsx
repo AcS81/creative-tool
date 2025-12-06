@@ -5,6 +5,7 @@ import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
 import { AnalysisLayout } from "../components/Layout/AnalysisLayout";
+import { DomainCard } from "../components/DomainCard";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -24,6 +25,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound"
   >("overview");
+
+  const domainProfiles = result?.fingerprint.perDomain;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -161,12 +164,27 @@ export default function Home() {
 
             {activeTab !== "overview" && (
               <div className="space-y-3">
-                <p className="text-base font-semibold capitalize">
-                  Your {activeTab}
-                </p>
-                <p className="text-sm text-muted">
-                  Domain details coming in later iterations. For now, you can switch tabs without losing your analysis.
-                </p>
+                {activeTab === "voice" && domainProfiles?.voiceProfile && (
+                  <DomainCard name="Your Voice" profile={domainProfiles.voiceProfile} />
+                )}
+                {activeTab === "language" && domainProfiles?.languageProfile && (
+                  <DomainCard name="Your Language" profile={domainProfiles.languageProfile} />
+                )}
+                {activeTab === "narrative" && domainProfiles?.narrativeProfile && (
+                  <DomainCard name="Your Narrative" profile={domainProfiles.narrativeProfile} />
+                )}
+                {activeTab === "visual" && domainProfiles?.visualProfile && (
+                  <DomainCard name="Your Visuals" profile={domainProfiles.visualProfile} />
+                )}
+                {activeTab === "editing" && domainProfiles?.editingProfile && (
+                  <DomainCard name="Your Editing" profile={domainProfiles.editingProfile} />
+                )}
+                {activeTab === "sound" && domainProfiles?.soundProfile && (
+                  <DomainCard name="Your Sound" profile={domainProfiles.soundProfile} />
+                )}
+                {!domainProfiles && (
+                  <p className="text-sm text-muted">Run an analysis first.</p>
+                )}
               </div>
             )}
           </AnalysisLayout>

@@ -300,7 +300,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Task Complete When**
 
 - [x] YouTube utilities ready and tested.  
-- [ ] Used by later tasks (e.g. analysis API).
+- [x] Used by later tasks (e.g. analysis API).
 
 ---
 
@@ -349,7 +349,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] Service & interface committed with tests.  
+- [x] Service & interface committed with tests.  
 - [x] This service is ready for API integration.
 
 ---
@@ -702,24 +702,24 @@ Use this checklist to confirm **Iteration 1** is complete before planning Iterat
 
 ### ✅ Phase 2 – Mock Pipeline
 
-- [ ] YouTube URLs validated and parsed reliably.  
-- [ ] Mock analysis service produces valid fingerprints + archetypes.  
-- [ ] POST `/api/analyze` persists analyses and fingerprints.  
+- [x] YouTube URLs validated and parsed reliably.  
+- [x] Mock analysis service produces valid fingerprints + archetypes.  
+- [x] POST `/api/analyze` persists analyses and fingerprints.  
 
 ### ✅ Phase 3 – Overview UI
 
-- [ ] User can paste a YouTube URL and trigger analysis from UI.  
-- [ ] Overview shows archetype, radar chart, and nearest reference creators.  
-- [ ] “Where you’re unusual” bullets displayed.  
+- [x] User can paste a YouTube URL and trigger analysis from UI.  
+- [x] Overview shows archetype, radar chart, and nearest reference creators.  
+- [x] “Where you’re unusual” bullets displayed.  
 
 ### ✅ Phase 4 – Domain Skeleton Views
 
-- [ ] Tabs for Overview, Voice, Language, Narrative, Visual, Editing, Sound.  
-- [ ] Each domain tab shows summary text + simple visual.  
+- [x] Tabs for Overview, Voice, Language, Narrative, Visual, Editing, Sound.  
+- [x] Each domain tab shows summary text + simple visual.  
 
 ### ✅ Phase 5 – Local Dev & E2E
 
-- [ ] README describes local setup clearly.  
+- [x] README describes local setup clearly.  
 - [ ] A full end-to-end flow (URL → Overview) works reliably on a fresh machine.  
 
 ---
