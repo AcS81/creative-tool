@@ -4,6 +4,7 @@ import { useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
+import { AnalysisLayout } from "../components/Layout/AnalysisLayout";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -20,6 +21,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound"
+  >("overview");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,51 +108,68 @@ export default function Home() {
 
       {result && (
         <div className="w-full space-y-6 rounded-lg border border-border bg-white/80 p-8 shadow-[var(--shadow-soft)]">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
-                Overall archetype
-              </p>
-              <p className="text-2xl font-semibold">{result.overallArchetype}</p>
-              <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
-            </div>
-          </div>
-
-          <RadarChartOverview
-            fingerprint={result.fingerprint}
-            comparisonValues={result.nicheAverageMetaAxes || undefined}
-            comparisonLabel="Reference avg"
-          />
-
-          <div className="mt-4">
-            <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
-            <div className="mt-2 grid gap-3 md:grid-cols-3">
-              {result.nearestReferences.map((ref) => (
-                <div
-                  key={ref.creatorId}
-                  className="rounded-md border border-border bg-surface p-3 shadow-sm"
-                >
-                  <p className="text-base font-semibold">{ref.displayName}</p>
-                  <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
+          <AnalysisLayout activeTab={activeTab} onTabChange={setActiveTab}>
+            {activeTab === "overview" && (
+              <div className="space-y-6">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.15em] text-muted">
+                      Overall archetype
+                    </p>
+                    <p className="text-2xl font-semibold">{result.overallArchetype}</p>
+                    <p className="mt-1 text-sm text-muted">Analysis ID: {result.videoAnalysisId}</p>
+                  </div>
                 </div>
-              ))}
-              {result.nearestReferences.length === 0 && (
-                <p className="text-sm text-muted">No reference data available yet.</p>
-              )}
-            </div>
-          </div>
 
-          <div className="mt-4">
-            <p className="text-sm font-semibold text-muted">Where you’re unusual</p>
-            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/80">
-              {(result.insights ?? []).map((insight, idx) => (
-                <li key={idx}>{insight}</li>
-              ))}
-              {(!result.insights || result.insights.length === 0) && (
-                <li className="text-muted">Not enough reference data yet.</li>
-              )}
-            </ul>
-          </div>
+                <RadarChartOverview
+                  fingerprint={result.fingerprint}
+                  comparisonValues={result.nicheAverageMetaAxes || undefined}
+                  comparisonLabel="Reference avg"
+                />
+
+                <div className="mt-4">
+                  <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
+                  <div className="mt-2 grid gap-3 md:grid-cols-3">
+                    {result.nearestReferences.map((ref) => (
+                      <div
+                        key={ref.creatorId}
+                        className="rounded-md border border-border bg-surface p-3 shadow-sm"
+                      >
+                        <p className="text-base font-semibold">{ref.displayName}</p>
+                        <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
+                      </div>
+                    ))}
+                    {result.nearestReferences.length === 0 && (
+                      <p className="text-sm text-muted">No reference data available yet.</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <p className="text-sm font-semibold text-muted">Where you’re unusual</p>
+                  <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/80">
+                    {(result.insights ?? []).map((insight, idx) => (
+                      <li key={idx}>{insight}</li>
+                    ))}
+                    {(!result.insights || result.insights.length === 0) && (
+                      <li className="text-muted">Not enough reference data yet.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            )}
+
+            {activeTab !== "overview" && (
+              <div className="space-y-3">
+                <p className="text-base font-semibold capitalize">
+                  Your {activeTab}
+                </p>
+                <p className="text-sm text-muted">
+                  Domain details coming in later iterations. For now, you can switch tabs without losing your analysis.
+                </p>
+              </div>
+            )}
+          </AnalysisLayout>
         </div>
       )}
     </main>

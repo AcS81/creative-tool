@@ -572,13 +572,13 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Create a tabbed layout or secondary navigation on the Overview page:
+- [x] Create a tabbed layout or secondary navigation on the Overview page:
   - Tabs: `Overview`, `Voice`, `Language`, `Narrative`, `Visual`, `Editing`, `Sound`.  
-- [ ] For each tab (except Overview):
+- [x] For each tab (except Overview):
   - Show heading: “Your {Domain}”.  
   - Show a small text summary extracted from fingerprint (e.g., `voiceProfile.summary`).  
   - Show a simple 5-axis radar or bar chart **placeholder** for that domain (even if using mock static data for now).  
-- [ ] Factor out shared layout into `src/components/Layout/AnalysisLayout.tsx`.  
+- [x] Factor out shared layout into `src/components/Layout/AnalysisLayout.tsx`.  
 
 **Constraints**
 
@@ -587,12 +587,12 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] User can switch between tabs without losing analysis data in state.  
-- [ ] Each domain tab shows:
+- [x] User can switch between tabs without losing analysis data in state.  
+- [x] Each domain tab shows:
   - Domain name.  
   - One short summary line.  
   - A simple visual (radar or bar chart).  
-- [ ] If no analysis exists (user hasn’t run one), tabs either disabled or show a “Run an analysis first” message.
+- [x] If no analysis exists (user hasn’t run one), tabs either disabled or show a “Run an analysis first” message.
 
 **Manual Test**
 
@@ -602,7 +602,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] Domain-level navigation and skeleton views present and stable.
+- [x] Domain-level navigation and skeleton views present and stable.
 
 ---
 
