@@ -151,6 +151,35 @@ export default function Home() {
         </form>
       </div>
 
+      {loading && (
+        <div className="cs-card space-y-4 p-6">
+          <p className="text-sm font-semibold text-muted">Analyzing your video…</p>
+          <div className="grid gap-3">
+            <div className="h-4 w-1/2 animate-pulse rounded bg-surface-strong" />
+            <div className="h-4 w-1/3 animate-pulse rounded bg-surface-strong" />
+            <div className="h-40 animate-pulse rounded bg-surface-strong" />
+          </div>
+          <p className="text-xs text-muted">
+            This may take up to a few minutes in Gemini mode; the page will populate on completion.
+          </p>
+        </div>
+      )}
+
+      {!loading && error && !result && (
+        <div className="cs-card space-y-2 p-6 border-red-200 bg-red-50">
+          <p className="text-sm font-semibold text-red-700">Analysis failed</p>
+          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-xs text-red-500">Double-check the URL and try again.</p>
+        </div>
+      )}
+
+      {!loading && !error && !result && (
+        <div className="cs-card space-y-2 p-6">
+          <p className="text-sm font-semibold text-foreground">No analysis yet</p>
+          <p className="text-sm text-muted">Paste a YouTube URL above to see your fingerprint.</p>
+        </div>
+      )}
+
       {result && (
         <div className="cs-card w-full space-y-6 p-8">
           <AnalysisLayout activeTab={activeTab} onTabChange={handleTabChange}>
