@@ -437,8 +437,8 @@ These become candidates for Iteration 5+.
 
 **Acceptance Criteria**
 
-- [ ] After revocation, no further Analytics calls are possible until reconnection.  
-- [ ] Settings UI and behavior matches the storage reality.
+- [x] After revocation, no further Analytics calls are possible until reconnection.  
+- [x] Settings UI and behavior matches the storage reality.
 
 ---
 
@@ -454,7 +454,7 @@ These become candidates for Iteration 5+.
 
 **Goals**
 
-- [ ] Update `README.md` and add `docs/iteration_4_e2e.md` to describe:
+- [x] Update `README.md` and add `docs/iteration_4_e2e.md` to describe:
   - Additional env vars for OAuth and Analytics.  
   - How to obtain client credentials and configure redirect URLs.  
   - E2E test flow for performance mode:
@@ -487,25 +487,25 @@ Use this checklist to confirm **Iteration 4** is complete.
 
 ### ✅ Performance Domain & Analytics
 
-- [ ] Fingerprint supports optional `performanceProfile` and `hasPerformanceData`.  
-- [ ] OAuth and Analytics are configured and tokens stored securely.  
-- [ ] `fetchVideoAnalytics` reliably returns normalized retention + metrics for owned videos.
+- [x] Fingerprint supports optional `performanceProfile` and `hasPerformanceData`.  
+- [x] OAuth and Analytics are configured and tokens stored securely.  
+- [x] `fetchVideoAnalytics` reliably returns normalized retention + metrics for owned videos.
 
 ### ✅ Performance-Aware Fingerprints
 
-- [ ] `buildPerformanceProfile` converts analytics into stable scores, metrics, and a summary.  
-- [ ] `analyzeVideo` attaches `performanceProfile` when Analytics is available without breaking creative-only flows.
+- [x] `buildPerformanceProfile` converts analytics into stable scores, metrics, and a summary.  
+- [x] `analyzeVideo` attaches `performanceProfile` when Analytics is available without breaking creative-only flows.
 
 ### ✅ UI & Coaching
 
-- [ ] Performance tab visualizes retention over time with beats/scenes and shows core metrics.  
-- [ ] Performance-aware coaching insights connect creative fingerprints and retention/CTR.  
-- [ ] Overview surfaces a compact “Performance at a glance” without overwhelming core content.
+- [x] Performance tab visualizes retention over time with beats/scenes and shows core metrics.  
+- [x] Performance-aware coaching insights connect creative fingerprints and retention/CTR.  
+- [x] Overview surfaces a compact “Performance at a glance” without overwhelming core content.
 
 ### ✅ Privacy & Dev Experience
 
-- [ ] Settings/Privacy accurately reflects Analytics usage and allows disconnection.  
-- [ ] README and iteration 4 docs describe mock, creative-only, and performance modes.  
+- [x] Settings/Privacy accurately reflects Analytics usage and allows disconnection.  
+- [x] README and iteration 4 docs describe mock, creative-only, and performance modes.  
 - [ ] Manual and automated E2E flows for performance mode succeed.
 
 ---
@@ -516,4 +516,3 @@ Use this checklist to confirm **Iteration 4** is complete.
 - **Iteration 2**: Gemini-powered creative analysis – real transcript/scenes and rich fingerprints across domains B–G.  
 - **Iteration 3**: Experience & coaching upgrade – polished UX, improved Overview + domain views, and creative-only insights.  
 - **Iteration 4 (this document)**: Adds the **Performance & Analytics Slice**, connecting YouTube Analytics (retention, CTR, engagement) to the creative fingerprint so creators can see **how their style lands with audiences** and get grounded, performance-aware coaching.
-

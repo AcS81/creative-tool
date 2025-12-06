@@ -12,9 +12,10 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 ad
 1) Prerequisites: Node 18+ (tested on Node 24), npm.
 2) Install dependencies: `npm install`
 3) Copy envs: `cp .env.example .env` (adjust DB path if needed). The default `ANALYSIS_MODE=mock` keeps everything local.
-4) Run migrations (includes latest columns such as `failureReason`):  
+4) Run migrations (includes latest columns such as `failureReason`, auth tables):  
    - `npm run prisma:migrate -- --name init` (first time)  
-   - `npm run prisma:migrate -- --name add-failure-reason` (if you pulled after that change)
+   - `npm run prisma:migrate -- --name add-failure-reason` (if you pulled after that change)  
+   - `npm run prisma:migrate -- --name add-oauth-auth-tables` (if not already applied)
 5) (Optional) Seed reference creators: `npm run seed`
 6) Start the app: `npm run dev` then open http://localhost:3000.
 7) Optional demo: click “Try a sample analysis” on the landing card to see the full experience without external keys.
@@ -54,4 +55,14 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 3 ad
 - API usage incurs Gemini and YouTube quotas/billing; pick a lighter model (e.g., `gemini-2.5-flash`) if you want lower cost/latency.
 
 ### Privacy
-- No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. OAuth/performance overlays are not yet enabled in this iteration.
+- No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. When performance is enabled, only YouTube Analytics metrics are stored; OAuth tokens are encrypted and can be revoked via the UI (Disconnect YouTube) or by deleting token rows.
+
+### Performance / Analytics mode (Iteration 4)
+- Set `ENABLE_PERFORMANCE=true` and provide: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URL`, `TOKEN_ENCRYPTION_KEY`. Use a Web OAuth client with redirect whitelisted (e.g., `http://localhost:3000/api/auth/youtube/callback`).
+- Connect YouTube from the landing page. Running an analysis for a video on the connected channel will attach `performanceProfile` (retention, CTR, views, likes, comments) and show the Performance tab + “Performance at a glance.”
+- Disconnect YouTube at any time via the landing page (tokens revoked/deleted).
+
+### E2E flows
+- Mock mode: set `ANALYSIS_MODE=mock`, run `npm run dev`, paste any URL, or click sample. Expect archetype, radar, insights, domain tabs.
+- Gemini mode: set `ANALYSIS_MODE=gemini` with `GEMINI_API_KEY`/`YOUTUBE_API_KEY`; run a real URL to see live fingerprints.
+- Gemini + Performance: set performance envs above, connect YouTube, analyze a video you own. Expect performance summary on Overview, Performance tab with retention + metrics + coaching.
