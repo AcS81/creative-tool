@@ -409,7 +409,7 @@ New configuration:
 
 **Goals**
 
-- [ ] For each domain tab (Voice, Language, Narrative, Visual, Editing, Sound):
+- [x] For each domain tab (Voice, Language, Narrative, Visual, Editing, Sound):
   - Display:
     - Domain archetype name (`primaryArchetype`).  
     - Domain `summaryText` from fingerprint.  
@@ -429,9 +429,9 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] For a completed analysis in Gemini mode:
+- [x] For a completed analysis in Gemini mode:
   - Each domain tab shows non-empty, domain-specific content derived from fingerprint.  
-- [ ] If a domain is missing, a clear “partial analysis” message appears and the rest of the UI remains functional.
+- [x] If a domain is missing, a clear “partial analysis” message appears and the rest of the UI remains functional.
 
 ---
 
