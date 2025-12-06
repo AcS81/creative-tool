@@ -191,6 +191,7 @@ export default function Home() {
               <li>✅ Call mock or Gemini pipeline</li>
               <li>✅ Show archetype + nearest neighbours</li>
               <li>✅ Radar, unusual insights, domain tabs</li>
+              <li>🔒 Connect YouTube to enable performance data (Iteration 4)</li>
             </ul>
             <button
               type="button"
@@ -199,6 +200,12 @@ export default function Home() {
             >
               Try a sample analysis
             </button>
+            <a
+              className="cs-link mt-3 inline-flex items-center text-sm font-semibold text-accent hover:underline"
+              href="/api/auth/youtube/start"
+            >
+              Connect YouTube (OAuth)
+            </a>
           </div>
         </form>
       </div>
