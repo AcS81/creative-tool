@@ -531,12 +531,12 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Implement a helper in `src/lib/analysis/insights.ts`:
+- [x] Implement a helper in `src/lib/analysis/insights.ts`:
   - Input: user meta axes, array of reference meta axes.  
   - Output: simple bullet list of 2–4 textual insights, e.g.:
     - “More abstract than 80% of reference creators.”  
     - “Less visually dynamic than most reference creators.”  
-- [ ] Display this as a bullet list on the Overview page under the radar chart.
+- [x] Display this as a bullet list on the Overview page under the radar chart.
 
 **Constraints**
 
@@ -545,9 +545,9 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] At least 2 insights generated per analysis (when reference data exists).  
-- [ ] Text is human readable and grounded in the data.  
-- [ ] If no reference creators exist (e.g., seed not run), show fallback (“Not enough reference data yet.”).
+- [x] At least 2 insights generated per analysis (when reference data exists).  
+- [x] Text is human readable and grounded in the data.  
+- [x] If no reference creators exist (e.g., seed not run), show fallback (“Not enough reference data yet.”).
 
 **Manual Test**
 
@@ -557,7 +557,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] Insight helper and UI integration are committed and working.
+- [x] Insight helper and UI integration are committed and working.
 
 ---
 

@@ -12,6 +12,7 @@ type AnalyzeResponse = {
   overallArchetype: string;
   nearestReferences: NearestReference[];
   nicheAverageMetaAxes?: VideoFingerprintJson["metaAxes"] | null;
+  insights?: string[];
 };
 
 export default function Home() {
@@ -135,6 +136,18 @@ export default function Home() {
                 <p className="text-sm text-muted">No reference data available yet.</p>
               )}
             </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-sm font-semibold text-muted">Where you’re unusual</p>
+            <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/80">
+              {(result.insights ?? []).map((insight, idx) => (
+                <li key={idx}>{insight}</li>
+              ))}
+              {(!result.insights || result.insights.length === 0) && (
+                <li className="text-muted">Not enough reference data yet.</li>
+              )}
+            </ul>
           </div>
         </div>
       )}

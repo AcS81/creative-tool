@@ -3,6 +3,7 @@ import prisma from "../../../lib/db";
 import { analyzeVideo } from "../../../lib/analysis/service";
 import { parseYouTubeUrl } from "../../../lib/youtube";
 import type { VideoFingerprintJson } from "../../../lib/types";
+import { generateInsights } from "../../../lib/analysis/insights";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -97,6 +98,7 @@ const fetchReferenceData = async (fingerprint: VideoFingerprintJson) => {
   return {
     nearestReferences: distances.sort((a, b) => a.distance - b.distance).slice(0, 3),
     averageMetaAxes: computeAverageMetaAxes(parsedFingerprints),
+    referenceMetaAxes: parsedFingerprints.map((fp) => fp.metaAxes),
   };
 };
 
@@ -166,9 +168,10 @@ export async function POST(request: Request) {
       data: { status: "complete" },
     });
 
-    const { nearestReferences, averageMetaAxes } = await fetchReferenceData(
+    const { nearestReferences, averageMetaAxes, referenceMetaAxes } = await fetchReferenceData(
       analysisResult.fingerprint,
     );
+    const insights = generateInsights(analysisResult.fingerprint.metaAxes, referenceMetaAxes);
 
     return NextResponse.json({
       videoAnalysisId: completedAnalysis.id,
@@ -176,6 +179,7 @@ export async function POST(request: Request) {
       overallArchetype: analysisResult.overallArchetype,
       nearestReferences,
       nicheAverageMetaAxes: averageMetaAxes,
+      insights,
     });
   } catch (error) {
     console.error("Analyze API error:", error);
