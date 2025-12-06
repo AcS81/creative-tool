@@ -13,7 +13,16 @@ type Props = {
 };
 
 export function DomainView({ name, profile, visual, tags, insights, extra }: Props) {
-  const tagList = tags && tags.length > 0 ? tags : profile.highlights ?? [];
+  const derivedTags = profile.scores
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3)
+    .map((score) => {
+      if (score.value >= 70) return `Strong ${score.label}`;
+      if (score.value >= 55) return `Leaning ${score.label}`;
+      return `${score.label} present`;
+    });
+
+  const tagList = tags && tags.length > 0 ? tags : [...derivedTags, ...(profile.highlights ?? [])];
   return (
     <div className="cs-card p-6 space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
