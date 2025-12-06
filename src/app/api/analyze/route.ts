@@ -197,6 +197,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const message =
+      error instanceof YoutubeApiError || error instanceof GeminiApiError
+        ? error.message
+        : "Could not analyze this URL. Please try again.";
+
     if (error instanceof YoutubeApiError || error instanceof GeminiApiError) {
       console.error("Analyze API upstream error:", error);
     } else {
@@ -206,12 +211,12 @@ export async function POST(request: Request) {
     if (videoAnalysisId) {
       await prisma.videoAnalysis.update({
         where: { id: videoAnalysisId },
-        data: { status: "failed" },
+        data: { status: "failed", failureReason: message },
       });
     }
 
     return NextResponse.json(
-      { error: "AnalysisFailed", message: "Could not analyze this URL. Please try again." },
+      { error: "AnalysisFailed", message },
       { status: 500 },
     );
   }

@@ -18,6 +18,7 @@ export interface VideoAnalysis {
   title?: string;
   durationSeconds?: number;
   status: AnalysisStatus;
+  failureReason?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
