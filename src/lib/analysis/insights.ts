@@ -16,10 +16,16 @@ const percentile = (value: number, samples: number[]) => {
   return below / samples.length;
 };
 
-export function generateInsights(
-  userMeta: MetaAxes,
-  references: MetaAxes[],
-): string[] {
+const describeDelta = (axis: keyof MetaAxes, pct: number, score: number) => {
+  const label = axisLabels[axis];
+  if (pct === 50) return `${label}: about typical vs reference creators.`;
+  if (pct > 70) return `${label}: higher than ${pct}% of reference creators (standout strength).`;
+  if (pct > 50) return `${label}: above ${pct}% of reference creators.`;
+  if (pct < 30) return `${label}: lower than ${100 - pct}% of reference creators (unusual softness).`;
+  return `${label}: below ${100 - pct}% of reference creators.`;
+};
+
+export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]): string[] {
   if (!references.length) return ["Not enough reference data yet."];
 
   const insights: { axis: keyof MetaAxes; score: number; pct: number }[] = [];
@@ -32,13 +38,10 @@ export function generateInsights(
   });
 
   insights.sort((a, b) => b.distanceFromMid - a.distanceFromMid);
-  const top = insights.slice(0, 3);
+  const top = insights.slice(0, 4);
 
   return top.map((item) => {
-    const label = axisLabels[item.axis];
     const pct = Math.round(item.pct * 100);
-    if (pct === 50) return `${label}: about typical vs reference creators.`;
-    if (pct > 50) return `${label}: higher than ${pct}% of reference creators.`;
-    return `${label}: lower than ${100 - pct}% of reference creators.`;
+    return describeDelta(item.axis, pct, item.score);
   });
 }
