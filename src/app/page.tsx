@@ -63,6 +63,7 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
+  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
     "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound" | "performance"
   >("overview");
@@ -124,6 +125,7 @@ export default function Home() {
     e.preventDefault();
     setError(null);
     setResult(null);
+    setDisconnectMessage(null);
 
     if (!isValidYouTubeUrl(url)) {
       setError("Please enter a valid YouTube URL.");
@@ -150,6 +152,22 @@ export default function Home() {
       setError("Could not analyze this URL. Please try again.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    setDisconnectMessage(null);
+    try {
+      const res = await fetch("/api/auth/youtube/disconnect", { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setDisconnectMessage(body?.message ?? "Could not revoke YouTube tokens.");
+        return;
+      }
+      const body = await res.json();
+      setDisconnectMessage(`YouTube connection revoked (${body.revoked ?? 0} token(s) removed).`);
+    } catch {
+      setDisconnectMessage("Could not revoke YouTube tokens. Please try again.");
     }
   };
 
@@ -251,6 +269,29 @@ export default function Home() {
           >
             Load sample analysis
           </button>
+          <div className="mt-4 space-y-2 rounded-md border border-border bg-surface-strong p-4 text-sm">
+            <p className="font-semibold text-foreground">Analytics & privacy</p>
+            <p className="text-muted">
+              No raw video is stored. Only URLs, derived fingerprints, and optional YouTube Analytics metrics are saved.
+              Tokens are revocable at any time.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <a
+                className="cs-button inline-flex w-fit justify-center text-xs"
+                href="/api/auth/youtube/start"
+              >
+                Connect YouTube
+              </a>
+              <button
+                type="button"
+                className="cs-button-secondary text-xs"
+                onClick={handleDisconnect}
+              >
+                Disconnect YouTube
+              </button>
+              {disconnectMessage && <span className="text-xs text-muted">{disconnectMessage}</span>}
+            </div>
+          </div>
         </div>
       )}
 
