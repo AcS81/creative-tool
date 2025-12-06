@@ -90,7 +90,7 @@ New configuration:
 
 **Goals**
 
-- [ ] Implement `src/lib/youtube/api.ts` with:
+- [x] Implement `src/lib/youtube/api.ts` with:
   - `fetchYoutubeMetadata(videoId: string)` → returns:
     - `title`  
     - `description`  
@@ -107,11 +107,11 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] Valid `videoId` → metadata object with required fields.  
-- [ ] Non-existent or private video → error with `type: 'NotFound' | 'Forbidden'`.  
-- [ ] Quota or other API failure → `type: 'UpstreamError'`.  
-- [ ] Unit tests (with HTTP mocking) cover success + error paths.  
-- [ ] Analysis service uses this wrapper (no duplicate HTTP logic).
+- [x] Valid `videoId` → metadata object with required fields.  
+- [x] Non-existent or private video → error with `type: 'NotFound' | 'Forbidden'`.  
+- [x] Quota or other API failure → `type: 'UpstreamError'`.  
+- [x] Unit tests (with HTTP mocking) cover success + error paths.  
+- [x] Analysis service uses this wrapper (no duplicate HTTP logic).
 
 ---
 
@@ -520,7 +520,7 @@ Use this checklist to confirm **Iteration 2** is complete before planning Iterat
 ### ✅ Phase 0 – External Services & Config
 
 - [x] Env vars and config for Gemini + YouTube set up.  
-- [ ] YouTube Data API wrapper works for metadata.  
+- [x] YouTube Data API wrapper works for metadata.  
 
 ### ✅ Phase 1 – Fingerprint & Data Shape
 
