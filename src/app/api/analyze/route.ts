@@ -147,6 +147,7 @@ export async function POST(request: Request) {
         channelTitle: metadata.channelTitle,
         publishedAt: metadata.publishedAt,
         durationSeconds,
+        thumbnailUrl: metadata.thumbnailUrl,
       },
     });
   } catch (error) {

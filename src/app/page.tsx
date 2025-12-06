@@ -9,6 +9,7 @@ import { DomainCard } from "../components/DomainCard";
 import { DomainTimeline } from "../components/DomainTimeline";
 import { AppShell } from "../components/AppShell";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Chip } from "../components/Chip";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -23,6 +24,7 @@ type AnalyzeResponse = {
     channelTitle?: string;
     publishedAt?: string;
     durationSeconds?: number;
+    thumbnailUrl?: string;
   };
 };
 
@@ -104,14 +106,16 @@ export default function Home() {
     <AppShell>
       <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 py-4 lg:py-6">
       <div className="cs-card w-full p-10 backdrop-blur">
-        <p className="cs-kicker">CreatorSight</p>
-        <h1 className="cs-heading mt-3 leading-tight">
-          Paste a YouTube URL to get a creative fingerprint.
-        </h1>
-        <p className="cs-body mt-3 max-w-3xl text-muted">
-          We validate the link, run the configured analysis pipeline, and preview your archetype,
-          radar, and closest reference creators.
-        </p>
+        <div className="flex flex-col gap-3">
+          <p className="cs-kicker">CreatorSight</p>
+          <h1 className="cs-heading leading-tight text-foreground">
+            Paste a YouTube URL to get a creative fingerprint.
+          </h1>
+          <p className="cs-body max-w-3xl text-muted">
+            We validate the link, run the configured analysis pipeline, and preview your archetype,
+            radar, and closest reference creators.
+          </p>
+        </div>
 
         <form
           id="analysis"
@@ -152,29 +156,64 @@ export default function Home() {
           <AnalysisLayout activeTab={activeTab} onTabChange={handleTabChange}>
             {activeTab === "overview" && (
               <div className="space-y-6">
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div>
-                    <p className="cs-kicker text-[10px]">Overall archetype</p>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {result.overallArchetype}
-                    </p>
-                    <p className="mt-1 text-sm text-muted">
-                      Analysis ID: {result.videoAnalysisId}
-                    </p>
+                <div className="grid gap-4 md:grid-cols-[1.4fr,1fr]">
+                  <div className="cs-panel flex flex-col gap-3 p-4 shadow-sm md:flex-row md:items-center md:gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10 text-lg font-bold text-accent">
+                        {result.overallArchetype.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="cs-kicker text-[10px]">Overall archetype</p>
+                        <p className="text-xl font-semibold text-foreground">
+                          {result.overallArchetype}
+                        </p>
+                        <p className="text-xs text-muted">Analysis ID: {result.videoAnalysisId}</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Chip label={`Voice: ${result.fingerprint.perDomain.voiceProfile.primaryArchetype}`} />
+                      <Chip
+                        label={`Language: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
+                      />
+                      <Chip
+                        label={`Narrative: ${result.fingerprint.perDomain.narrativeProfile.primaryArchetype}`}
+                      />
+                      <Chip
+                        label={`Visual: ${result.fingerprint.perDomain.visualProfile.primaryArchetype}`}
+                      />
+                      <Chip
+                        label={`Editing: ${result.fingerprint.perDomain.editingProfile.primaryArchetype}`}
+                      />
+                      <Chip
+                        label={`Sound: ${result.fingerprint.perDomain.soundProfile.primaryArchetype}`}
+                      />
+                    </div>
                   </div>
                   {result.metadata ? (
-                    <div className="cs-panel border-border/80 bg-surface px-4 py-3 text-sm text-muted shadow-sm">
-                      <p className="font-semibold text-foreground">{result.metadata.title}</p>
-                      <p>{result.metadata.channelTitle}</p>
-                      <p>
-                        {result.metadata.publishedAt
-                          ? new Date(result.metadata.publishedAt).toLocaleDateString()
-                          : "Publish date unknown"}
-                        {" • "}
-                        {typeof result.metadata.durationSeconds === "number"
-                          ? formatDuration(result.metadata.durationSeconds)
-                          : "Duration unknown"}
-                      </p>
+                    <div className="cs-panel flex gap-3 p-4 shadow-sm">
+                      {result.metadata.thumbnailUrl ? (
+                        <div className="overflow-hidden rounded-lg border border-border/80 bg-surface-strong">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={result.metadata.thumbnailUrl}
+                            alt={result.metadata.title ?? "Video thumbnail"}
+                            className="h-20 w-32 object-cover"
+                          />
+                        </div>
+                      ) : null}
+                      <div className="space-y-1 text-sm text-muted">
+                        <p className="font-semibold text-foreground">{result.metadata.title}</p>
+                        <p>{result.metadata.channelTitle}</p>
+                        <p>
+                          {result.metadata.publishedAt
+                            ? new Date(result.metadata.publishedAt).toLocaleDateString()
+                            : "Publish date unknown"}
+                          {" • "}
+                          {typeof result.metadata.durationSeconds === "number"
+                            ? formatDuration(result.metadata.durationSeconds)
+                            : "Duration unknown"}
+                        </p>
+                      </div>
                     </div>
                   ) : null}
                 </div>

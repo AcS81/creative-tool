@@ -11,6 +11,7 @@ vi.mock("../../../lib/youtube/api", () => ({
     channelTitle: "Channel Name",
     durationSeconds: 120,
     publishedAt: "2024-01-01T00:00:00Z",
+    thumbnailUrl: "http://thumb",
   }),
 }));
 
@@ -106,5 +107,6 @@ describe("POST /api/analyze", () => {
     expect((json.fingerprint as VideoFingerprintJson).metaAxes.voiceIntensity).toBeGreaterThanOrEqual(0);
     expect(json.metadata?.title).toBe("Sample Test Video");
     expect(json.metadata?.durationSeconds).toBe(120);
+    expect(json.metadata?.thumbnailUrl).toBe("http://thumb");
   });
 });

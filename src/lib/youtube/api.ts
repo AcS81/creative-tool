@@ -7,6 +7,7 @@ export type YoutubeMetadata = {
   channelTitle: string;
   publishedAt: string;
   durationSeconds: number;
+  thumbnailUrl?: string;
 };
 
 export type YoutubeApiErrorType = "InvalidId" | "NotFound" | "Forbidden" | "UpstreamError";
@@ -109,6 +110,10 @@ export async function fetchYoutubeMetadata(
   const channelTitle = snippet?.channelTitle ?? "";
   const publishedAt = snippet?.publishedAt;
   const durationIso = contentDetails?.duration;
+  const thumbnailUrl =
+    snippet?.thumbnails?.medium?.url ||
+    snippet?.thumbnails?.high?.url ||
+    snippet?.thumbnails?.default?.url;
 
   if (!title || !publishedAt || !durationIso) {
     throw new YoutubeApiError("UpstreamError", "YouTube API response missing required fields.");
@@ -121,5 +126,6 @@ export async function fetchYoutubeMetadata(
     channelTitle,
     publishedAt,
     durationSeconds: parseIsoDurationSeconds(durationIso),
+    thumbnailUrl,
   };
 }

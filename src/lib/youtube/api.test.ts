@@ -32,6 +32,7 @@ describe("fetchYoutubeMetadata", () => {
               channelId: "channel-1",
               channelTitle: "Channel",
               publishedAt: "2024-01-01T00:00:00Z",
+              thumbnails: { medium: { url: "http://thumb" } },
             },
             contentDetails: {
               duration: "PT1H2M3S",
@@ -49,6 +50,7 @@ describe("fetchYoutubeMetadata", () => {
       channelTitle: "Channel",
       publishedAt: "2024-01-01T00:00:00Z",
       durationSeconds: 3723,
+      thumbnailUrl: "http://thumb",
     });
   });
 
