@@ -12,6 +12,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Chip } from "../components/Chip";
 import { DomainView } from "../components/DomainView";
 import { DomainRadar } from "../components/DomainRadar";
+import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -83,6 +84,34 @@ export default function Home() {
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", tab);
     router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+  };
+
+  const loadSample = () => {
+    setError(null);
+    setLoading(false);
+    setResult({
+      videoAnalysisId: "sample-analysis",
+      fingerprint: sampleAnalysisResult.fingerprint,
+      overallArchetype: sampleAnalysisResult.overallArchetype,
+      nearestReferences: [],
+      nicheAverageMetaAxes: null,
+      insights: ["Sample insights: this is a demo view."],
+      insightDetails: {
+        unusualnessInsights: [],
+        strengthInsights: [],
+        growthInsights: [],
+        bullets: ["Sample insights: this is a demo view."],
+      },
+      domainInsights: {
+        voiceProfile: ["Sample: energetic delivery."],
+        languageProfile: ["Sample: balanced explanation and takes."],
+        narrativeProfile: ["Sample: clear setups and payoffs."],
+        visualProfile: ["Sample: steady framing with motion accents."],
+        editingProfile: ["Sample: cut-heavy pacing with polish."],
+        soundProfile: ["Sample: balanced mix under voice."],
+      },
+      metadata: sampleMetadata,
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -163,6 +192,13 @@ export default function Home() {
               <li>✅ Show archetype + nearest neighbours</li>
               <li>✅ Radar, unusual insights, domain tabs</li>
             </ul>
+            <button
+              type="button"
+              className="cs-button mt-4 w-full justify-center"
+              onClick={loadSample}
+            >
+              Try a sample analysis
+            </button>
           </div>
         </form>
       </div>
@@ -190,9 +226,18 @@ export default function Home() {
       )}
 
       {!loading && !error && !result && (
-        <div className="cs-card space-y-2 p-6">
+        <div className="cs-card space-y-3 p-6">
           <p className="text-sm font-semibold text-foreground">No analysis yet</p>
-          <p className="text-sm text-muted">Paste a YouTube URL above to see your fingerprint.</p>
+          <p className="text-sm text-muted">
+            Paste a YouTube URL above to see your fingerprint, or load our sample analysis.
+          </p>
+          <button
+            type="button"
+            className="cs-button w-fit"
+            onClick={loadSample}
+          >
+            Load sample analysis
+          </button>
         </div>
       )}
 
