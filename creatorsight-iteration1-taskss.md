@@ -108,18 +108,18 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Goals**
 
-- [ ] Define TypeScript types in `src/lib/types/` for:
+- [x] Define TypeScript types in `src/lib/types/` for:
   - `CreatorType = 'user' | 'reference'`  
   - `CreatorProfile`  
   - `VideoAnalysis`  
   - `VideoFingerprint`  
-- [ ] Define a JSON-friendly **fingerprint schema** that aligns with PRD domains:
+- [x] Define a JSON-friendly **fingerprint schema** that aligns with PRD domains:
   - Meta axes (Overview radar):
     - `voiceIntensity`, `conceptualDepth`, `narrativeStructureStrength`, `visualDynamism`, `productionPolish`.  
   - Per-domain summaries:
     - `voiceProfile`, `languageProfile`, `narrativeProfile`, `visualProfile`, `editingProfile`, `soundProfile`.  
-- [ ] Add Zod schemas for fingerprint validation in `src/lib/schemas/fingerprint.ts`.  
-- [ ] Export helper functions:
+- [x] Add Zod schemas for fingerprint validation in `src/lib/schemas/fingerprint.ts`.  
+- [x] Export helper functions:
   - `validateFingerprint(json)` → throws with helpful error on invalid.  
   - `isValidFingerprint(json)` → boolean.  
 
@@ -132,12 +132,12 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Acceptance Criteria**
 
-- [ ] TypeScript interfaces compile without errors.  
-- [ ] Zod schemas match interfaces exactly.  
-- [ ] At least one unit test file (e.g., `fingerprint.test.ts`) with:
+- [x] TypeScript interfaces compile without errors.  
+- [x] Zod schemas match interfaces exactly.  
+- [x] At least one unit test file (e.g., `fingerprint.test.ts`) with:
   - Valid fingerprint passes.  
   - Missing required field fails with descriptive error.  
-- [ ] `version` field enforced (e.g., `"1.0.0"`).  
+- [x] `version` field enforced (e.g., `"1.0.0"`).  
 
 **Manual Test**
 
@@ -149,7 +149,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 **Task Complete When**
 
 - [ ] Types + schemas + tests committed.  
-- [ ] No TypeScript or linting errors.
+- [x] No TypeScript or linting errors.
 
 ---
 
@@ -200,8 +200,8 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 - [x] Prisma schema validates (`npx prisma validate` passes).  
 - [x] `npx prisma migrate dev --name init_core_models` succeeds.  
-- [ ] `npx prisma studio` shows all three tables.  
-- [ ] Foreign keys set and working.
+- [x] `npx prisma studio` shows all three tables.  
+- [x] Foreign keys set and working.
 
 **Manual Test**
 
@@ -212,7 +212,7 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 
 **Task Complete When**
 
-- [ ] All acceptance criteria met.  
+- [x] All acceptance criteria met.  
 - [x] `db.ts` helper committed and used in at least one small script or test.
 
 ---
@@ -224,13 +224,13 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 - PRD Section 5.5 (Reference library & similarity), 1.3 (Solution step 3).  
 - For this iteration, we use a **small, hardcoded reference set** (e.g., 3–5 famous YouTubers) with manually created fingerprints.
 
-**Goals**
+- **Goals**
 
-- [ ] Create `prisma/seed.ts` that:
+- [x] Create `prisma/seed.ts` that:
   - Creates a few `CreatorProfile` entries with `type = 'reference'`.  
   - Attaches one `VideoAnalysis` + `VideoFingerprint` per reference creator with **hand-authored** fingerprints (aligned with schema).  
-- [ ] Add npm script `npm run seed` to execute the seed with `ts-node` or a compiled version.  
-- [ ] Document how to run seeds in `README`.
+- [x] Add npm script `npm run seed` to execute the seed with `ts-node` or a compiled version.  
+- [x] Document how to run seeds in `README`.
 
 **Constraints**
 
@@ -238,13 +238,13 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 - Fingerprints must be **valid** per Zod schema from Task 0.2.  
 - Use recognizable placeholder names (“High-Energy Commentator”, “Calm Storyteller”) without real personal data if you prefer.
 
-**Acceptance Criteria**
+- **Acceptance Criteria**
 
-- [ ] Running `npm run seed` populates DB with:
+- [x] Running `npm run seed` populates DB with:
   - At least 3 `CreatorProfile` rows of type `reference`.  
   - Each with one `VideoAnalysis` and one `VideoFingerprint`.  
-- [ ] No seed errors if run multiple times (idempotent or safe to re-run).  
-- [ ] Seeded fingerprints pass `validateFingerprint`.
+- [x] No seed errors if run multiple times (idempotent or safe to re-run).  
+- [x] Seeded fingerprints pass `validateFingerprint`.
 
 **Manual Test**
 
@@ -252,10 +252,10 @@ You can change this stack later; tasks are structured so that Gemini/YouTube int
 2. Open Prisma Studio → confirm profiles & fingerprints exist.  
 3. Optionally write a tiny Node script using Prisma to fetch references and log fingerprints.
 
-**Task Complete When**
+- **Task Complete When**
 
 - [ ] Seed script and documentation committed.  
-- [ ] Validation of seeded fingerprints confirmed.
+- [x] Validation of seeded fingerprints confirmed.
 
 ---
 
@@ -698,7 +698,7 @@ Use this checklist to confirm **Iteration 1** is complete before planning Iterat
 ### ✅ Phase 1 – Data Layer
 
 - [x] `CreatorProfile`, `VideoAnalysis`, `VideoFingerprint` models exist.  
-- [ ] Seeded reference creators and fingerprints exist.  
+- [x] Seeded reference creators and fingerprints exist.  
 
 ### ✅ Phase 2 – Mock Pipeline
 
