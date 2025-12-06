@@ -234,6 +234,11 @@ export default function Home() {
                       >
                         <p className="text-base font-semibold">{ref.displayName}</p>
                         <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
+                        {ref.closestAxis ? (
+                          <p className="mt-1 text-xs text-muted">
+                            Closest on {ref.closestAxis.label} ({Math.round(ref.closestAxis.delta)} pts)
+                          </p>
+                        ) : null}
                       </div>
                     ))}
                     {result.nearestReferences.length === 0 && (

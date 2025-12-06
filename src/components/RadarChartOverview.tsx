@@ -15,18 +15,27 @@ type Props = {
   comparisonValues?: VideoFingerprintJson["metaAxes"];
 };
 
-type ChartDatum = {
-  axis: string;
-  value: number;
-  comparison?: number;
-};
-
 const axisLabels: Record<keyof VideoFingerprintJson["metaAxes"], string> = {
   voiceIntensity: "Voice intensity",
   conceptualDepth: "Conceptual depth",
   narrativeStructureStrength: "Narrative structure",
   visualDynamism: "Visual dynamism",
   productionPolish: "Production polish",
+};
+
+const axisDescriptions: Record<keyof VideoFingerprintJson["metaAxes"], string> = {
+  voiceIntensity: "How energetic and projected the delivery feels.",
+  conceptualDepth: "How much abstract thinking and depth shows up.",
+  narrativeStructureStrength: "How clearly the story beats and arcs land.",
+  visualDynamism: "How much motion and visual change the viewer sees.",
+  productionPolish: "Perceived finish: cuts, mix, and overall sheen.",
+};
+
+type ChartDatum = {
+  axis: string;
+  value: number;
+  comparison?: number;
+  description: string;
 };
 
 const toChartData = (
@@ -37,7 +46,21 @@ const toChartData = (
     axis: axisLabels[key as keyof typeof axisLabels],
     value,
     comparison: comparison?.[key as keyof typeof meta],
+    description: axisDescriptions[key as keyof typeof axisDescriptions],
   }));
+
+function CustomTooltip({ active, payload, label }: any) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  const description = item.payload?.description as string | undefined;
+  return (
+    <div className="rounded-md border border-border bg-white px-3 py-2 text-sm shadow-md">
+      <p className="font-semibold text-foreground">{label}</p>
+      <p className="text-muted">{Math.round(item.value)} / 100</p>
+      {description ? <p className="mt-1 text-xs text-muted">{description}</p> : null}
+    </div>
+  );
+}
 
 export function RadarChartOverview({ fingerprint, comparisonValues, comparisonLabel }: Props) {
   if (!fingerprint) {
@@ -51,36 +74,54 @@ export function RadarChartOverview({ fingerprint, comparisonValues, comparisonLa
   const data = toChartData(fingerprint.metaAxes, comparisonValues);
 
   return (
-    <div className="h-[360px] w-full rounded-md border border-border bg-white/80 p-4 shadow-sm">
-      <ResponsiveContainer>
-        <RadarChart data={data}>
-          <PolarGrid stroke="#e2e8f0" />
-          <PolarAngleAxis dataKey="axis" tick={{ fill: "#475569", fontSize: 12 }} />
-          <PolarRadiusAxis tick={{ fill: "#94a3b8", fontSize: 10 }} angle={30} domain={[0, 100]} />
-          <Radar
-            name="You"
-            dataKey="value"
-            stroke="#0ea5e9"
-            fill="#0ea5e9"
-            fillOpacity={0.35}
-            strokeWidth={2}
-          />
-          {comparisonValues ? (
+    <div className="w-full space-y-3 rounded-md border border-border bg-white/80 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-muted">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-3 w-3 rounded-sm bg-[#2563eb]" />
+          You
+        </span>
+        {comparisonValues ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm border border-border bg-gray-200" />
+            {comparisonLabel ?? "Reference avg"}
+          </span>
+        ) : null}
+      </div>
+      <div className="grid gap-2 text-[12px] text-muted md:grid-cols-5">
+        <span>Voice intensity</span>
+        <span>Conceptual depth</span>
+        <span>Narrative structure</span>
+        <span>Visual dynamism</span>
+        <span>Production polish</span>
+      </div>
+      <div className="h-[360px] w-full">
+        <ResponsiveContainer>
+          <RadarChart data={data}>
+            <PolarGrid stroke="#e2e8f0" />
+            <PolarAngleAxis dataKey="axis" tick={{ fill: "#475569", fontSize: 12 }} />
+            <PolarRadiusAxis tick={{ fill: "#94a3b8", fontSize: 10 }} angle={30} domain={[0, 100]} />
             <Radar
-              name={comparisonLabel ?? "Reference"}
-              dataKey="comparison"
-              stroke="#94a3b8"
-              fill="#94a3b8"
-              fillOpacity={0.15}
+              name="You"
+              dataKey="value"
+              stroke="#2563eb"
+              fill="#2563eb"
+              fillOpacity={0.28}
               strokeWidth={2}
             />
-          ) : null}
-          <Tooltip
-            formatter={(val: number) => `${Math.round(val)} / 100`}
-            contentStyle={{ fontSize: 12, borderRadius: 8 }}
-          />
-        </RadarChart>
-      </ResponsiveContainer>
+            {comparisonValues ? (
+              <Radar
+                name={comparisonLabel ?? "Reference"}
+                dataKey="comparison"
+                stroke="#94a3b8"
+                fill="#94a3b8"
+                fillOpacity={0.12}
+                strokeWidth={2}
+              />
+            ) : null}
+            <Tooltip content={<CustomTooltip />} />
+          </RadarChart>
+        </ResponsiveContainer>
+      </div>
     </div>
   );
 }
