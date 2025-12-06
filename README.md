@@ -1,6 +1,6 @@
-# CreatorSight (Iteration 1 Foundation)
+# CreatorSight (Iteration 2 – Gemini/YouTube slice)
 
-CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now). This iteration sets up the base project with Tailwind, Prisma + SQLite, and landing copy for the upcoming pipeline.
+CreatorSight is a local Next.js app for analyzing YouTube videos. Iteration 2 adds Gemini + YouTube Data API support alongside the existing mock mode.
 
 ## Stack
 - Next.js 16 (App Router, TypeScript, Tailwind CSS 4)
@@ -11,12 +11,12 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 ## Getting started
 1) Prerequisites: Node 18+ (tested on Node 24), npm.
 2) Install dependencies: `npm install`
-2) Copy envs: `cp .env.example .env` (adjust if you prefer a different DB path). The default `ANALYSIS_MODE=mock` keeps everything local; switch to `gemini` when you have API keys set.
-3) Run the initial migration (keeps Prisma cache inside the repo):  
-   - `npm run prisma:migrate -- --name init`  
-   - or `CACHE_DIR=.prisma/cache npx prisma migrate dev --name init`
-4) (Optional) Seed reference creators: `npm run seed`
-5) Start the app: `npm run dev` then open http://localhost:3000.
+3) Copy envs: `cp .env.example .env` (adjust DB path if needed). The default `ANALYSIS_MODE=mock` keeps everything local.
+4) Run migrations (includes latest columns such as `failureReason`):  
+   - `npm run prisma:migrate -- --name init` (first time)  
+   - `npm run prisma:migrate -- --name add-failure-reason` (if you pulled after that change)
+5) (Optional) Seed reference creators: `npm run seed`
+6) Start the app: `npm run dev` then open http://localhost:3000.
 
 ## Useful scripts
 - `npm run dev` / `npm run build` / `npm start`
@@ -28,10 +28,29 @@ CreatorSight is a local Next.js app for analyzing YouTube videos (mocked for now
 - `npm run test` (Vitest)
 
 ## Notes
-- The analysis is mock/deterministic for this iteration (no Gemini or YouTube APIs yet).
-- `/` lets you paste a YouTube URL, calls the mock analysis API, and shows archetype, radar chart (with reference average), nearest references, and simple domain tabs.
+- `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, and domain tabs with radars/timelines/highlights.
 - Prisma models include core entities; more detail will arrive in later iterations.
 
 ## Analysis modes
-- `mock` (default): deterministic, offline-friendly analysis. Works without any external API keys.
-- `gemini`: enables real Gemini + YouTube Data API analysis (coming in Iteration 2). Requires `GEMINI_API_KEY` and `YOUTUBE_API_KEY`; requests fail fast with a `MisconfiguredEnvironment` error if keys are missing.
+- `mock` (default): deterministic, offline-friendly analysis. Works without external API keys.
+- `gemini`: real Gemini + YouTube Data API. Requires `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, and optional `GEMINI_MODEL` (default `gemini-2.5-pro`). Requests fail fast with `MisconfiguredEnvironment` if keys are missing.
+
+### Run in mock mode
+1) Ensure `.env` has `ANALYSIS_MODE=mock`.
+2) `npm run dev` and analyze any YouTube URL (data is deterministic).
+
+### Run in gemini mode
+1) Set in `.env`:  
+   - `ANALYSIS_MODE=gemini`  
+   - `GEMINI_API_KEY=<your key>`  
+   - `YOUTUBE_API_KEY=<your key>`  
+   - (optional) `GEMINI_MODEL=gemini-2.5-pro` or `gemini-2.5-flash`
+2) Restart `npm run dev`.
+3) Paste a public YouTube URL and run analysis. If Gemini returns 404, try a different `GEMINI_MODEL` your key can access.
+
+### Latency and cost expectations
+- Gemini + YouTube mode may take up to 5–10 minutes for a long video; calls are synchronous in this iteration.
+- API usage incurs Gemini and YouTube quotas/billing; pick a lighter model (e.g., `gemini-2.5-flash`) if you want lower cost/latency.
+
+### Privacy
+- No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. OAuth/performance overlays are not yet enabled in this iteration.

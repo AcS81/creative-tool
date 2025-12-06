@@ -468,17 +468,17 @@ New configuration:
 
 **Goals**
 
-- [ ] Extend `README.md` to explain:
+- [x] Extend `README.md` to explain:
   - How to run in `mock` mode (Iteration 1 behavior).  
   - How to enable `gemini` mode:
     - Set `GEMINI_API_KEY`, `YOUTUBE_API_KEY`, `ANALYSIS_MODE=gemini`.  
   - Latency and cost expectations (e.g., up to 5–10 minutes, per-clip cost notes).  
-- [ ] Clarify privacy:
+- [x] Clarify privacy:
   - No raw video stored; only URLs and derived fingerprints.
 
 **Acceptance Criteria**
 
-- [ ] Fresh developer can follow README to:
+- [x] Fresh developer can follow README to:
   - Run the app in `mock` mode.  
   - Switch to `gemini` mode (if they have keys) and successfully analyze at least one public video.
 
