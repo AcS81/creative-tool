@@ -204,11 +204,11 @@ New configuration:
 
 **Goals**
 
-- [ ] Implement `src/lib/gemini/client.ts` with:
+- [x] Implement `src/lib/gemini/client.ts` with:
   - `getTranscriptAndScenes(input: { videoUrl: string })` →  
     `{ transcriptSegments, sceneSegments }` where:
-    - `transcriptSegments`: `{ startSeconds, endSeconds, text }[]`  
-    - `sceneSegments`: `{ startSeconds, endSeconds, label, shortSummary }[]`  
+      - `transcriptSegments`: `{ startSeconds, endSeconds, text }[]`  
+      - `sceneSegments`: `{ startSeconds, endSeconds, label, shortSummary }[]`  
 - [ ] Use a structured JSON-only prompt that:
   - Describes the required shapes.  
   - Encourages coarse segmentation for longer videos.  
@@ -220,10 +220,10 @@ New configuration:
 
 **Acceptance Criteria**
 
-- [ ] With `ANALYSIS_MODE=gemini` and valid key:
+- [x] With `ANALYSIS_MODE=gemini` and valid key:
   - Sample public YouTube URL returns structured transcript + scenes.  
-- [ ] Gemini errors (quota, network, malformed response) are normalized to typed errors.  
-- [ ] Unit/integration tests with mocked Gemini responses validate shape and error paths.
+- [x] Gemini errors (quota, network, malformed response) are normalized to typed errors.  
+- [x] Unit/integration tests with mocked Gemini responses validate shape and error paths.
 
 ---
 
