@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { VideoFingerprintJson } from "../types";
+import type { LegacyVideoFingerprintJson, VideoFingerprintJson } from "../types";
 
 const domainScoreSchema = z.object({
   key: z.string().min(1, "score key is required"),
@@ -63,10 +63,9 @@ const performanceProfileSchema = z.object({
   insights: z.array(z.string().min(1)).optional(),
 });
 
-const fingerprintVersionSchema = z.union([z.literal("1.1.0"), z.literal("1.2.0")]);
+const fingerprintVersionSchema = z.literal("1.2.0");
 
-export const fingerprintSchema = z.object({
-  version: fingerprintVersionSchema,
+const baseFingerprintShape = {
   createdAt: z
     .string()
     .datetime({ offset: true, message: "createdAt must be an ISO datetime string" }),
@@ -110,21 +109,43 @@ export const fingerprintSchema = z.object({
     .optional(),
   performanceProfile: performanceProfileSchema.optional(),
   hasPerformanceData: z.boolean().optional().default(false),
+};
+
+export const fingerprintSchema = z.object({
+  version: fingerprintVersionSchema,
+  ...baseFingerprintShape,
+});
+
+const legacyFingerprintSchema = z.object({
+  version: z.literal("1.1.0"),
+  ...baseFingerprintShape,
 });
 
 export type FingerprintSchema = z.infer<typeof fingerprintSchema>;
 
 export function validateFingerprint(json: unknown): VideoFingerprintJson {
   const parsed = fingerprintSchema.safeParse(json);
-  if (!parsed.success) {
-    const message = parsed.error.issues
-      .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
-      .join("; ");
-    throw new Error(`Invalid fingerprint: ${message}`);
+  if (parsed.success) {
+    return parsed.data;
   }
-  return parsed.data;
+
+  const legacyParsed = legacyFingerprintSchema.safeParse(json);
+  if (legacyParsed.success) {
+    const legacy = legacyParsed.data as LegacyVideoFingerprintJson;
+    return {
+      ...legacy,
+      version: "1.2.0",
+      hasPerformanceData: legacy.hasPerformanceData ?? Boolean(legacy.performanceProfile),
+    };
+  }
+
+  const message = parsed.error.issues
+    .map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`)
+    .join("; ");
+  throw new Error(`Invalid fingerprint: ${message}`);
 }
 
 export function isValidFingerprint(json: unknown): json is VideoFingerprintJson {
-  return fingerprintSchema.safeParse(json).success;
+  if (fingerprintSchema.safeParse(json).success) return true;
+  return legacyFingerprintSchema.safeParse(json).success;
 }

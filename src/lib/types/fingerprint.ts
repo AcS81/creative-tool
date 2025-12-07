@@ -113,8 +113,10 @@ export interface PerformanceProfile {
   insights?: string[];
 }
 
-export interface VideoFingerprintJson {
-  version: "1.1.0" | "1.2.0";
+export type VideoFingerprintVersion = "1.2.0";
+export type LegacyVideoFingerprintVersion = "1.1.0";
+
+interface VideoFingerprintBase {
   createdAt: string;
   metaAxes: MetaAxes;
   perDomain: FingerprintPerDomain;
@@ -128,6 +130,14 @@ export interface VideoFingerprintJson {
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
 }
+
+export interface VideoFingerprintJson extends VideoFingerprintBase {
+  version: VideoFingerprintVersion;
+}
+
+export type LegacyVideoFingerprintJson = VideoFingerprintBase & {
+  version: LegacyVideoFingerprintVersion;
+};
 
 export interface VideoFingerprint {
   id: string;

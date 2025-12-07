@@ -121,3 +121,4 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 - Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present. Text-only v1 is **removed**; `ANALYSIS_VERSION=v1` now throws a configuration error instead of routing to the deprecated path.
 - Optional override: `ANALYSIS_VERSION=v2` keeps the canonical path explicit; no extra flag needed in normal dev/prod.
 - `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v2-multimodal` for new runs (legacy records may still show `gemini-v1-text`) and includes `diagnostics.multimodalFallbackUsed` when the temp-upload inline path is taken.
+- Fingerprint schema: `VideoFingerprintJson` v2 (`version=1.2.0`) is canonical. Legacy v1.1 fingerprints are accepted only via an upgrade shim that rewrites them to `1.2.0`; new analyses always emit `1.2.0`.

@@ -128,13 +128,13 @@ When this iteration is done:
 **Goals**
 
 - [ ] Consolidate fingerprint types in `src/lib/schemas/fingerprint.ts` (or equivalent) so that:
-  - [ ] `VideoFingerprintJson` v2 is clearly marked as the **canonical** schema.  
-  - [ ] Any v1 variants are either removed or supported via a small, explicit migration helper.  
+-  - ✅ `VideoFingerprintJson` v2 is clearly marked as the **canonical** schema; legacy v1.1 inputs are upgraded to v2 on validation.  
+-  - ✅ Any v1 variants are supported only via a small, explicit migration helper in validation.  
 - [ ] Ensure `buildVideoFingerprint` from Iteration 1:
-  - [ ] Is the only entry point used by `analyzeVideo` for creative fingerprints.  
-  - [ ] Produces all meta axes described in `docs/axes_and_domains.md`.  
+-  - ✅ Is the only entry point used by `analyzeVideo` for creative fingerprints.  
+-  - ✅ Produces all meta axes described in `docs/axes_and_domains.md`.  
 - [ ] Update DB/Prisma types (if needed) so `VideoFingerprint` storage is aligned with v2:
-  - [ ] If schema drift exists, add `schemaVersion` and a migration path or re-seed data.  
+-  - ✅ Version is fixed to `1.2.0` in types/schemas; legacy reads are upgraded in-memory.
 
 **Constraints**
 

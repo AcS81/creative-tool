@@ -52,7 +52,9 @@ describe("fingerprint schema", () => {
 
   it("flags invalid objects via isValidFingerprint", () => {
     const withBadVersion = { ...baseFingerprint, version: "1.0.0" };
+    const legacy = { ...baseFingerprint, version: "1.1.0" };
     expect(isValidFingerprint(withBadVersion)).toBe(false);
+    expect(isValidFingerprint(legacy)).toBe(true);
     expect(isValidFingerprint(baseFingerprint)).toBe(true);
   });
 
@@ -61,9 +63,16 @@ describe("fingerprint schema", () => {
     expect(parsed.perDomain.editingProfile.scores[0].value).toBeTypeOf("number");
   });
 
+  it("upgrades legacy v1.1 fingerprints to v2", () => {
+    const legacy = { ...baseFingerprint, version: "1.1.0" };
+    const upgraded = validateFingerprint(legacy);
+    expect(upgraded.version).toBe("1.2.0");
+    expect(upgraded.hasPerformanceData).toBe(false);
+  });
+
   it("throws descriptive error for unsupported version", () => {
     const legacy = { ...baseFingerprint, version: "1.0.0" };
-    expect(() => validateFingerprint(legacy)).toThrow(/version/i);
+    expect(() => validateFingerprint(legacy)).toThrow(/Invalid fingerprint/);
   });
 
   it("accepts an optional performance profile", () => {
