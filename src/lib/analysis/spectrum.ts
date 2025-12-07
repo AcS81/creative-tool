@@ -75,3 +75,4 @@ export const buildSpectrumData = (domain: DomainKey, profile: DomainProfile): Sp
     };
   });
 };
+
