@@ -31,6 +31,11 @@ export interface GeminiNarrativeMetrics {
   mini_arc_density: GeminiObservedMetric;
   foreshadow_callbacks: GeminiObservedMetric;
   transition_clarity: GeminiObservedMetric;
+  story_presence?: GeminiObservedMetric;
+  devices?: Array<{
+    type: string;
+    timestamp: number;
+  }>;
 }
 
 export interface GeminiVisualEditSoundMetrics {
@@ -39,6 +44,7 @@ export interface GeminiVisualEditSoundMetrics {
   cut_rate: GeminiObservedMetric;
   pattern_interrupts: GeminiObservedMetric;
   broll_coverage: GeminiObservedMetric;
+  music_coverage: GeminiObservedMetric;
   music_changes: GeminiObservedMetric;
   sfx_density: GeminiObservedMetric;
   silence_for_emphasis: GeminiObservedMetric;

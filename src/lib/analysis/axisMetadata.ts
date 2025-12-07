@@ -195,6 +195,15 @@ const languageAxes: AxisMetadata[] = [
 
 const narrativeAxes: AxisMetadata[] = [
   {
+    id: "narrative.story_presence",
+    domain: "narrative",
+    label: "Story presence",
+    shortDescription: "Amount of narrative or anecdotal framing across the video.",
+    howMeasured: "Share of beats that are hook/setup/escalation/payoff versus straight explanation.",
+    scaleDirection: "low=instructional, high=story-led",
+    aliases: ["story_presence", "storyPresence"],
+  },
+  {
     id: "narrative.mini_arc_density",
     domain: "narrative",
     label: "Mini-arc density",

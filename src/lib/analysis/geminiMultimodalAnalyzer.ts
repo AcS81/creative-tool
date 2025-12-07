@@ -85,6 +85,18 @@ const responseJsonSchema = {
         mini_arc_density: metricSchema,
         foreshadow_callbacks: metricSchema,
         transition_clarity: metricSchema,
+        story_presence: metricSchema,
+        devices: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string" },
+              timestamp: { type: "number" },
+            },
+            required: ["type", "timestamp"],
+          },
+        },
       },
       required: ["beats", "mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
     },
@@ -96,6 +108,7 @@ const responseJsonSchema = {
         cut_rate: metricSchema,
         pattern_interrupts: metricSchema,
         broll_coverage: metricSchema,
+        music_coverage: metricSchema,
         music_changes: metricSchema,
         sfx_density: metricSchema,
         silence_for_emphasis: metricSchema,
@@ -106,6 +119,7 @@ const responseJsonSchema = {
         "cut_rate",
         "pattern_interrupts",
         "broll_coverage",
+        "music_coverage",
         "music_changes",
         "sfx_density",
         "silence_for_emphasis",
@@ -127,13 +141,14 @@ const userPrompt = [
   "Return JSON for these domains:",
   "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation.",
   "- language: concreteness, metaphor_density, references, humor, teaching_vs_riffing.",
-  "- narrative: beats [{label,start,end}], mini_arc_density, foreshadow_callbacks, transition_clarity.",
-  "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_changes, sfx_density, silence_for_emphasis.",
+  "- narrative: beats [{label,start,end}], mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence, devices [{type,timestamp}].",
+  "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
   "Rules:",
   "- scores are 0-100 reflecting the observed strength/level.",
   "- value is a short raw measurement string.",
   "- explanation is a short justification.",
-  "- Provide beats using seconds.",
+  "- Provide beats using seconds and include hook/setup/escalation/payoff/outro labels when present.",
+  "- For narrative.devices, use types: contrast, foreshadow, callback, analogy, reversal, pattern_interrupt, stakes_change.",
   "- JSON only; no prose.",
 ].join("\n");
 
@@ -192,12 +207,18 @@ const summarize = (
   return `${domainName} highlights — ${snippets.join("; ")}.`;
 };
 
-const toBeatSegments = (beats: GeminiMultimodalResponse["narrative"]["beats"]): BeatSegment[] =>
+const toBeatSegments = (
+  beats: GeminiMultimodalResponse["narrative"]["beats"],
+  devices?: GeminiMultimodalResponse["narrative"]["devices"],
+): BeatSegment[] =>
   beats.map((beat) => ({
     label: beat.label,
     startSeconds: beat.start,
     endSeconds: beat.end,
-    devices: [],
+    devices:
+      devices
+        ?.filter((d) => d.timestamp >= beat.start && d.timestamp <= beat.end)
+        .map((d) => d.type) ?? [],
   }));
 
 const buildDomainProfile = (
@@ -252,7 +273,7 @@ const buildProfiles = (
   const narrative = buildDomainProfile(
     "narrative",
     "Narrative",
-    ["mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
+    ["mini_arc_density", "foreshadow_callbacks", "transition_clarity", "story_presence"],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -278,13 +299,20 @@ const buildProfiles = (
     fromFallback ? "Used fallback media path" : undefined,
   );
 
+  const soundHighlights: string[] = [];
+  if (ves.music_coverage?.value && ves.music_coverage.value !== "unobserved") {
+    soundHighlights.push(`Music coverage ~${ves.music_coverage.value}`);
+  }
+  if (ves.music_changes?.value && ves.music_changes.value !== "unobserved") {
+    soundHighlights.push(`Music changes: ${ves.music_changes.value}`);
+  }
   const sound = buildDomainProfile(
     "sound",
     "Sound",
-    ["music_changes", "sfx_density", "silence_for_emphasis"],
+    ["music_coverage", "music_changes", "sfx_density", "silence_for_emphasis"],
     ves,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fromFallback ? "Used fallback media path" : soundHighlights.join("; "),
   );
 
   return { voice, language, narrative, visual, editing, sound };
@@ -329,7 +357,7 @@ export const analyzeVideoMultimodal = async (input: {
 
   return {
     profiles,
-    beats: toBeatSegments(parsed.narrative.beats),
+    beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
     axisDetails,
     diagnostics: {
       fromFallback: result.fromFallback,

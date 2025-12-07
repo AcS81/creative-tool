@@ -39,6 +39,8 @@ const sampleRaw = {
     mini_arc_density: { score: 50, value: "3", explanation: "some arcs" },
     foreshadow_callbacks: { score: 40, value: "2 callbacks", explanation: "few callbacks" },
     transition_clarity: { score: 60, value: "clear", explanation: "clear transitions" },
+    story_presence: { score: 70, value: "strong", explanation: "narrative-led" },
+    devices: [{ type: "callback", timestamp: 10 }],
   },
   visual_edit_sound: {
     environment_stability: { score: 70, value: "80% same setup", explanation: "stable" },
@@ -46,6 +48,7 @@ const sampleRaw = {
     cut_rate: { score: 55, value: "2.1s avg", explanation: "moderate cuts" },
     pattern_interrupts: { score: 50, value: "3 moments", explanation: "some interrupts" },
     broll_coverage: { score: 58, value: "30%", explanation: "broll occasionally" },
+    music_coverage: { score: 65, value: "70%", explanation: "music under most of video" },
     music_changes: { score: 40, value: "2 changes", explanation: "few music swaps" },
     sfx_density: { score: 30, value: "2 sfx", explanation: "light sfx" },
     silence_for_emphasis: { score: 20, value: "1 pause", explanation: "rare silence" },
@@ -66,6 +69,7 @@ describe("analyzeVideoMultimodal", () => {
     const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
     expect(result.profiles.voice.scores.length).toBeGreaterThan(0);
     expect(result.beats?.[0]?.label).toBe("hook");
+    expect(result.beats?.[0]?.devices).toContain("callback");
     expect(result.diagnostics.fromFallback).toBe(false);
     expect(result.axisDetails["voice.speaking_rate"]?.rawValue).toBe("155 wpm");
   });
