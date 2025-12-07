@@ -14,6 +14,7 @@ This replaces the previous plan. It assumes we use Gemini’s native video inges
 - Observation from the fallback downloader (Node fetch with Range bytes): a plain watch URL returns `status=200`, `content-type=text/html`, ~1.5MB of HTML starting with `<!DOCTYPE html>`. This means our current fallback (`inline_data` built from `fetch(youtubeUrl)`) is not providing audio/video to Gemini.
 - Primary `file_data` entitlement could not be validated in this environment (no `GEMINI_API_KEY` available at run time); rerun the probe with a key to confirm whether direct YouTube ingestion works for this account.
 - Recommendation: treat the PRD “no download” non-goal as needing a narrow exception—fallback must stream real media bytes (e.g., via a short progressive audio/video pull or a signed temp upload) instead of watch-page HTML, otherwise multimodal quality will remain unreliable.
+- Axis semantics and glossary live in `docs/axes_and_domains.md`; the UI now links to this doc from the Overview to explain how each axis is measured and what “unobserved” means.
 
 ---
 

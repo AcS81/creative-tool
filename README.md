@@ -30,6 +30,8 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
 - `npm run prisma:studio` (opens Prisma Studio)
 - `npm run seed` (populate reference creators + fingerprints)
 - `npm run test` (Vitest)
+- `npm run probe:ingestion` (dev probe for Gemini file_data vs fallback ingestion)
+- `npm run eval:golden` (run multimodal pipeline against the documented golden YouTube set)
 
 ## Notes
 - `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, overview insights, and domain tabs (radars + score bars + micro-insights). A sample analysis button is available for instant demo.
@@ -81,3 +83,4 @@ The current app covers the PRD MVP features:
 - **Iteration 3**: `docs/iteration_3_e2e.md` – UX/coaching polish, sample/demo flow.
 - **Iteration 4**: `docs/iteration_4_e2e.md` – Performance mode (YouTube OAuth + Analytics) end-to-end.
 - **Iteration 5**: `docs/iteration_5_e2e.md` – quick checklist that combines running an analysis, revisiting it via “Recent analyses”, and (optionally) seeing the Performance tab with live data.
+- **Axes glossary**: `docs/axes_and_domains.md` – human-readable meanings for meta/domain axes and how to interpret scores/unobserved states.

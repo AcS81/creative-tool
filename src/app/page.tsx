@@ -582,6 +582,17 @@ export default function Home() {
 
                 <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
                   <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-semibold text-muted">Insights</p>
+                      <a
+                        href="/docs/axes_and_domains.md"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs font-semibold text-foreground underline"
+                      >
+                        What do these axes mean?
+                      </a>
+                    </div>
                     <p className="text-sm font-semibold text-muted">Insights</p>
                     <ul className="list-disc space-y-1 pl-4 text-sm text-foreground/85">
                       {(result.insightDetails?.bullets ?? result.insights ?? []).map((insight, idx) => (
