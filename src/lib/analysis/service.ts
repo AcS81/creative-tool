@@ -10,12 +10,13 @@ import {
   analyzeVisual,
   analyzeVoice,
 } from "./geminiDomains";
-import type { DomainProfile, MetaAxes, VideoFingerprintJson } from "../types";
+import type { BeatSegment, DomainProfile, MetaAxes, VideoFingerprintJson, SceneSegment, TranscriptSegment } from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
 import { fetchVideoAnalytics } from "../youtube/analytics";
 import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
+import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
 
 type AnalyzeOptions = {
   config?: AppConfig;
@@ -58,22 +59,56 @@ export async function analyzeVideo(
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
   const useMock = options.useMock ?? config.analysisMode === "mock";
+  const useMultimodal = config.analysisV2MultimodalEnabled === true;
 
   if (useMock !== false) {
     return mockAnalyzeVideo(input);
   }
 
   const videoUrl = buildVideoUrl(input.videoId);
-  const transcriptAndScenes = await getTranscriptAndScenes({ videoUrl }, { config });
+  let voiceProfile: DomainProfile;
+  let languageProfile: DomainProfile;
+  let narrativeProfile: DomainProfile;
+  let visualProfile: DomainProfile;
+  let editingProfile: DomainProfile;
+  let soundProfile: DomainProfile;
+  let beats: BeatSegment[] | undefined;
+  let multimodalDiagnostics: AnalyzeVideoResult["diagnostics"] | undefined;
+  let transcriptAndScenes:
+    | {
+        transcriptSegments: TranscriptSegment[];
+        sceneSegments: SceneSegment[];
+      }
+    | undefined;
 
-  const domainInput = {
-    transcriptSegments: transcriptAndScenes.transcriptSegments,
-    sceneSegments: transcriptAndScenes.sceneSegments,
-    videoUrl,
-  };
+  if (useMultimodal) {
+    const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+    voiceProfile = multimodal.profiles.voice;
+    languageProfile = multimodal.profiles.language;
+    narrativeProfile = multimodal.profiles.narrative;
+    visualProfile = multimodal.profiles.visual;
+    editingProfile = multimodal.profiles.editing;
+    soundProfile = multimodal.profiles.sound;
+    beats = multimodal.beats;
+    multimodalDiagnostics = {
+      source: "gemini",
+      performanceAttached: false,
+      performanceErrorType: undefined,
+      performanceErrorMessage: undefined,
+      analysisVersion: "v2_multimodal",
+      usedFallback: multimodal.diagnostics.fromFallback,
+      unobservedCounts: multimodal.diagnostics.unobservedCounts,
+    };
+  } else {
+    transcriptAndScenes = await getTranscriptAndScenes({ videoUrl }, { config });
 
-  const [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] =
-    await Promise.all([
+    const domainInput = {
+      transcriptSegments: transcriptAndScenes.transcriptSegments,
+      sceneSegments: transcriptAndScenes.sceneSegments,
+      videoUrl,
+    };
+
+    const results = await Promise.all([
       analyzeVoice(domainInput, { config }),
       analyzeLanguage(domainInput, { config }),
       analyzeNarrative(domainInput, { config }),
@@ -81,6 +116,9 @@ export async function analyzeVideo(
       analyzeEditing(domainInput, { config }),
       analyzeSound(domainInput, { config }),
     ]);
+
+    [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] = results;
+  }
 
   const metaAxes = computeMetaAxes({
     voice: voiceProfile,
@@ -106,10 +144,14 @@ export async function analyzeVideo(
       soundProfile,
     },
     overallArchetype,
-    supporting: {
-      transcriptSegments: transcriptAndScenes.transcriptSegments,
-      sceneSegments: transcriptAndScenes.sceneSegments,
-    },
+    supporting: useMultimodal
+      ? {
+          beats,
+        }
+      : {
+          transcriptSegments: transcriptAndScenes?.transcriptSegments,
+          sceneSegments: transcriptAndScenes?.sceneSegments,
+        },
     hasPerformanceData: false,
   };
 
@@ -160,6 +202,7 @@ export async function analyzeVideo(
       performanceAttached,
       performanceErrorType,
       performanceErrorMessage,
+      ...(multimodalDiagnostics ?? {}),
     },
   };
 }

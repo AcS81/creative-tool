@@ -17,6 +17,9 @@ export interface AnalyzeVideoResult {
     performanceAttached?: boolean;
     performanceErrorType?: string;
     performanceErrorMessage?: string;
+    analysisVersion?: "v1_text" | "v2_multimodal";
+    usedFallback?: boolean;
+    unobservedCounts?: Record<string, number>;
   };
 }
 
