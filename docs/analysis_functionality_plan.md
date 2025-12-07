@@ -1,103 +1,108 @@
-# CreatorSight – Functional Upgrade Plan (Grounded Analysis)
+# CreatorSight – Native Multimodal Analysis Plan (Gemini with YouTube URL file parts)
 
-Purpose: replace hallucinated, URL-only analysis with grounded signals while staying aligned with the MVP PRD. This plan adds concrete ingestion and scoring steps for the creative domains and optional performance overlay.
+This replaces the previous plan. It assumes we use Gemini’s native video ingestion (YouTube URL passed as a `file_data` part) so the model “sees/hears” the video instead of hallucinating from text. Scope and outputs stay aligned to the MVP PRD.
 
 ---
 
-## 1) Gaps Today
-- Gemini is only given a YouTube URL; it cannot see/hear the video, so transcripts, scenes, and all domain judgments are guessed.
-- No real audio/text evidence → wrong story/music/voice calls; users see shapes without meaningful text.
-- Axis explanations live in multiple places and do not tie back to measured signals.
+## 1) Reality Check: How Gemini Must Be Called
+- Passing the URL as plain text is text-only → hallucinations.
+- Passing the URL as `file_data` with `mime_type: "video/*"` (Google AI Studio / Vertex “YouTube import” capability) lets Gemini fetch frames/audio directly.
+- We must verify entitlement: if `file_data` fails (403/unsupported), fall back to a lightweight fetch + signed URL upload, still without persisting raw media after use.
 
-## 2) Ingestion & Evidence (no persistent video storage)
-Data we actually need to collect per video:
-- **Metadata**: title, channel, duration (YouTube Data API).
-- **Transcript**: official captions via timedtext; fallback ASR.
-- **Audio slices**: short-lived temp audio (no persistence) for prosody features and music/SFX detection.
-- **Frames & cuts**: lightweight shot boundary detection to estimate cut pace and visual setup changes.
+---
 
-Concrete approach:
-1. **Transcript first**  
-   - Try YouTube captions (`timedtext`/`captions` APIs).  
-   - If missing, stream low-bitrate audio only and run ASR (Whisper-small or Gemini audio). Delete temp files immediately; keep only segmented text+timestamps.
-2. **Prosody audio pass (30–90s sampled windows)**  
-   - Extract word-level timing from transcript; refine with silence detection to find pauses/resets.  
-   - Use DSP on sampled audio windows (e.g., 1s RMS + pitch contour) to compute loudness range and pitch variance. No full-video storage.
-3. **Shot/cut detection (lightweight)**  
-   - Sample frames at ~1 fps; compute frame diffs or color histograms to flag cuts.  
-   - Derive cut rate distribution (early vs late), environment stability (% frames with same background cluster).
-4. **Music/SFX detection (lightweight)**  
-   - On audio windows, compute spectral centroid/flatness and voice-vs-music energy; mark music coverage %.  
-   - Count transient bursts for SFX density; identify silence spans used for emphasis.
+## 2) Architecture (per analysis job)
+1) **Metadata**: YouTube Data API (title, channel, duration).  
+2) **Primary path: Native Gemini video read**  
+   - Call Gemini once per domain bundle with a `file_data` part referencing the YouTube URL.  
+   - Use a single, wide system instruction + structured JSON schema covering all domains.  
+3) **Fallback path (only if file_data rejected)**  
+   - Stream audio + sparse frames to temp storage, upload as a FilePart (signed URL), then invoke Gemini.  
+   - Delete temp artifacts immediately after the call.  
+4) **Post-process**: build fingerprint, meta-axes, archetypes, nearest references; optional performance overlay if OAuth + ownership.
 
-All raw audio/frame artifacts are temp only (ephemeral storage), keeping PRD’s “no storage of raw video” intent.
+---
 
-## 3) Domain Scoring Inputs
-We will feed Gemini with grounded evidence (not just a URL). Each domain prompt gets:
-- Canonical transcript segments (time-aligned).
-- Beat/scene boundaries from shot + transcript segmentation.
-- Prosody stats (wpm, filler ppm, pause lengths, resets).
-- Visual/editing stats (cut pace, environment stability, b-roll % estimate).
-- Sound stats (music % coverage, loudness balance, silence spans, SFX density).
+## 3) API Call Design (client rewrite)
+- Endpoint: Gemini 1.5 Pro (multimodal).  
+- Request parts:
+  - `file_data`: `{ mime_type: "video/mp4", file_uri: youtubeUrl }`  
+  - `text`: system + user instruction containing required metrics and JSON schema.  
+- Temperature: 0.2; `responseMimeType: "application/json"`.  
+- Single-shot response containing **all domains**, not fragmented per-domain calls.
 
-### Voice
-- Avg words/min + distribution; filler words/min; pause frequency/length; resets per minute.
-- Loudness dynamic range; pitch variation within sentences and across video.
-- Sample prompt fields: `{speech_rate_wpm, filler_ppm, avg_pause_ms, reset_events, loudness_range_db, pitch_var_within, pitch_var_across}`.
+---
 
-### Language
-- Abstract vs concrete ratio (concrete noun density); simile/metaphor density.
-- Reference type counts (cultural/historical/scientific); humor frequency.
-- Teaching vs riffing tone split (instruction vs opinion vs narrative).
+## 4) JSON Schema (single source of truth for axes + explanations)
+For each domain, return `score` (0–100), `value` (raw measurement string), and `explanation` (short text). No “Axis 4/5” placeholders.
 
-### Narrative
-- Explicit beats: hook, setup, escalation, payoff, outro (LLM labels on beats).
-- Mini-arc density; foreshadowing, callbacks, open loops, cliffhangers.
-- Transition clarity (hard vs guided) derived from cut detection + connective language.
+```json
+{
+  "voice": {
+    "speaking_rate": { "score": 0, "value": "160 wpm", "explanation": "" },
+    "filler_rate": { "score": 0, "value": "4 per min", "explanation": "" },
+    "pauses": { "score": 0, "value": "0.8s avg, 12 resets", "explanation": "" },
+    "loudness_range": { "score": 0, "value": "12 dB", "explanation": "" },
+    "pitch_variation": { "score": 0, "value": "medium", "explanation": "" }
+  },
+  "language": {
+    "concreteness": { "score": 0, "value": "62% concrete nouns", "explanation": "" },
+    "metaphor_density": { "score": 0, "value": "5 per 1k words", "explanation": "" },
+    "references": { "score": 0, "value": "cultural 3 / historical 0 / scientific 1", "explanation": "" },
+    "humor": { "score": 0, "value": "2 jokes", "explanation": "" },
+    "teaching_vs_riffing": { "score": 0, "value": "70% instructional", "explanation": "" }
+  },
+  "narrative": {
+    "beats": [
+      { "label": "hook", "start": 0, "end": 15 },
+      { "label": "setup", "start": 15, "end": 90 }
+    ],
+    "mini_arc_density": { "score": 0, "value": "3", "explanation": "" },
+    "foreshadow_callbacks": { "score": 0, "value": "2 callbacks, 1 open loop", "explanation": "" },
+    "transition_clarity": { "score": 0, "value": "guided", "explanation": "" }
+  },
+  "visual_edit_sound": {
+    "environment_stability": { "score": 0, "value": "78% same setup", "explanation": "" },
+    "talking_vs_broll_vs_graphics": { "score": 0, "value": "60/30/10", "explanation": "" },
+    "cut_rate": { "score": 0, "value": "avg 2.1s", "explanation": "" },
+    "pattern_interrupts": { "score": 0, "value": "memes/overlays at 4 timestamps", "explanation": "" },
+    "broll_coverage": { "score": 0, "value": "30%", "explanation": "" },
+    "music_changes": { "score": 0, "value": "music under 70% runtime, 3 changes", "explanation": "" },
+    "sfx_density": { "score": 0, "value": "6 notable SFX", "explanation": "" },
+    "silence_for_emphasis": { "score": 0, "value": "3 spans ~1.0s", "explanation": "" }
+  }
+}
+```
 
-### Visual / Editing / Sound
-- Environment stability %; talking-head vs real-world vs graphics time (frame clustering).  
-- Cut rate & distribution (fast early, slow later); b-roll coverage % (frames without mouth motion / with overlays).  
-- Transitions/pattern interrupts/memes/overlays (from cut anomalies + keyword cues).  
-- Music changes, SFX density, silence for emphasis (from audio windows).
+Meta-axes and archetypes derive from these scores; axis labels/explanations come from one metadata module (single source).
 
-## 4) Pipeline Overview (per analysis job)
-1. **Fetch metadata** (YouTube Data API).  
-2. **Fetch captions**; if absent, **ASR** from streamed audio (temp).  
-3. **Segment transcript** into sentences and beats (LLM on text only).  
-4. **Audio feature pass** on sampled windows: WPM, fillers, pauses/resets, loudness range, pitch variance, music/SFX/silence spans.  
-5. **Visual/editing pass** on sampled frames: cut boundaries, environment clusters, talking-head vs b-roll ratio.  
-6. **Assemble evidence bundle** (text, stats, timelines) → **Gemini domain prompts** (one per domain) that cite the evidence explicitly.  
-7. **Compute meta axes + archetypes** from domain profiles; persist fingerprint + supporting evidence (textual stats, not raw media).  
-8. **Similarity** against reference library; return nearest neighbours + niche averages.  
-9. **(Optional) Performance**: if OAuth + ownership, fetch retention/CTR and align with beats/cuts.
+---
 
-## 5) Efficiency & Cost Controls
-- Prefer captions → avoid ASR when possible.  
-- Sampled audio (e.g., 10 x 20s windows) instead of full-stream DSP.  
-- Frame sampling at ~1 fps for cut detection; no video download.  
-- Single Gemini call per domain with structured JSON output; deterministic prompts (temp=0.2).  
-- Cache transcripts and derived stats by `videoId` to reuse across reruns.
+## 5) Prompt Content (embedded in client)
+- System: “You are a video analysis engine. You watch the attached YouTube video via file_data. You must measure the requested metrics from the audio + visual content, then emit strict JSON matching the schema. Do not guess or hallucinate; if a metric is not observable, set `value: "unobserved"` and `score: 0`.”
+- User: include definitions for each metric (speaking rate, filler, concreteness, simile/metaphor, hook/setup/escalation/payoff/outro, environment stability, b-roll, cut pace, pattern interrupts, music coverage, SFX, silence). Require timestamps for beats.
+- Response: `responseMimeType: "application/json"`.
 
-## 6) Outputs (what we store)
-- `fingerprint`: domain profiles + meta axes + supporting stats (no raw media).  
-- `supporting`: transcript segments, beat map, cut map, prosody/music summaries.  
-- `diagnostics`: which evidence sources were used (captions vs ASR; audio/window counts; frame sample rate) and confidence flags.
+---
 
-## 7) Work Plan (implementation-ready)
-1. **Captions + ASR**: add caption fetcher; add streamed-audio ASR fallback with immediate deletion of temp files.  
-2. **Prosody/stat extractor**: compute WPM, fillers, pauses/resets, loudness range, pitch variance from transcript + audio windows.  
-3. **Frame/cut analyzer**: 1 fps sampling + histogram diff to get cut map, environment clusters, b-roll estimate.  
-4. **Audio texture analyzer**: music/silence/SFX spans from spectral features on sampled windows.  
-5. **Beat + device labeling**: LLM on transcript + cut map to label beats (hook/setup/escalation/payoff/outro), foreshadow/callback/open-loop flags.  
-6. **Domain prompt redesign**: inject measured stats into each domain call; enforce schemas with validations.  
-7. **Diagnostics & confidence**: log which evidence was present; surface “low confidence” if captions missing or ASR coverage <80%.  
-8. **UI text**: display explanatory text per domain pulling from measured stats (not placeholders); include axis hover help from a single metadata source.  
-9. **Performance alignment** (optional): map retention points to beats/cuts once OAuth confirms ownership.
+## 6) Implementation Steps (repo-specific)
+1) **Gemini client rewrite** (`src/lib/gemini/client.ts`): add multimodal request builder using `file_data` for YouTube URL; add fallback path for temp upload if direct fetch rejected. Keep schema validation.  
+2) **Domain analyzer consolidation** (`src/lib/analysis/geminiDomains.ts` → new multimodal call): move to a single-call schema (above) instead of six separate text-only calls. Parse into DomainProfiles + supporting beats/cuts/music stats.  
+3) **Axis metadata single source**: keep one module for labels/explanations; frontend reads from it for tooltips and descriptions.  
+4) **Fingerprint builder**: map multimodal JSON into `VideoFingerprintJson` (meta axes, per-domain scores, beats, music coverage, cut pace).  
+5) **UI wiring**: show explanations from the response; no placeholder axes. Surface diagnostics when fallback (temp upload) was used or when metrics are `unobserved`.  
+6) **Tests**: add integration test stubs with mocked Gemini response; unit tests for parser/validator and the fallback path selection.
 
-## 8) Acceptance Checks
-- Story/music detection uses measured beats + music coverage, not guesses.  
-- Transcript displayed matches spoken words (captions/ASR); LLM only summarizes, never invents.  
-- Axis meanings are sourced from one metadata file and shown consistently.  
-- No raw video/audio persists after processing; only derived stats and text remain.  
-- End-to-end latency stays within PRD target by sampling (not full-stream) and minimizing Gemini calls.
+---
+
+## 7) Validation Plan
+- Use a video with clear music bed and a simple story arc; verify returned `music_changes`, `beats`, and `cut_rate` match reality.  
+- Check that removing captions still works (Gemini should rely on audio/video).  
+- Ensure any failure to fetch via `file_data` triggers the fallback and surfaces a “lower confidence” flag in diagnostics.
+
+---
+
+## 8) Risks & Mitigations
+- **Entitlement/quotas**: file_data access to YouTube may be gated; mitigate with temp-upload fallback.  
+- **Latency/cost**: single multimodal call is heavier; keep temperature low and request only needed fields.  
+- **Schema drift**: enforce zod schema and reject non-conforming responses; display partial results with clear flags.

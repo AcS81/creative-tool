@@ -14,12 +14,14 @@ describe("getAppConfig", () => {
     delete process.env.TOKEN_ENCRYPTION_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.YOUTUBE_API_KEY;
+    delete process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
   });
 
   it("defaults to mock mode and performance disabled", () => {
     const config = getAppConfig();
     expect(config.analysisMode).toBe("mock");
     expect(config.performanceEnabled).toBe(false);
+    expect(config.analysisV2MultimodalEnabled).toBe(false);
   });
 
   it("requires Gemini keys when ANALYSIS_MODE=gemini", () => {
@@ -43,5 +45,11 @@ describe("getAppConfig", () => {
     const config = getAppConfig();
     expect(config.performanceEnabled).toBe(true);
     expect(config.googleClientId).toBe("id");
+  });
+
+  it("enables multimodal flag when requested", () => {
+    process.env.ENABLE_ANALYSIS_V2_MULTIMODAL = "true";
+    const config = getAppConfig();
+    expect(config.analysisV2MultimodalEnabled).toBe(true);
   });
 });

@@ -9,6 +9,7 @@ export type AppConfig = {
   googleClientSecret?: string;
   googleRedirectUrl?: string;
   tokenEncryptionKey?: string;
+  analysisV2MultimodalEnabled: boolean;
 };
 
 export class ConfigError extends Error {
@@ -43,6 +44,7 @@ export const getAppConfig = (): AppConfig => {
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const googleRedirectUrl = process.env.GOOGLE_REDIRECT_URL;
   const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY;
+  const analysisV2MultimodalEnabled = parseBoolean(process.env.ENABLE_ANALYSIS_V2_MULTIMODAL);
 
   if (analysisMode === "gemini") {
     const missingKeys = [!geminiApiKey && "GEMINI_API_KEY", !youtubeApiKey && "YOUTUBE_API_KEY"].filter(
@@ -81,5 +83,6 @@ export const getAppConfig = (): AppConfig => {
     googleClientSecret,
     googleRedirectUrl,
     tokenEncryptionKey,
+    analysisV2MultimodalEnabled,
   };
 };

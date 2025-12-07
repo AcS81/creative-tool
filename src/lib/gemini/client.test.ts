@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ConfigError } from "../config";
-import { getTranscriptAndScenes, GeminiApiError } from "./client";
+import { ConfigError, type AppConfig } from "../config";
+import {
+  getTranscriptAndScenes,
+  GeminiApiError,
+  callGeminiMultimodalJson,
+  type GeminiMultimodalResult,
+} from "./client";
 
 const mockFetch = (status: number, body: unknown) =>
   vi.fn().mockResolvedValue({
@@ -73,5 +78,163 @@ describe("getTranscriptAndScenes", () => {
     await expect(getTranscriptAndScenes({ videoUrl: "https://youtu.be/abc" })).rejects.toMatchObject({
       type: "InvalidResponse",
     } satisfies Partial<GeminiApiError>);
+  });
+});
+
+describe("callGeminiMultimodalJson", () => {
+  const baseConfig: AppConfig = {
+    analysisMode: "gemini",
+    geminiApiKey: "key",
+    youtubeApiKey: "yt",
+    performanceEnabled: false,
+    analysisV2MultimodalEnabled: true,
+  };
+
+  const sampleCandidate = (data: unknown) =>
+    samplePayload(JSON.stringify(data ?? { ok: true, marker: "yes" }));
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("fails when feature flag is off", async () => {
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: { ...baseConfig, analysisV2MultimodalEnabled: false },
+    });
+    expect(result).toMatchObject({ ok: false, errorCode: "FEATURE_DISABLED" });
+  });
+
+  it("fails on invalid url", async () => {
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://example.com/not-youtube",
+      prompt: "test",
+      config: baseConfig,
+    });
+    expect(result).toMatchObject({ ok: false, errorCode: "INVALID_URL" });
+  });
+
+  it("fails when key missing", async () => {
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: { ...baseConfig, geminiApiKey: undefined },
+    });
+    expect(result).toMatchObject({ ok: false, errorCode: "CONFIG_MISSING" });
+  });
+
+  it("returns success via primary path", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch(200, sampleCandidate({ hello: "world" })) as unknown as typeof fetch,
+    );
+
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: baseConfig,
+      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      fromFallback: false,
+      status: 200,
+    });
+    expect((result as GeminiMultimodalResult & { rawJson: any }).rawJson.hello).toBe("world");
+  });
+
+  it("returns success via fallback when file_data rejected", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (...args: any[]) => {
+        call += 1;
+        if (call === 1) {
+          // primary Gemini call rejected
+          return {
+            ok: false,
+            status: 403,
+            json: async () => ({ error: { message: "file_data not allowed" } }),
+          } as Response;
+        }
+        if (call === 2) {
+          // fallback download sample
+          return {
+            ok: true,
+            status: 200,
+            arrayBuffer: async () => Buffer.from([1, 2, 3]),
+          } as Response;
+        }
+        // fallback Gemini call success
+        return {
+          ok: true,
+          status: 200,
+          json: async () => sampleCandidate({ via: "fallback" }),
+        } as Response;
+      }) as unknown as typeof fetch,
+    );
+
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: baseConfig,
+      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+    });
+
+    expect(result).toMatchObject({
+      ok: true,
+      fromFallback: true,
+      status: 200,
+    });
+    expect((result as GeminiMultimodalResult & { rawJson: any }).rawJson.via).toBe("fallback");
+  });
+
+  it("returns fallback error when download fails", async () => {
+    let call = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        call += 1;
+        if (call === 1) {
+          return {
+            ok: false,
+            status: 403,
+            json: async () => ({ error: { message: "file_data not allowed" } }),
+          } as Response;
+        }
+        return {
+          ok: false,
+          status: 404,
+          arrayBuffer: async () => Buffer.from([]),
+        } as Response;
+      }) as unknown as typeof fetch,
+    );
+
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: baseConfig,
+      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+    });
+
+    expect(result).toMatchObject({ ok: false, errorCode: "FALLBACK_FAILED" });
+  });
+
+  it("returns invalid response when JSON cannot be parsed", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch(200, samplePayload("not-json")) as unknown as typeof fetch,
+    );
+
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: baseConfig,
+    });
+
+    expect(result).toMatchObject({ ok: false, errorCode: "INVALID_RESPONSE" });
   });
 });
