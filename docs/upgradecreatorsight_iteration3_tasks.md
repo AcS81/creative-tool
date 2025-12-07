@@ -291,13 +291,13 @@ When this iteration is done:
 
 **Goals**
 
-- [ ] Promote the golden-set script (`scripts/run-multimodal-golden.ts` or similar) to a maintained regression tool by:
-  - [ ] Making it runnable via an npm script (e.g. `npm run golden:multimodal`).  
-  - [ ] Documenting how to run it with real keys and what output to look for.  
-- [ ] Extend checks (or add assertions) so they explicitly test:
-  - [ ] Story presence correctly reflects narrative-heavy vs tutorial-style videos.  
-  - [ ] Music coverage and `music_changes` align with human expectations.  
-  - [ ] At least one “unobserved” case is handled gracefully.  
+- [x] Promote the golden-set script (`scripts/run-multimodal-golden.ts` or similar) to a maintained regression tool by:
+  - [x] Making it runnable via an npm script (e.g. `npm run golden:multimodal`).  
+  - [x] Documenting how to run it with real keys and what output to look for.  
+- [x] Extend checks (or add assertions) so they explicitly test:
+  - [x] Story presence correctly reflects narrative-heavy vs tutorial-style videos.  
+  - [x] Music coverage and `music_changes` align with human expectations.  
+  - [x] At least one “unobserved” case is handled gracefully.  
 - [ ] Optionally integrate a lightweight version into CI (guarded by an env flag) that runs against mocked Gemini responses.  
 
 **Constraints**
@@ -307,9 +307,9 @@ When this iteration is done:
 
 **Acceptance Criteria**
 
-- [ ] Golden-set script runs successfully in a dev environment with real keys, producing readable logs.  
-- [ ] Developers can use it to spot regressions after changes to multimodal prompts, schema, or analyzers.  
-- [ ] A short section in `docs/multimodal_golden_set.md` (or iteration 2 E2E doc) describes how to use the script.  
+- [x] Golden-set script runs successfully in a dev environment with real keys, producing readable logs.  
+- [x] Developers can use it to spot regressions after changes to multimodal prompts, schema, or analyzers.  
+- [x] A short section in `docs/multimodal_golden_set.md` (or iteration 2 E2E doc) describes how to use the script.  
 
 ---
 
@@ -323,13 +323,13 @@ When this iteration is done:
 
 **Goals**
 
-- [ ] Update `docs/analysis_functionality_plan.md` to:
-  - [ ] Mark which steps are **fully implemented** and which were adjusted during real-world implementation (e.g., any nuances around `file_data` entitlement).  
-  - [ ] Note the final flag strategy and any deviations from initial assumptions.  
-- [ ] Add a short addendum or new section to `docs/iteration_5_prd_mvp_status.md` (or a new `iteration_6_multimodal_status.md` if preferred) that:
-  - [ ] Confirms FR‑5–FR‑15 are now backed by the multimodal pipeline.  
-  - [ ] Highlights any behaviour changes (e.g., better story/music detection, new diagnostics).  
-- [ ] Ensure `docs/axes_and_domains.md` remains the single source for axis semantics and is linked from Overview and any relevant debug views.  
+- [x] Update `docs/analysis_functionality_plan.md` to:
+  - [x] Mark which steps are **fully implemented** and which were adjusted during real-world implementation (e.g., any nuances around `file_data` entitlement).  
+  - [x] Note the final flag strategy and any deviations from initial assumptions.  
+- [x] Add a short addendum or new section to `docs/iteration_5_prd_mvp_status.md` (or a new `iteration_6_multimodal_status.md` if preferred) that:
+  - [x] Confirms FR‑5–FR‑15 are now backed by the multimodal pipeline.  
+  - [x] Highlights any behaviour changes (e.g., better story/music detection, new diagnostics).  
+- [x] Ensure `docs/axes_and_domains.md` remains the single source for axis semantics and is linked from Overview and any relevant debug views.  
 
 **Constraints**
 
@@ -338,8 +338,8 @@ When this iteration is done:
 
 **Acceptance Criteria**
 
-- [ ] A new or updated status doc clearly describes the state of multimodal analysis vs the PRD.  
-- [ ] New contributors can read `README.md` + the plan doc and understand that multimodal is the default, with clear notes on fallbacks.  
+- [x] A new or updated status doc clearly describes the state of multimodal analysis vs the PRD.  
+- [x] New contributors can read `README.md` + the plan doc and understand that multimodal is the default, with clear notes on fallbacks.  
 
 ---
 
@@ -352,14 +352,14 @@ When this iteration is done:
 
 **Goals**
 
-- [ ] Review `/dev/multimodal` (or equivalent) and ensure it:
-  - [ ] Clearly indicates that it’s exercising the **same** pipeline used by `/api/analyze`.  
-  - [ ] Shows whether `file_data` or fallback was used, plus counts of `unobserved` metrics.  
-  - [ ] Links to `docs/axes_and_domains.md` for axis definitions.  
-- [ ] Trim any debug-only features that rely on the old text-only path or outdated schemas.  
-- [ ] Update README or a small dev doc to explain how to:
-  - [ ] Run the app in mock vs Gemini vs performance modes.  
-  - [ ] Use the debug view and golden-set script when changing prompts or schema.  
+- [x] Review `/dev/multimodal` (or equivalent) and ensure it:
+  - [x] Clearly indicates that it’s exercising the **same** pipeline used by `/api/analyze`.  
+  - [x] Shows whether `file_data` or fallback was used, plus counts of `unobserved` metrics.  
+  - [x] Links to `docs/axes_and_domains.md` for axis definitions.  
+- [x] Trim any debug-only features that rely on the old text-only path or outdated schemas.  
+- [x] Update README or a small dev doc to explain how to:
+  - [x] Run the app in mock vs Gemini vs performance modes.  
+  - [x] Use the debug view and golden-set script when changing prompts or schema.  
 
 **Constraints**
 
@@ -367,8 +367,8 @@ When this iteration is done:
 
 **Acceptance Criteria**
 
-- [ ] Developers can reliably use `/dev/multimodal` to inspect end-to-end multimodal runs without confusion about which path is active.  
-- [ ] All references to obsolete debug endpoints or v1-only behaviour are removed or clearly marked as deprecated.  
+- [x] Developers can reliably use `/dev/multimodal` to inspect end-to-end multimodal runs without confusion about which path is active.  
+- [x] All references to obsolete debug endpoints or v1-only behaviour are removed or clearly marked as deprecated.  
 
 ---
 
@@ -394,8 +394,8 @@ Use this checklist to confirm Iteration 3 of the **upgrade track** is complete a
 
 ### ✅ Regression & Docs
 
-- [ ] Golden-set script is usable by developers to detect regressions in story/music/editing detection.  
-- [ ] Plan and PRD status docs are updated to reflect the multimodal implementation and flag strategy.  
-- [ ] Debug views and README clearly describe how to run and inspect the multimodal pipeline.  
+- [x] Golden-set script is usable by developers to detect regressions in story/music/editing detection.  
+- [x] Plan and PRD status docs are updated to reflect the multimodal implementation and flag strategy.  
+- [x] Debug views and README clearly describe how to run and inspect the multimodal pipeline.  
 
 When all of the above are ticked, the **Native Multimodal Analysis Plan** (`docs/analysis_functionality_plan.md`) is effectively **complete**: every creative analysis in CreatorSight uses Gemini’s multimodal view of the video, fingerprints and similarity are grounded in the new metrics, and both creators and developers can trust and understand what the system is doing.

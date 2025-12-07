@@ -58,8 +58,16 @@ export default function MultimodalDevPage() {
       <div className="space-y-2">
         <h1 className="text-xl font-semibold">Multimodal Dev Runner</h1>
         <p className="text-sm text-muted">
-          Runs the v2 multimodal analysis pipeline. Feature flag toggles the client. Raw response is redacted to core
-          fields only.
+          Exercises the same multimodal pipeline used by <code className="rounded bg-slate-100 px-1 py-0.5">/api/analyze</code>{" "}
+          (analyzeVideoMultimodal + v2 fingerprint). Shows whether we used the inline upload fallback and counts of
+          unobserved metrics.
+        </p>
+        <p className="text-xs text-muted">
+          Axis glossary:{" "}
+          <a className="underline" href="/docs/axes_and_domains.md" target="_blank" rel="noreferrer">
+            docs/axes_and_domains.md
+          </a>
+          .
         </p>
       </div>
 
@@ -78,7 +86,7 @@ export default function MultimodalDevPage() {
             onChange={(e) => setFlagEnabled(e.target.checked)}
             className="h-4 w-4 rounded border-border"
           />
-          Enable analysis_v2_multimodal flag
+          Toggle rollout flag (pipeline remains multimodal)
         </label>
         <button
           onClick={runAnalysis}
@@ -100,9 +108,11 @@ export default function MultimodalDevPage() {
               </span>
             ) : null}
             {result.fromFallback ? (
-              <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">Used fallback</span>
+              <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
+                Inline upload fallback
+              </span>
             ) : (
-              <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700">Primary path</span>
+              <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700">Primary file_data</span>
             )}
             {result.unobservedCounts ? (
               <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-muted">

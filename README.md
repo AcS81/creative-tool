@@ -79,6 +79,11 @@ The current app covers the PRD MVP features:
 - Connect YouTube from the landing page. Running an analysis for a video on the connected channel will attach `performanceProfile` (retention, CTR, views, likes, comments) and show the Performance tab + “Performance at a glance.”
 - Disconnect YouTube at any time via the landing page (tokens revoked/deleted).
 
+### Debugging & regression helpers
+- `/dev/multimodal` (dev-only) hits the same multimodal pipeline as `/api/analyze`; it shows whether `file_data` vs inline upload fallback was used, includes unobserved metric counts, and links to `docs/axes_and_domains.md` for axis definitions.
+- `npm run probe:ingestion -- --url <youtube-url>` tests Gemini YouTube ingestion vs the inline upload fallback path with timing and status output.
+- `npm run golden:multimodal` runs the small golden set against live Gemini keys to spot regressions in story/music/pacing detection (see `docs/multimodal_golden_set.md`).
+
 ### E2E flows and iteration docs
 - **Iteration 1**: `docs/iteration_1_e2e.md` – mock-only URL → Overview → domain tabs.
 - **Iteration 2**: `docs/iteration_2_e2e.md` – Gemini + YouTube Data integration, creative fingerprint end-to-end.
