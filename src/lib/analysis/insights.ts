@@ -1,4 +1,4 @@
-import type { VideoFingerprintJson } from "../types";
+import type { VideoFingerprintJson, FingerprintPerDomain } from "../types";
 
 type MetaAxes = VideoFingerprintJson["metaAxes"];
 
@@ -14,6 +14,10 @@ export type Insight = {
   category: "unusualness" | "strength" | "growth";
   axis: keyof MetaAxes;
   text: string;
+};
+
+type ObservationContext = {
+  fingerprint?: VideoFingerprintJson;
 };
 
 const percentile = (value: number, samples: number[]) => {
@@ -42,7 +46,36 @@ const describeGrowth = (axis: keyof MetaAxes, pct: number) => {
   return null;
 };
 
-export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]) {
+const domainsByMetaAxis: Record<keyof MetaAxes, Array<keyof FingerprintPerDomain>> = {
+  voiceIntensity: ["voiceProfile"],
+  conceptualDepth: ["languageProfile"],
+  narrativeStructureStrength: ["narrativeProfile"],
+  visualDynamism: ["visualProfile", "editingProfile"],
+  productionPolish: ["editingProfile", "soundProfile"],
+};
+
+const isAxisObserved = (axis: keyof MetaAxes, fingerprint?: VideoFingerprintJson) => {
+  if (!fingerprint) return true;
+  const domains = domainsByMetaAxis[axis] ?? [];
+  if (domains.length === 0) return true;
+
+  const domainScores = domains.map((d) => fingerprint.perDomain[d]?.scores ?? []);
+  const allScores = domainScores.flat();
+  if (allScores.length === 0) return false;
+
+  const hasNonZero = allScores.some((s) => s.value > 0);
+  const hasObservedDetail =
+    fingerprint.supporting?.axisDetails &&
+    Object.values(fingerprint.supporting.axisDetails).some((detail) => detail.observed !== false);
+
+  return hasNonZero || hasObservedDetail;
+};
+
+export function generateInsights(
+  userMeta: MetaAxes,
+  references: MetaAxes[],
+  options: ObservationContext = {},
+) {
   const refs = (references ?? []).filter(
     (ref): ref is MetaAxes => !!ref && typeof ref.voiceIntensity === "number",
   );
@@ -59,6 +92,7 @@ export function generateInsights(userMeta: MetaAxes, references: MetaAxes[]) {
   const insights: Insight[] = [];
 
   (Object.keys(userMeta) as Array<keyof MetaAxes>).forEach((axis) => {
+    if (!isAxisObserved(axis, options.fingerprint)) return;
     const refSamples = refs.map((ref) => ref[axis]);
     const pct = percentile(userMeta[axis], refSamples);
     const unusual = describeUnusual(axis, pct);

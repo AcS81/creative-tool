@@ -33,7 +33,7 @@ export function generateDomainInsights(
   }
 
   const meta = fingerprint.metaAxes;
-  const allInsights = generateInsights(meta, cleanedRefs);
+  const allInsights = generateInsights(meta, cleanedRefs, { fingerprint });
   const domainInsights: Record<DomainKey, string[]> = {
     voiceProfile: [],
     languageProfile: [],

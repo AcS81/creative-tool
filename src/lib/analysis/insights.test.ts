@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateInsights } from "./insights";
+import type { VideoFingerprintJson } from "../types";
 
 const sampleMeta = {
   voiceIntensity: 60,
@@ -16,6 +17,20 @@ const refs = [
   { ...sampleMeta, voiceIntensity: 80 },
 ];
 
+const sampleFingerprint: VideoFingerprintJson = {
+  version: "1.2.0",
+  createdAt: new Date().toISOString(),
+  metaAxes: sampleMeta,
+  perDomain: {
+    voiceProfile: { primaryArchetype: "Voice", summaryText: "Voice", scores: [{ key: "voice.speaking_rate", label: "Speech pace", value: 60 }] },
+    languageProfile: { primaryArchetype: "Lang", summaryText: "Lang", scores: [{ key: "language.concreteness", label: "Concreteness", value: 55 }] },
+    narrativeProfile: { primaryArchetype: "Narr", summaryText: "Narr", scores: [{ key: "narrative.story_presence", label: "Story presence", value: 50 }] },
+    visualProfile: { primaryArchetype: "Vis", summaryText: "Vis", scores: [{ key: "visual.environment_stability", label: "Env", value: 45 }] },
+    editingProfile: { primaryArchetype: "Edit", summaryText: "Edit", scores: [{ key: "editing.cut_rate", label: "Cut rate", value: 55 }] },
+    soundProfile: { primaryArchetype: "Sound", summaryText: "Sound", scores: [{ key: "sound.music_coverage", label: "Music", value: 65 }] },
+  },
+};
+
 describe("generateInsights", () => {
   it("returns fallback when no references available", () => {
     const result = generateInsights(sampleMeta, []);
@@ -24,9 +39,23 @@ describe("generateInsights", () => {
   });
 
   it("produces ranked insights with readable text", () => {
-    const result = generateInsights(sampleMeta, refs);
+    const result = generateInsights(sampleMeta, refs, { fingerprint: sampleFingerprint });
     expect(result.bullets.length).toBeGreaterThan(0);
     expect(result.bullets[0]).toMatch(/reference videos/);
     expect(result.strengthInsights.length).toBeGreaterThan(0);
+  });
+
+  it("skips unobserved axes when domain scores are zero", () => {
+    const sparseFingerprint: VideoFingerprintJson = {
+      ...sampleFingerprint,
+      metaAxes: { ...sampleMeta, visualDynamism: 0 },
+      perDomain: {
+        ...sampleFingerprint.perDomain,
+        visualProfile: { primaryArchetype: "Vis", summaryText: "Vis", scores: [{ key: "visual.environment_stability", label: "Env", value: 0 }] },
+        editingProfile: { primaryArchetype: "Edit", summaryText: "Edit", scores: [{ key: "editing.cut_rate", label: "Cut rate", value: 0 }] },
+      },
+    };
+    const result = generateInsights(sparseFingerprint.metaAxes, refs, { fingerprint: sparseFingerprint });
+    expect(result.bullets.some((b) => b.toLowerCase().includes("visual"))).toBe(false);
   });
 });
