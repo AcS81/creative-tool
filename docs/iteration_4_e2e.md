@@ -66,7 +66,7 @@ This flow verifies the full Performance domain (H) using YouTube Analytics for a
 - No server/client errors in console during any of the flows.
 - Successful analyses persist `VideoAnalysis` and `VideoFingerprint` rows; when Analytics is available:
   - Fingerprints include a `performanceProfile` and `hasPerformanceData === true`.
-  - The Performance tab renders retention + metrics.
+  - The Performance tab renders retention + metrics with beat markers aligned to multimodal narrative roles.
 - When Analytics fails (e.g., quota errors or ownership issues):
   - The creative fingerprint is still returned and rendered.
   - Performance data is omitted and the Performance tab falls back to the empty/CTA state.
