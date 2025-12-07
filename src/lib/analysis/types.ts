@@ -12,13 +12,13 @@ export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   diagnostics?: {
-    source: "mock" | "gemini";
+    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal";
     hashSeed?: number;
     performanceAttached?: boolean;
     performanceErrorType?: string;
     performanceErrorMessage?: string;
-    analysisVersion?: "v1_text" | "v2_multimodal";
-    usedFallback?: boolean;
+    analysisVersion?: "v1" | "v2";
+    multimodalFallbackUsed?: boolean;
     unobservedCounts?: Record<string, number>;
     analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
     analysisErrorMessage?: string;

@@ -73,6 +73,7 @@ async function run() {
 
   const config: AppConfig = {
     analysisMode: "gemini",
+    analysisVersion: "v2",
     analysisV2MultimodalEnabled: true,
     geminiApiKey: process.env.GEMINI_API_KEY,
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "dev",

@@ -100,7 +100,7 @@ const sampleFingerprint: VideoFingerprintJson = {
 export const sampleAnalysisResult: AnalyzeVideoResult = {
   fingerprint: sampleFingerprint,
   overallArchetype: sampleFingerprint.overallArchetype ?? "Sample Archetype",
-  diagnostics: { source: "mock" },
+  diagnostics: { source: "mock", analysisPath: "mock", analysisVersion: "v1" },
 };
 
 export const sampleMetadata = {

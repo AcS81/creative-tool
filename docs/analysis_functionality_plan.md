@@ -113,3 +113,11 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 - **Entitlement/quotas**: file_data access to YouTube may be gated; mitigate with temp-upload fallback.  
 - **Latency/cost**: single multimodal call is heavier; keep temperature low and request only needed fields.  
 - **Schema drift**: enforce zod schema and reject non-conforming responses; display partial results with clear flags.
+
+---
+
+## 9) Runtime Flags and Diagnostics
+- `ANALYSIS_MODE=mock` → deterministic offline pipeline. `ANALYSIS_MODE=gemini` → requires Gemini + YouTube keys.
+- Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present outside `NODE_ENV=test`. Set `ANALYSIS_VERSION=v1` (or `ENABLE_ANALYSIS_V2_MULTIMODAL=false`) to force the text-only rollback.
+- Optional override: `ANALYSIS_VERSION=v2` enforces the multimodal path; no env flag needed in normal dev/prod.
+- `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v1-text | gemini-v2-multimodal` and includes `diagnostics.multimodalFallbackUsed` when the temp-upload inline path is taken.

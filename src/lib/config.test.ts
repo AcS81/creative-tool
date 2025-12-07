@@ -7,6 +7,7 @@ describe("getAppConfig", () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
     delete process.env.ANALYSIS_MODE;
+    delete process.env.ANALYSIS_VERSION;
     delete process.env.ENABLE_PERFORMANCE;
     delete process.env.GOOGLE_CLIENT_ID;
     delete process.env.GOOGLE_CLIENT_SECRET;
@@ -20,8 +21,21 @@ describe("getAppConfig", () => {
   it("defaults to mock mode and performance disabled", () => {
     const config = getAppConfig();
     expect(config.analysisMode).toBe("mock");
+    expect(config.analysisVersion).toBe("v1");
     expect(config.performanceEnabled).toBe(false);
     expect(config.analysisV2MultimodalEnabled).toBe(false);
+  });
+
+  it("enables multimodal by default in gemini mode when configured outside test env", () => {
+    process.env.ANALYSIS_MODE = "gemini";
+    process.env.GEMINI_API_KEY = "key";
+    process.env.YOUTUBE_API_KEY = "yt";
+    process.env.NODE_ENV = "development";
+
+    const config = getAppConfig();
+    expect(config.analysisMode).toBe("gemini");
+    expect(config.analysisVersion).toBe("v2");
+    expect(config.analysisV2MultimodalEnabled).toBe(true);
   });
 
   it("requires Gemini keys when ANALYSIS_MODE=gemini", () => {
@@ -32,6 +46,18 @@ describe("getAppConfig", () => {
     process.env.YOUTUBE_API_KEY = "yt";
     const config = getAppConfig();
     expect(config.analysisMode).toBe("gemini");
+  });
+
+  it("forces v1 when ANALYSIS_VERSION=v1", () => {
+    process.env.ANALYSIS_MODE = "gemini";
+    process.env.ANALYSIS_VERSION = "v1";
+    process.env.GEMINI_API_KEY = "key";
+    process.env.YOUTUBE_API_KEY = "yt";
+    process.env.NODE_ENV = "development";
+
+    const config = getAppConfig();
+    expect(config.analysisVersion).toBe("v1");
+    expect(config.analysisV2MultimodalEnabled).toBe(false);
   });
 
   it("requires OAuth keys when performance is enabled", () => {
@@ -48,8 +74,13 @@ describe("getAppConfig", () => {
   });
 
   it("enables multimodal flag when requested", () => {
+    process.env.ANALYSIS_MODE = "gemini";
+    process.env.GEMINI_API_KEY = "key";
+    process.env.YOUTUBE_API_KEY = "yt";
+    process.env.NODE_ENV = "test";
     process.env.ENABLE_ANALYSIS_V2_MULTIMODAL = "true";
     const config = getAppConfig();
     expect(config.analysisV2MultimodalEnabled).toBe(true);
+    expect(config.analysisVersion).toBe("v2");
   });
 });

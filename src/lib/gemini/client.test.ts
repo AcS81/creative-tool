@@ -84,6 +84,7 @@ describe("getTranscriptAndScenes", () => {
 describe("callGeminiMultimodalJson", () => {
   const baseConfig: AppConfig = {
     analysisMode: "gemini",
+    analysisVersion: "v2",
     geminiApiKey: "key",
     youtubeApiKey: "yt",
     performanceEnabled: false,

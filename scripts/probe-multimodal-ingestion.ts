@@ -125,6 +125,7 @@ async function main() {
 
   const config: AppConfig = {
     analysisMode: "mock",
+    analysisVersion: "v2",
     analysisV2MultimodalEnabled: true,
     geminiApiKey: process.env.GEMINI_API_KEY,
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "unused",

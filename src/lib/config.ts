@@ -1,7 +1,9 @@
 export type AnalysisMode = "mock" | "gemini";
+export type AnalysisVersion = "v1" | "v2";
 
 export type AppConfig = {
   analysisMode: AnalysisMode;
+  analysisVersion: AnalysisVersion;
   geminiApiKey?: string;
   youtubeApiKey?: string;
   performanceEnabled: boolean;
@@ -29,6 +31,14 @@ const normalizeAnalysisMode = (raw?: string | null): AnalysisMode => {
   return raw.toLowerCase() === "gemini" ? "gemini" : "mock";
 };
 
+const normalizeAnalysisVersion = (raw?: string | null): AnalysisVersion | undefined => {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "v1" || normalized === "1") return "v1";
+  if (normalized === "v2" || normalized === "2") return "v2";
+  return undefined;
+};
+
 const parseBoolean = (raw?: string | null) => {
   if (!raw) return false;
   const normalized = raw.trim().toLowerCase();
@@ -37,6 +47,7 @@ const parseBoolean = (raw?: string | null) => {
 
 export const getAppConfig = (): AppConfig => {
   const analysisMode = normalizeAnalysisMode(process.env.ANALYSIS_MODE);
+  const analysisVersionFromEnv = normalizeAnalysisVersion(process.env.ANALYSIS_VERSION);
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const youtubeApiKey = process.env.YOUTUBE_API_KEY;
   const performanceEnabled = parseBoolean(process.env.ENABLE_PERFORMANCE);
@@ -44,7 +55,9 @@ export const getAppConfig = (): AppConfig => {
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const googleRedirectUrl = process.env.GOOGLE_REDIRECT_URL;
   const tokenEncryptionKey = process.env.TOKEN_ENCRYPTION_KEY;
-  const analysisV2MultimodalEnabled = parseBoolean(process.env.ENABLE_ANALYSIS_V2_MULTIMODAL);
+  const rawMultimodalFlag = process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
+  const analysisV2MultimodalFlag =
+    typeof rawMultimodalFlag === "string" ? parseBoolean(rawMultimodalFlag) : undefined;
 
   if (analysisMode === "gemini") {
     const missingKeys = [!geminiApiKey && "GEMINI_API_KEY", !youtubeApiKey && "YOUTUBE_API_KEY"].filter(
@@ -74,8 +87,26 @@ export const getAppConfig = (): AppConfig => {
     }
   }
 
+  const geminiConfigured = analysisMode === "gemini" && Boolean(geminiApiKey) && Boolean(youtubeApiKey);
+  const isTestEnv = process.env.NODE_ENV === "test";
+  const defaultMultimodalEnabled = geminiConfigured && !isTestEnv;
+
+  let analysisVersion: AnalysisVersion;
+  let analysisV2MultimodalEnabled: boolean;
+  if (analysisVersionFromEnv) {
+    analysisVersion = analysisVersionFromEnv;
+    analysisV2MultimodalEnabled = analysisVersionFromEnv === "v2";
+  } else if (typeof analysisV2MultimodalFlag === "boolean") {
+    analysisV2MultimodalEnabled = analysisV2MultimodalFlag;
+    analysisVersion = analysisV2MultimodalFlag ? "v2" : "v1";
+  } else {
+    analysisV2MultimodalEnabled = defaultMultimodalEnabled;
+    analysisVersion = analysisV2MultimodalEnabled ? "v2" : "v1";
+  }
+
   return {
     analysisMode,
+    analysisVersion,
     geminiApiKey,
     youtubeApiKey,
     performanceEnabled,

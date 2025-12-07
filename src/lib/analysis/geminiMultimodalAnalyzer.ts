@@ -3,6 +3,7 @@ import type { AxisDetail, BeatSegment, DomainProfile } from "../types";
 import {
   callGeminiMultimodalJson,
   GeminiApiError,
+  type GeminiMultimodalErrorCode,
   type GeminiMultimodalResult,
 } from "../gemini/client";
 import type { GeminiMultimodalResponse, GeminiObservedMetric } from "./types/multimodal";
@@ -328,11 +329,15 @@ const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<str
   visual_edit_sound: unobserved(Object.keys(response.visual_edit_sound), response.visual_edit_sound).length,
 });
 
-const toError = (result: GeminiMultimodalResult): Error => {
+const toError = (result: GeminiMultimodalResult): GeminiApiError & { code?: GeminiMultimodalErrorCode } => {
   const message = result.errorMessage || "Unknown Gemini multimodal error";
   const type: "InvalidResponse" | "UpstreamError" =
     result.errorCode === "INVALID_RESPONSE" ? "InvalidResponse" : "UpstreamError";
-  return new GeminiApiError(type, message, result.status);
+  const error = new GeminiApiError(type, message, result.status) as GeminiApiError & {
+    code?: GeminiMultimodalErrorCode;
+  };
+  error.code = result.errorCode;
+  return error;
 };
 
 export const analyzeVideoMultimodal = async (input: {

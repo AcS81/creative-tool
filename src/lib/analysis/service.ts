@@ -43,13 +43,27 @@ const archetypeForMeta = (meta: MetaAxes) => {
 
 const buildVideoUrl = (videoId: string) => `https://www.youtube.com/watch?v=${videoId}`;
 
+const isUnsupportedMultimodalError = (error: unknown) => {
+  const code = (error as any)?.code;
+  const status = (error as any)?.status as number | undefined;
+  return (
+    code === "FEATURE_DISABLED" ||
+    code === "CONFIG_MISSING" ||
+    code === "INVALID_URL" ||
+    code === "FALLBACK_FAILED" ||
+    status === 403
+  );
+};
+
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
   const useMock = options.useMock ?? config.analysisMode === "mock";
-  const useMultimodal = config.analysisV2MultimodalEnabled === true;
+  const rolloutForcesV1 = config.analysisVersion === "v1" || config.analysisV2MultimodalEnabled === false;
+  const useMultimodal =
+    config.analysisMode === "gemini" && config.analysisV2MultimodalEnabled !== false && !rolloutForcesV1;
 
   if (useMock !== false) {
     return mockAnalyzeVideo(input);
@@ -64,9 +78,11 @@ export async function analyzeVideo(
   let soundProfile: DomainProfile;
   let beats: BeatSegment[] | undefined;
   let axisDetails: Record<string, AxisDetail> | undefined;
-  let multimodalDiagnostics: AnalyzeVideoResult["diagnostics"] | undefined;
   let analysisPath: AnalyzeVideoResult["diagnostics"]["analysisPath"] | undefined;
   let analysisErrorMessage: string | undefined;
+  let analysisVersionUsed: AnalyzeVideoResult["diagnostics"]["analysisVersion"] | undefined;
+  let unobservedCounts: Record<string, number> | undefined;
+  let multimodalFallbackUsed = false;
   let transcriptAndScenes:
     | {
         transcriptSegments: TranscriptSegment[];
@@ -87,20 +103,17 @@ export async function analyzeVideo(
       soundProfile = multimodal.profiles.sound;
       beats = multimodal.beats;
       axisDetails = multimodal.axisDetails;
-      multimodalDiagnostics = {
-        source: "gemini",
-        performanceAttached: false,
-        performanceErrorType: undefined,
-        performanceErrorMessage: undefined,
-        analysisVersion: "v2_multimodal",
-        usedFallback: multimodal.diagnostics.fromFallback,
-        unobservedCounts: multimodal.diagnostics.unobservedCounts,
-        analysisPath: "gemini-v2-multimodal",
-      };
       analysisPath = "gemini-v2-multimodal";
+      analysisVersionUsed = "v2";
+      multimodalFallbackUsed = Boolean(multimodal.diagnostics.fromFallback);
+      unobservedCounts = multimodal.diagnostics.unobservedCounts;
       ranMultimodal = true;
     } catch (error) {
-      console.warn("Multimodal analysis failed; falling back to text-only path", error);
+      const canFallback = isUnsupportedMultimodalError(error);
+      if (!canFallback) {
+        throw error;
+      }
+      console.warn("Multimodal analysis unavailable; falling back to text-only path", error);
       analysisErrorMessage = error instanceof Error ? error.message : "Unknown multimodal error";
     }
   }
@@ -125,12 +138,7 @@ export async function analyzeVideo(
 
     [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] = results;
     analysisPath = "gemini-v1-text";
-    multimodalDiagnostics = {
-      ...(multimodalDiagnostics ?? {}),
-      analysisVersion: "v1_text",
-      analysisPath,
-      analysisErrorMessage,
-    };
+    analysisVersionUsed = "v1";
   }
 
   const perDomain: FingerprintPerDomain = {
@@ -148,15 +156,16 @@ export async function analyzeVideo(
   let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
     overallArchetype,
-    supporting: useMultimodal
-      ? {
-          beats,
-          axisDetails,
-        }
-      : {
-          transcriptSegments: transcriptAndScenes?.transcriptSegments,
-          sceneSegments: transcriptAndScenes?.sceneSegments,
-        },
+    supporting:
+      analysisPath === "gemini-v2-multimodal"
+        ? {
+            beats,
+            axisDetails,
+          }
+        : {
+            transcriptSegments: transcriptAndScenes?.transcriptSegments,
+            sceneSegments: transcriptAndScenes?.sceneSegments,
+          },
     hasPerformanceData: false,
   });
 
@@ -203,13 +212,15 @@ export async function analyzeVideo(
     fingerprint: validated,
     overallArchetype,
     diagnostics: {
-      source: "gemini",
+      source: analysisPath ?? "gemini-v1-text",
       performanceAttached,
       performanceErrorType,
       performanceErrorMessage,
       analysisPath,
       analysisErrorMessage,
-      ...(multimodalDiagnostics ?? {}),
+      analysisVersion: analysisVersionUsed ?? (analysisPath === "gemini-v2-multimodal" ? "v2" : "v1"),
+      multimodalFallbackUsed,
+      unobservedCounts,
     },
   };
 }

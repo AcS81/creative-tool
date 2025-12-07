@@ -96,6 +96,8 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
       source: "mock",
       hashSeed: seed,
       analysisPath: "mock",
+      analysisVersion: "v1",
+      multimodalFallbackUsed: false,
     },
   };
 }
