@@ -11,6 +11,7 @@ import {
   analyzeVoice,
 } from "./geminiDomains";
 import type {
+  AxisDetail,
   BeatSegment,
   DomainProfile,
   MetaAxes,
@@ -62,6 +63,7 @@ export async function analyzeVideo(
   let editingProfile: DomainProfile;
   let soundProfile: DomainProfile;
   let beats: BeatSegment[] | undefined;
+  let axisDetails: Record<string, AxisDetail> | undefined;
   let multimodalDiagnostics: AnalyzeVideoResult["diagnostics"] | undefined;
   let transcriptAndScenes:
     | {
@@ -79,6 +81,7 @@ export async function analyzeVideo(
     editingProfile = multimodal.profiles.editing;
     soundProfile = multimodal.profiles.sound;
     beats = multimodal.beats;
+    axisDetails = multimodal.axisDetails;
     multimodalDiagnostics = {
       source: "gemini",
       performanceAttached: false,
@@ -127,6 +130,7 @@ export async function analyzeVideo(
     supporting: useMultimodal
       ? {
           beats,
+          axisDetails,
         }
       : {
           transcriptSegments: transcriptAndScenes?.transcriptSegments,

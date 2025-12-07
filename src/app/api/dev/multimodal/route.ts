@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     const fingerprint = buildVideoFingerprint(analysis.profiles, {
       metaAxes: computeMetaAxesFromProfiles(analysis.profiles),
-      supporting: { beats: analysis.beats },
+      supporting: { beats: analysis.beats, axisDetails: analysis.axisDetails },
       version: "1.2.0",
     });
 

@@ -1,4 +1,5 @@
 import type {
+  AxisDetail,
   BeatSegment,
   DomainProfile,
   FingerprintPerDomain,
@@ -18,6 +19,7 @@ type BuildFingerprintOptions = {
     transcriptSegments?: TranscriptSegment[];
     sceneSegments?: SceneSegment[];
     beats?: BeatSegment[];
+    axisDetails?: Record<string, AxisDetail>;
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;

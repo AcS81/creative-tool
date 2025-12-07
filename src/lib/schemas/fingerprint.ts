@@ -7,12 +7,19 @@ const domainScoreSchema = z.object({
   value: z.number().min(0).max(100),
 });
 
+const axisDetailSchema = z.object({
+  rawValue: z.string(),
+  explanation: z.string().optional(),
+  observed: z.boolean().optional(),
+});
+
 const domainProfileSchema = z.object({
   primaryArchetype: z.string().min(1, "primaryArchetype is required"),
   secondaryArchetype: z.string().min(1).optional(),
   summaryText: z.string().min(1, "summaryText is required"),
   scores: z.array(domainScoreSchema).min(1, "at least one score is required"),
   highlights: z.array(z.string().min(1)).optional(),
+  axisDetails: z.record(axisDetailSchema).optional(),
 });
 
 const metaAxesSchema = z.object({
@@ -98,6 +105,7 @@ export const fingerprintSchema = z.object({
           }),
         )
         .optional(),
+      axisDetails: z.record(axisDetailSchema).optional(),
     })
     .optional(),
   performanceProfile: performanceProfileSchema.optional(),

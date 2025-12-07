@@ -67,6 +67,7 @@ describe("analyzeVideoMultimodal", () => {
     expect(result.profiles.voice.scores.length).toBeGreaterThan(0);
     expect(result.beats?.[0]?.label).toBe("hook");
     expect(result.diagnostics.fromFallback).toBe(false);
+    expect(result.axisDetails["voice.speaking_rate"]?.rawValue).toBe("155 wpm");
   });
 
   it("flags fallback usage", async () => {
@@ -79,5 +80,6 @@ describe("analyzeVideoMultimodal", () => {
     const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
     expect(result.profiles.voice.highlights?.some((h) => h.includes("fallback"))).toBe(true);
     expect(result.diagnostics.fromFallback).toBe(true);
+    expect(result.axisDetails["voice.speaking_rate"]?.observed).toBe(true);
   });
 });

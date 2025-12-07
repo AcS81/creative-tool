@@ -29,6 +29,12 @@ export interface AxisScore {
   value: number;
 }
 
+export interface AxisDetail {
+  rawValue: string;
+  explanation?: string;
+  observed?: boolean;
+}
+
 export type DomainScore = AxisScore;
 
 export interface DomainProfile {
@@ -37,6 +43,7 @@ export interface DomainProfile {
   summaryText: string;
   scores: DomainScore[];
   highlights?: string[];
+  axisDetails?: Record<string, AxisDetail>;
 }
 
 export interface MetaAxes {
@@ -116,6 +123,7 @@ export interface VideoFingerprintJson {
     transcriptSegments?: TranscriptSegment[];
     sceneSegments?: SceneSegment[];
     beats?: BeatSegment[];
+    axisDetails?: Record<string, AxisDetail>;
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;

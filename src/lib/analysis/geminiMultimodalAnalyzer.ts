@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config";
-import type { BeatSegment, DomainProfile } from "../types";
+import type { AxisDetail, BeatSegment, DomainProfile } from "../types";
 import {
   callGeminiMultimodalJson,
   GeminiApiError,
@@ -22,6 +22,7 @@ type MultimodalProfiles = {
 export type MultimodalAnalysisResult = {
   profiles: MultimodalProfiles;
   beats?: BeatSegment[];
+  axisDetails: Record<string, AxisDetail>;
   diagnostics: {
     fromFallback: boolean;
     unobservedCounts: Record<string, number>;
@@ -146,6 +147,7 @@ const toScores = (
   domain: DomainKey,
   metricKeys: string[],
   metrics: Record<string, GeminiObservedMetric>,
+  detailMaps?: { domainDetails?: Record<string, AxisDetail>; globalDetails?: Record<string, AxisDetail> },
 ): DomainProfile["scores"] =>
   metricKeys
     .map((key) => {
@@ -154,7 +156,19 @@ const toScores = (
       const safeScore = Number.isFinite(metric.score) ? metric.score : 0;
       const axisKey = axisId(domain, key);
       const meta = resolveAxisMetadata(axisKey) ?? resolveAxisMetadata(key);
-      return { key: meta?.id ?? axisKey, label: meta?.label ?? key, value: safeScore };
+      const resolvedKey = meta?.id ?? axisKey;
+      const detail: AxisDetail = {
+        rawValue: metric.value ?? "",
+        explanation: metric.explanation,
+        observed: metric.value !== "unobserved" && metric.score !== 0,
+      };
+      if (detailMaps?.domainDetails) {
+        detailMaps.domainDetails[resolvedKey] = detail;
+      }
+      if (detailMaps?.globalDetails) {
+        detailMaps.globalDetails[resolvedKey] = detail;
+      }
+      return { key: resolvedKey, label: meta?.label ?? key, value: safeScore };
     })
     .filter(Boolean) as DomainProfile["scores"];
 
@@ -191,9 +205,14 @@ const buildDomainProfile = (
   domainName: string,
   metricKeys: string[],
   metrics: Record<string, GeminiObservedMetric>,
+  axisDetails: Record<string, AxisDetail>,
   extraHighlight?: string,
 ): DomainProfile => {
-  const scores = toScores(domain, metricKeys, metrics);
+  const domainDetails: Record<string, AxisDetail> = {};
+  const scores = toScores(domain, metricKeys, metrics, {
+    domainDetails,
+    globalDetails: axisDetails,
+  });
   const missing = unobserved(metricKeys, metrics);
   const highlights = [
     ...(extraHighlight ? [extraHighlight] : []),
@@ -204,16 +223,22 @@ const buildDomainProfile = (
     primaryArchetype: `Multimodal ${domainName}`,
     summaryText: summarize(domain, domainName, metricKeys, metrics),
     scores,
+    axisDetails: domainDetails,
     highlights: highlights.length > 0 ? highlights : undefined,
   };
 };
 
-const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean): MultimodalProfiles => {
+const buildProfiles = (
+  response: GeminiMultimodalResponse,
+  fromFallback: boolean,
+  axisDetails: Record<string, AxisDetail>,
+): MultimodalProfiles => {
   const voice = buildDomainProfile(
     "voice",
     "Voice",
     ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
     response.voice,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
   const language = buildDomainProfile(
@@ -221,6 +246,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
     "Language",
     ["concreteness", "metaphor_density", "references", "humor", "teaching_vs_riffing"],
     response.language,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
   const narrative = buildDomainProfile(
@@ -228,6 +254,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
     "Narrative",
     ["mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
 
@@ -238,6 +265,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
     "Visual",
     ["environment_stability", "talking_vs_broll_vs_graphics", "pattern_interrupts"],
     ves,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
 
@@ -246,6 +274,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
     "Editing",
     ["cut_rate", "pattern_interrupts", "broll_coverage"],
     ves,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
 
@@ -254,6 +283,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
     "Sound",
     ["music_changes", "sfx_density", "silence_for_emphasis"],
     ves,
+    axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
 
@@ -294,11 +324,13 @@ export const analyzeVideoMultimodal = async (input: {
   }
 
   const parsed = parseGeminiMultimodalJson(result.rawJson);
-  const profiles = buildProfiles(parsed, result.fromFallback);
+  const axisDetails: Record<string, AxisDetail> = {};
+  const profiles = buildProfiles(parsed, result.fromFallback, axisDetails);
 
   return {
     profiles,
     beats: toBeatSegments(parsed.narrative.beats),
+    axisDetails,
     diagnostics: {
       fromFallback: result.fromFallback,
       unobservedCounts: collectUnobservedCounts(parsed),
