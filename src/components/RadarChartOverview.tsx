@@ -8,27 +8,12 @@ import {
   Tooltip,
 } from "recharts";
 import type { VideoFingerprintJson } from "../lib/types";
+import { metaAxesMetadata } from "../lib/analysis/axisMetadata";
 
 type Props = {
   fingerprint?: VideoFingerprintJson | null;
   comparisonLabel?: string;
   comparisonValues?: VideoFingerprintJson["metaAxes"];
-};
-
-const axisLabels: Record<keyof VideoFingerprintJson["metaAxes"], string> = {
-  voiceIntensity: "Voice intensity",
-  conceptualDepth: "Conceptual depth",
-  narrativeStructureStrength: "Narrative structure",
-  visualDynamism: "Visual dynamism",
-  productionPolish: "Production polish",
-};
-
-const axisDescriptions: Record<keyof VideoFingerprintJson["metaAxes"], string> = {
-  voiceIntensity: "How energetic and projected the delivery feels.",
-  conceptualDepth: "How much abstract thinking and depth shows up.",
-  narrativeStructureStrength: "How clearly the story beats and arcs land.",
-  visualDynamism: "How much motion and visual change the viewer sees.",
-  productionPolish: "Perceived finish: cuts, mix, and overall sheen.",
 };
 
 type ChartDatum = {
@@ -42,11 +27,11 @@ const toChartData = (
   meta: VideoFingerprintJson["metaAxes"],
   comparison?: VideoFingerprintJson["metaAxes"],
 ): ChartDatum[] =>
-  Object.entries(meta).map(([key, value]) => ({
-    axis: axisLabels[key as keyof typeof axisLabels],
-    value,
-    comparison: comparison?.[key as keyof typeof meta],
-    description: axisDescriptions[key as keyof typeof axisDescriptions],
+  metaAxesMetadata.map(({ id, label, description }) => ({
+    axis: label,
+    value: meta[id as keyof typeof meta],
+    comparison: comparison?.[id as keyof typeof meta],
+    description,
   }));
 
 function CustomTooltip({ active, payload, label }: any) {
