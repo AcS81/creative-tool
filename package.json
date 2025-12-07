@@ -12,7 +12,8 @@
     "prisma:migrate": "CACHE_DIR=.prisma/cache prisma migrate dev",
     "prisma:studio": "CACHE_DIR=.prisma/cache prisma studio",
     "seed": "CACHE_DIR=.prisma/cache tsx prisma/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

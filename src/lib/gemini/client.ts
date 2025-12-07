@@ -176,6 +176,11 @@ export type GeminiMultimodalRequest = {
    * Useful for tests and local development when you want to exercise the request builder.
    */
   forceEnable?: boolean;
+  /**
+   * Dev-only: skip the primary file_data path and run the inline fallback directly.
+   * Useful for validating whether the fetched bytes look like media vs HTML.
+   */
+  forceFallback?: boolean;
 };
 
 type GeminiVideoPart =
@@ -402,8 +407,13 @@ const downloadVideoSample = async (youtubeUrl: string, signal?: AbortSignal): Pr
   return Buffer.concat(chunks, received);
 };
 
-const prepareFallbackUpload = async (youtubeUrl: string, signal?: AbortSignal): Promise<TempUploadHandle> => {
+const prepareFallbackUpload = async (
+  youtubeUrl: string,
+  signal?: AbortSignal,
+  logger?: Logger,
+): Promise<TempUploadHandle> => {
   const mediaBuffer = await downloadVideoSample(youtubeUrl, signal);
+  logger?.info?.(`Fallback media sample fetched: ${mediaBuffer.byteLength} bytes`);
 
   const cleanup = async () => {
     try {
@@ -493,6 +503,54 @@ export const callGeminiMultimodalJson = async (
     return toConfigMissing("GEMINI_API_KEY is not set.");
   }
 
+  const attemptFallback = async (): Promise<GeminiMultimodalResult> => {
+    logger.warn("Using inline_data fallback path for Gemini multimodal call.");
+
+    let upload: TempUploadHandle | undefined;
+    try {
+      upload = await prepareFallbackUpload(request.youtubeUrl, request.signal, logger);
+    } catch (error) {
+      logger.error("Failed to prepare fallback upload", error);
+      return toFallbackFailed(describeError(error));
+    }
+
+    try {
+      const fallbackOutcome = await callGeminiWithVideoPart({
+        apiKey,
+        videoPart: upload.part,
+        prompt: request.prompt,
+        jsonSchema: request.jsonSchema,
+        systemInstruction: request.systemInstruction,
+        signal: request.signal,
+      });
+
+      if (fallbackOutcome.ok) {
+        return {
+          ok: true,
+          fromFallback: true,
+          rawJson: fallbackOutcome.data,
+          status: fallbackOutcome.status,
+        };
+      }
+
+      const message =
+        fallbackOutcome.errorMessage ||
+        "Gemini returned an error while using the fallback inline upload.";
+      if (fallbackOutcome.status && fallbackOutcome.status >= 200 && fallbackOutcome.status < 300) {
+        return toInvalidResponse(message, fallbackOutcome.status);
+      }
+      return toUpstreamError(message, fallbackOutcome.status);
+    } finally {
+      if (upload) {
+        await upload.cleanup();
+      }
+    }
+  };
+
+  if (request.forceFallback) {
+    return attemptFallback();
+  }
+
   const primaryOutcome = await callGeminiWithVideoPart({
     apiKey,
     videoPart: {
@@ -527,44 +585,5 @@ export const callGeminiMultimodalJson = async (
   }
 
   logger.warn("Gemini file_data path rejected; attempting temp upload fallback.");
-
-  let upload: TempUploadHandle | undefined;
-  try {
-    upload = await prepareFallbackUpload(request.youtubeUrl, request.signal, logger);
-  } catch (error) {
-    logger.error("Failed to prepare fallback upload", error);
-    return toFallbackFailed(describeError(error));
-  }
-
-  try {
-    const fallbackOutcome = await callGeminiWithVideoPart({
-      apiKey,
-      videoPart: upload.part,
-      prompt: request.prompt,
-      jsonSchema: request.jsonSchema,
-      systemInstruction: request.systemInstruction,
-      signal: request.signal,
-    });
-
-    if (fallbackOutcome.ok) {
-      return {
-        ok: true,
-        fromFallback: true,
-        rawJson: fallbackOutcome.data,
-        status: fallbackOutcome.status,
-      };
-    }
-
-    const message =
-      fallbackOutcome.errorMessage ||
-      "Gemini returned an error while using the fallback inline upload.";
-    if (fallbackOutcome.status && fallbackOutcome.status >= 200 && fallbackOutcome.status < 300) {
-      return toInvalidResponse(message, fallbackOutcome.status);
-    }
-    return toUpstreamError(message, fallbackOutcome.status);
-  } finally {
-    if (upload) {
-      await upload.cleanup();
-    }
-  }
+  return attemptFallback();
 };

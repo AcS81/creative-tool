@@ -9,6 +9,12 @@ This replaces the previous plan. It assumes we use Gemini’s native video inges
 - Passing the URL as `file_data` with `mime_type: "video/*"` (Google AI Studio / Vertex “YouTube import” capability) lets Gemini fetch frames/audio directly.
 - We must verify entitlement: if `file_data` fails (403/unsupported), fall back to a lightweight fetch + signed URL upload, still without persisting raw media after use.
 
+### Multimodal Reality (Iteration 2 – Task 0.1)
+- New probe script: `tsx scripts/probe-multimodal-ingestion.ts --url <youtube-url> [--force-fallback] [--skip-gemini] [--bytes N]`. It runs the multimodal call (when `GEMINI_API_KEY` is set) and also inspects the fallback download bytes.
+- Observation from the fallback downloader (Node fetch with Range bytes): a plain watch URL returns `status=200`, `content-type=text/html`, ~1.5MB of HTML starting with `<!DOCTYPE html>`. This means our current fallback (`inline_data` built from `fetch(youtubeUrl)`) is not providing audio/video to Gemini.
+- Primary `file_data` entitlement could not be validated in this environment (no `GEMINI_API_KEY` available at run time); rerun the probe with a key to confirm whether direct YouTube ingestion works for this account.
+- Recommendation: treat the PRD “no download” non-goal as needing a narrow exception—fallback must stream real media bytes (e.g., via a short progressive audio/video pull or a signed temp upload) instead of watch-page HTML, otherwise multimodal quality will remain unreliable.
+
 ---
 
 ## 2) Architecture (per analysis job)

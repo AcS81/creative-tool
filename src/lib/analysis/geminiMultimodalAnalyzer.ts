@@ -134,6 +134,10 @@ const userPrompt = [
   "- JSON only; no prose.",
 ].join("\n");
 
+export const multimodalResponseJsonSchema = responseJsonSchema;
+export const multimodalPrompt = userPrompt;
+export const multimodalSystemInstruction = systemInstruction;
+
 const metricLabelMap: Record<string, string> = {
   speaking_rate: "Speaking Rate",
   filler_rate: "Filler Rate",
