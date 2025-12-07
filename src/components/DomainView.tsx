@@ -3,6 +3,7 @@ import type { DomainProfile } from "../lib/types";
 import { Chip } from "./Chip";
 import { DomainScoreBars } from "./DomainScoreBars";
 import { describeArchetype, type DomainKey } from "../lib/archetypes/descriptions";
+import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
 
 type Props = {
   name: string;
@@ -55,6 +56,52 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
         <div className="rounded-lg border border-border/60 bg-surface-strong p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Score mix</p>
           <DomainScoreBars profile={profile} />
+        </div>
+      </div>
+
+      <div className="grid gap-3 rounded-lg border border-border/60 bg-surface-strong p-4 shadow-sm md:grid-cols-2">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Axis details</p>
+          <ul className="space-y-2 text-sm text-foreground">
+            {profile.scores.map((score) => {
+              const meta = resolveAxisMetadata(score.key);
+              const detail = profile.axisDetails?.[meta?.id ?? score.key];
+              const value = Math.round(Math.max(0, Math.min(100, score.value)));
+              const observed = detail?.observed !== false && detail?.rawValue !== "unobserved";
+              return (
+                <li key={score.key} className="rounded border border-border/50 bg-white/60 px-3 py-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-foreground">
+                    <span>{meta?.label ?? score.label ?? score.key}</span>
+                    <span>{value} / 100</span>
+                  </div>
+                  {detail?.rawValue ? (
+                    <p className="text-[12px] text-foreground/80">Raw: {detail.rawValue}</p>
+                  ) : null}
+                  <p className="text-xs text-muted">
+                    {detail?.explanation || meta?.shortDescription || meta?.howMeasured || meta?.scaleDirection}
+                  </p>
+                  {!observed ? (
+                    <p className="text-[11px] text-amber-700">Not observed confidently</p>
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">What this means</p>
+          <ul className="space-y-2 text-sm text-foreground">
+            {profile.highlights?.slice(0, 3).map((highlight) => (
+              <li key={highlight} className="rounded border border-border/50 bg-white/60 px-3 py-2">
+                {highlight}
+              </li>
+            ))}
+            {!profile.highlights?.length ? (
+              <li className="rounded border border-border/50 bg-white/60 px-3 py-2 text-muted">
+                Key takeaways will appear here.
+              </li>
+            ) : null}
+          </ul>
         </div>
       </div>
 

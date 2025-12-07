@@ -23,6 +23,9 @@ export function DomainScoreBars({ profile }: Props) {
                 style={{ width: `${value}%` }}
               />
             </div>
+            {profile.axisDetails?.[score.key]?.rawValue ? (
+              <p className="text-[11px] text-muted">Raw: {profile.axisDetails[score.key]!.rawValue}</p>
+            ) : null}
           </div>
         );
       })}
