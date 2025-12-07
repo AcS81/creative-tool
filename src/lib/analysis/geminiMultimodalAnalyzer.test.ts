@@ -26,6 +26,8 @@ const sampleRaw = {
     pauses: { score: 55, value: "0.9s avg", explanation: "occasional resets" },
     loudness_range: { score: 65, value: "12 dB", explanation: "decent range" },
     pitch_variation: { score: 50, value: "medium", explanation: "average pitch movement" },
+    clarity: { score: 70, value: "clear diction", explanation: "crisp words" },
+    warmth: { score: 60, value: "warm tone", explanation: "inviting tone" },
   },
   language: {
     concreteness: { score: 52, value: "balanced", explanation: "mix of concrete and abstract" },
@@ -45,11 +47,14 @@ const sampleRaw = {
   visual_edit_sound: {
     environment_stability: { score: 70, value: "80% same setup", explanation: "stable" },
     talking_vs_broll_vs_graphics: { score: 60, value: "60/30/10", explanation: "balanced mix" },
+    movement: { score: 55, value: "moderate movement", explanation: "some movement" },
+    expression: { score: 58, value: "expressive", explanation: "visible expressions" },
     cut_rate: { score: 55, value: "2.1s avg", explanation: "moderate cuts" },
     pattern_interrupts: { score: 50, value: "3 moments", explanation: "some interrupts" },
     broll_coverage: { score: 58, value: "30%", explanation: "broll occasionally" },
     music_coverage: { score: 65, value: "70%", explanation: "music under most of video" },
     music_changes: { score: 40, value: "2 changes", explanation: "few music swaps" },
+    music_balance: { score: 55, value: "balanced under VO", explanation: "music balanced" },
     sfx_density: { score: 30, value: "2 sfx", explanation: "light sfx" },
     silence_for_emphasis: { score: 20, value: "1 pause", explanation: "rare silence" },
   },

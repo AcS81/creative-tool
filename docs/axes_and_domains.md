@@ -9,49 +9,110 @@ This is a quick, human-readable glossary for the axes shown in the Overview rada
 - **Visual dynamism** – how much the visuals change or move (movement, setup changes, cut pace, interrupts).
 - **Production polish** – overall smoothness/finish of edits and mix (cuts, audio balance, lack of rough edges).
 
+---
+
+## How to read the dual charts
+- **Chart A: Independent radar** – facets stand alone; no implied “midpoint is ideal”. Use for variety/stability/coverage traits.
+- **Chart B: Spectrum shape (hexagram/diamond)** – 3–4 balanced spectrums where midpoint is meaningful. Low/mid/high labels matter more than raw numbers.
+- **Qual first, quant second** – show raw values and short explanations; numbers are directional. “Unobserved” stays explicit.
+- **Overlays** – user polygon + faint reference/archetype outline on both charts.
+
+---
+
 ## Voice
-- **Speech pace** – words per minute; low=slow, high=fast.
-- **Filler rate** – frequency of um/uh/like; low=few, high=frequent.
-- **Pauses/resets** – use and length of pauses; low=rare/short, high=frequent/longer.
-- **Loudness range** – vocal dynamic range; low=flat, high=dynamic.
-- **Pitch variation** – how much pitch moves; low=monotone, high=varied.
-- **Clarity** – articulation/intelligibility; low=muddy, high=crisp.
-- **Warmth** – tone friendliness/intimacy; low=cold, high=warm.
+**Chart A – independent facets**
+- Speech pace – words per minute; low=slow, high=fast.
+- Filler rate – frequency of um/uh/like; low=few, high=frequent.
+- Pauses/resets – use/length of pauses; low=rare/short, high=frequent/longer.
+- Loudness range – dynamic range; low=flat, high=dynamic.
+- Pitch variation – melodic movement; low=monotone, high=varied.
+
+**Chart B – spectrums**
+- Pace balance – slow ↔ fast; mid = measured cadence.
+- Calm ↔ Animated – based on pitch + loudness movement; mid = steady expressiveness.
+- Structured ↔ Riffing – reset cadence + filler mix; mid = intentional but loose.
+- Intimate ↔ Broadcast – projection + presence; mid = warm but clear.
+
+---
 
 ## Language
-- **Concreteness** – concrete examples vs abstraction; low=abstract, high=concrete.
-- **Metaphor density** – figurative language frequency; low=literal, high=figurative.
-- **References** – cultural/historical/scientific citations; low=few, high=frequent.
-- **Humor** – jokes/punchlines; low=serious, high=playful.
-- **Teaching vs riffing** – structured instruction vs loose commentary; low=riffing, high=instructional.
-- **Story presence** – anecdotal/story phrasing vs straight exposition; low=explanatory, high=story-led.
-- **Visualizability** – ease of picturing what’s said; low=abstract, high=imagery-rich.
+**Chart A – independent facets**
+- Concreteness – abstract ↔ concrete examples.
+- Metaphor density – literal ↔ figurative frequency.
+- References – count/diversity of cited references.
+- Humor – serious ↔ playful.
+- Teaching vs riffing – instructional ↔ loose commentary.
+- Story presence – anecdotal/story phrasing vs straight exposition.
+
+**Chart B – spectrums**
+- Abstract ↔ Concrete – grounded in `concreteness`.
+- Instructional ↔ Exploratory – based on `teaching_vs_riffing`.
+- Playful ↔ Serious – guided by `humor`.
+- Sparse ↔ Reference-rich – uses `references` density.
+
+---
 
 ## Narrative
-- **Story presence** – proportion of beats that are hook/setup/escalation/payoff vs pure explanation.
-- **Mini-arc density** – count of small setups/payoffs.
-- **Foreshadow & callbacks** – open loops and returns.
-- **Transition clarity** – guided vs jarring section changes.
-- **Hooks** – strength of opening/re-engagement hooks.
-- **Pattern interrupts** – narrative-level resets/contrasts.
+**Chart A – independent facets**
+- Story presence – hook/setup/escalation/payoff share vs explanation.
+- Mini-arc density – count of small setups/payoffs.
+- Foreshadow & callbacks – open loops and returns.
+- Transition clarity – guided vs jarring section changes.
+- Hooks – strength of opening/re-engagement hooks.
+- Pattern interrupts – narrative-level resets/contrasts.
+
+**Chart B – spectrums**
+- Guided arc ↔ Freeform – driven by transition clarity + arcs.
+- Story-led ↔ Expository – based on story presence share.
+- Device-light ↔ Device-heavy – foreshadow/callback/pattern interrupts density.
+- Flat tension ↔ Rising/releasing – informed by mini-arc density and hooks.
+
+---
 
 ## Visual
-- **Environment stability** – % time in same setup; low=many changes, high=stable.
-- **Talking/B-roll/graphics mix** – balance between talking head, b-roll, and overlays.
-- **Movement** – camera/body motion; low=static, high=active.
-- **Expression** – facial expressiveness/eye contact; low=neutral, high=expressive.
+**Chart A – independent facets**
+- Environment stability – % time same setup; low=many changes, high=stable.
+- Talking/B-roll/graphics mix – balance of talking head vs overlays.
+- Movement – camera/body motion; low=static, high=active.
+- Expression – facial expressiveness/eye contact; low=neutral, high=expressive.
+- Shot variety – distinct setups/angles (derived from stability + movement).
+
+**Chart B – spectrums**
+- Static ↔ Dynamic – movement + setup changes.
+- Minimal overlays ↔ Graphic-rich – driven by graphics share.
+- Stable ↔ Roaming – stability vs variety of setups.
+- Clean ↔ Stylized – presence of visual interrupts/overlays.
+
+---
 
 ## Editing
-- **Cut rate** – average seconds between cuts; low=long shots, high=rapid cuts.
-- **Pattern interrupts** – visual/audio resets (memes/overlays/zoom cuts).
-- **B-roll coverage** – % runtime with b-roll; low=minimal, high=heavy.
+**Chart A – independent facets**
+- Cut rate – avg seconds between cuts; low=long shots, high=rapid cuts.
+- Pattern interrupts – visual resets (memes/overlays/zoom cuts).
+- B-roll coverage – % runtime with b-roll.
+- Rhythm consistency – evenness of pacing across segments.
+
+**Chart B – spectrums**
+- Slow cuts ↔ Fast cuts – based on `cut_rate`.
+- Clean ↔ Interrupt-heavy – weight of pattern interrupts.
+- Sparse ↔ Layered coverage – b-roll share across runtime.
+- Smooth ↔ Choppy – rhythm consistency + interrupt placement.
+
+---
 
 ## Sound
-- **Music coverage** – % runtime with music; low=none, high=continuous.
-- **Music changes** – count of distinct music shifts.
-- **Music vs voice** – balance of music loudness to narration; low=understated, high=overpowering.
-- **SFX density** – notable sound effects; low=rare, high=frequent.
-- **Silence for emphasis** – intentional quiet spans; low=none, high=frequent.
+**Chart A – independent facets**
+- Music coverage – % runtime with music.
+- Music changes – count of distinct music shifts.
+- Music vs voice balance – under ↔ overpowering.
+- SFX density – notable sound effects; low=rare, high=frequent.
+- Silence for emphasis – intentional quiet spans; low=none, high=frequent.
+
+**Chart B – spectrums**
+- Dry ↔ Musical bed – guided by music coverage.
+- Understated ↔ Overpowering mix – music vs voice balance.
+- Minimal SFX ↔ SFX-rich – from `sfx_density`.
+- Silence rare ↔ Silence used often – from `silence_for_emphasis`.
 
 ## Interpreting scores
 - Scores are directional, not clinical measurements.

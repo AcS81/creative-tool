@@ -53,8 +53,18 @@ const responseJsonSchema = {
         pauses: metricSchema,
         loudness_range: metricSchema,
         pitch_variation: metricSchema,
+        clarity: metricSchema,
+        warmth: metricSchema,
       },
-      required: ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
+      required: [
+        "speaking_rate",
+        "filler_rate",
+        "pauses",
+        "loudness_range",
+        "pitch_variation",
+        "clarity",
+        "warmth",
+      ],
     },
     language: {
       type: "object",
@@ -99,29 +109,35 @@ const responseJsonSchema = {
           },
         },
       },
-      required: ["beats", "mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
+      required: ["beats", "mini_arc_density", "foreshadow_callbacks", "transition_clarity", "story_presence"],
     },
     visual_edit_sound: {
       type: "object",
       properties: {
         environment_stability: metricSchema,
         talking_vs_broll_vs_graphics: metricSchema,
+        movement: metricSchema,
+        expression: metricSchema,
         cut_rate: metricSchema,
         pattern_interrupts: metricSchema,
         broll_coverage: metricSchema,
         music_coverage: metricSchema,
         music_changes: metricSchema,
+        music_balance: metricSchema,
         sfx_density: metricSchema,
         silence_for_emphasis: metricSchema,
       },
       required: [
         "environment_stability",
         "talking_vs_broll_vs_graphics",
+        "movement",
+        "expression",
         "cut_rate",
         "pattern_interrupts",
         "broll_coverage",
         "music_coverage",
         "music_changes",
+        "music_balance",
         "sfx_density",
         "silence_for_emphasis",
       ],
@@ -140,10 +156,10 @@ const systemInstruction = [
 
 const userPrompt = [
   "Return JSON for these domains:",
-  "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation.",
+  "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation, clarity, warmth.",
   "- language: concreteness, metaphor_density, references, humor, teaching_vs_riffing.",
   "- narrative: beats [{label,start,end}], mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence, devices [{type,timestamp}].",
-  "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
+  "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, movement, expression, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, music_balance, sfx_density, silence_for_emphasis.",
   "Rules:",
   "- scores are 0-100 reflecting the observed strength/level.",
   "- value is a short raw measurement string.",
@@ -270,7 +286,7 @@ const buildProfiles = (
   const voice = buildDomainProfile(
     "voice",
     "Voice",
-    ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
+    ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation", "clarity", "warmth"],
     response.voice as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -297,7 +313,7 @@ const buildProfiles = (
   const visual = buildDomainProfile(
     "visual",
     "Visual",
-    ["environment_stability", "talking_vs_broll_vs_graphics", "pattern_interrupts"],
+    ["environment_stability", "talking_vs_broll_vs_graphics", "movement", "expression", "pattern_interrupts"],
     ves,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -319,10 +335,13 @@ const buildProfiles = (
   if (ves.music_changes?.value && ves.music_changes.value !== "unobserved") {
     soundHighlights.push(`Music changes: ${ves.music_changes.value}`);
   }
+  if (ves.music_balance?.value && ves.music_balance.value !== "unobserved") {
+    soundHighlights.push(`Music vs voice: ${ves.music_balance.value}`);
+  }
   const sound = buildDomainProfile(
     "sound",
     "Sound",
-    ["music_coverage", "music_changes", "sfx_density", "silence_for_emphasis"],
+    ["music_coverage", "music_changes", "music_balance", "sfx_density", "silence_for_emphasis"],
     ves,
     axisDetails,
     fromFallback ? "Used fallback media path" : soundHighlights.join("; "),

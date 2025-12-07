@@ -18,6 +18,10 @@ export type AxisMetadata = {
   howMeasured: string;
   scaleDirection: string;
   aliases?: string[];
+  chart?: "independent" | "spectrum";
+  spectrumLabels?: { low: string; mid?: string; high: string };
+  derivedFrom?: string[];
+  spectrumWeights?: Record<string, number>;
 };
 
 const metaAxes: AxisMetadata[] = [
@@ -72,6 +76,7 @@ const voiceAxes: AxisMetadata[] = [
     howMeasured: "Estimated words per minute across the video.",
     scaleDirection: "low=slow, high=fast",
     aliases: ["speaking_rate"],
+    chart: "independent",
   },
   {
     id: "voice.filler_rate",
@@ -81,6 +86,7 @@ const voiceAxes: AxisMetadata[] = [
     howMeasured: "Fillers per minute relative to total speech.",
     scaleDirection: "low=few, high=frequent",
     aliases: ["filler_rate"],
+    chart: "independent",
   },
   {
     id: "voice.pauses",
@@ -90,6 +96,7 @@ const voiceAxes: AxisMetadata[] = [
     howMeasured: "Average pause length and intentional resets.",
     scaleDirection: "low=rare/short, high=frequent/longer",
     aliases: ["pauses", "flow"],
+    chart: "independent",
   },
   {
     id: "voice.loudness_range",
@@ -99,6 +106,7 @@ const voiceAxes: AxisMetadata[] = [
     howMeasured: "Spread between quietest and loudest delivery moments.",
     scaleDirection: "low=flat, high=dynamic",
     aliases: ["loudness_range", "energy"],
+    chart: "independent",
   },
   {
     id: "voice.pitch_variation",
@@ -108,6 +116,7 @@ const voiceAxes: AxisMetadata[] = [
     howMeasured: "Pitch range/variance across phrases.",
     scaleDirection: "low=monotone, high=varied",
     aliases: ["pitch_variation", "expressiveness"],
+    chart: "independent",
   },
   {
     id: "voice.clarity",
@@ -116,6 +125,7 @@ const voiceAxes: AxisMetadata[] = [
     shortDescription: "How crisp and intelligible the diction is.",
     howMeasured: "Perceived articulation and enunciation of words.",
     scaleDirection: "low=muddy, high=crisp",
+    chart: "independent",
   },
   {
     id: "voice.warmth",
@@ -124,6 +134,63 @@ const voiceAxes: AxisMetadata[] = [
     shortDescription: "Friendliness or intimacy of tone.",
     howMeasured: "Tone color and phrasing that feels inviting vs distant.",
     scaleDirection: "low=cold, high=warm",
+    chart: "independent",
+  },
+];
+
+const voiceSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "voice.pace_balance",
+    domain: "voice",
+    label: "Pace balance",
+    shortDescription: "Slow ↔ fast cadence; midpoint = measured pace.",
+    howMeasured: "Derived from speaking_rate distribution across the video.",
+    scaleDirection: "low=slow, mid=measured, high=fast",
+    spectrumLabels: { low: "slow", mid: "measured", high: "fast" },
+    chart: "spectrum",
+    derivedFrom: ["voice.speaking_rate"],
+    spectrumWeights: { "voice.speaking_rate": 1 },
+  },
+  {
+    id: "voice.calm_vs_animated",
+    domain: "voice",
+    label: "Calm ↔ animated",
+    shortDescription: "Steady delivery versus animated prosody.",
+    howMeasured: "Blend of pitch_variation and loudness_range variance.",
+    scaleDirection: "low=calm, mid=steady, high=animated",
+    spectrumLabels: { low: "calm", mid: "steady", high: "animated" },
+    chart: "spectrum",
+    derivedFrom: ["voice.pitch_variation", "voice.loudness_range"],
+    spectrumWeights: { "voice.pitch_variation": 1, "voice.loudness_range": 1 },
+  },
+  {
+    id: "voice.structured_vs_riffing",
+    domain: "voice",
+    label: "Structured ↔ riffing",
+    shortDescription: "Deliberate phrasing versus loose, improv pacing.",
+    howMeasured: "Pauses/resets rhythm plus filler_rate trends.",
+    scaleDirection: "low=structured, mid=balanced, high=riffing",
+    spectrumLabels: { low: "structured", mid: "balanced", high: "riffing" },
+    chart: "spectrum",
+    derivedFrom: ["voice.pauses", "voice.filler_rate"],
+    spectrumWeights: { "voice.pauses": -1, "voice.filler_rate": 1 },
+  },
+  {
+    id: "voice.intimate_vs_broadcast",
+    domain: "voice",
+    label: "Intimate ↔ broadcast",
+    shortDescription: "Close, warm tone versus projected, stage tone.",
+    howMeasured: "Projection cues from loudness/pitch plus warmth/clarity.",
+    scaleDirection: "low=intimate, mid=balanced, high=broadcast",
+    spectrumLabels: { low: "intimate", mid: "balanced", high: "broadcast" },
+    chart: "spectrum",
+    derivedFrom: ["voice.loudness_range", "voice.pitch_variation", "voice.clarity", "voice.warmth"],
+    spectrumWeights: {
+      "voice.loudness_range": 1,
+      "voice.pitch_variation": 1,
+      "voice.clarity": 1,
+      "voice.warmth": -1,
+    },
   },
 ];
 
@@ -136,6 +203,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Share of concrete nouns and tangible references.",
     scaleDirection: "low=abstract, high=concrete",
     aliases: ["concreteness", "abstractVsConcrete"],
+    chart: "independent",
   },
   {
     id: "language.metaphor_density",
@@ -145,6 +213,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Metaphors per thousand words or per segment.",
     scaleDirection: "low=literal, high=figurative",
     aliases: ["metaphor_density"],
+    chart: "independent",
   },
   {
     id: "language.references",
@@ -154,6 +223,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Count and diversity of cited references.",
     scaleDirection: "low=few, high=frequent",
     aliases: ["references"],
+    chart: "independent",
   },
   {
     id: "language.humor",
@@ -163,6 +233,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Notable punchlines, asides, or comedic beats.",
     scaleDirection: "low=serious, high=playful",
     aliases: ["humor"],
+    chart: "independent",
   },
   {
     id: "language.teaching_vs_riffing",
@@ -172,6 +243,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Share of explicit instruction relative to tangents/riffs.",
     scaleDirection: "low=riffing, high=instructional",
     aliases: ["teaching_vs_riffing", "explanationWeight"],
+    chart: "independent",
   },
   {
     id: "language.story_presence",
@@ -181,6 +253,7 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Density of story-driven phrasing vs straight exposition.",
     scaleDirection: "low=explanatory, high=story-driven",
     aliases: ["storyPresence"],
+    chart: "independent",
   },
   {
     id: "language.visualizability",
@@ -190,6 +263,58 @@ const languageAxes: AxisMetadata[] = [
     howMeasured: "Imagery, sensory cues, and concrete descriptors.",
     scaleDirection: "low=abstract, high=visual",
     aliases: ["visualizability"],
+    chart: "independent",
+  },
+];
+
+const languageSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "language.abstract_vs_concrete",
+    domain: "language",
+    label: "Abstract ↔ concrete",
+    shortDescription: "Idea-heavy vs example-heavy phrasing.",
+    howMeasured: "Directly from concreteness ratio.",
+    scaleDirection: "low=abstract, mid=balanced, high=concrete",
+    spectrumLabels: { low: "abstract", mid: "balanced", high: "concrete" },
+    chart: "spectrum",
+    derivedFrom: ["language.concreteness"],
+    spectrumWeights: { "language.concreteness": 1 },
+  },
+  {
+    id: "language.instructional_vs_exploratory",
+    domain: "language",
+    label: "Instructional ↔ exploratory",
+    shortDescription: "Step-by-step teaching vs riffing or takes.",
+    howMeasured: "Share of explicit instruction vs tangents.",
+    scaleDirection: "low=riffing, mid=balanced, high=instructional",
+    spectrumLabels: { low: "riffing", mid: "balanced", high: "instructional" },
+    chart: "spectrum",
+    derivedFrom: ["language.teaching_vs_riffing"],
+    spectrumWeights: { "language.teaching_vs_riffing": 1 },
+  },
+  {
+    id: "language.playful_vs_serious",
+    domain: "language",
+    label: "Playful ↔ serious",
+    shortDescription: "Humor density and tone.",
+    howMeasured: "Notable jokes/aside density and tone markers.",
+    scaleDirection: "low=serious, mid=light, high=playful",
+    spectrumLabels: { low: "serious", mid: "light", high: "playful" },
+    chart: "spectrum",
+    derivedFrom: ["language.humor"],
+    spectrumWeights: { "language.humor": 1 },
+  },
+  {
+    id: "language.reference_density",
+    domain: "language",
+    label: "Sparse ↔ reference-rich",
+    shortDescription: "Use of cultural/scientific/historical references.",
+    howMeasured: "Reference count and diversity per thousand words.",
+    scaleDirection: "low=sparse, mid=balanced, high=dense",
+    spectrumLabels: { low: "sparse", mid: "balanced", high: "dense" },
+    chart: "spectrum",
+    derivedFrom: ["language.references"],
+    spectrumWeights: { "language.references": 1 },
   },
 ];
 
@@ -202,6 +327,7 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Share of beats that are hook/setup/escalation/payoff versus straight explanation.",
     scaleDirection: "low=instructional, high=story-led",
     aliases: ["story_presence", "storyPresence"],
+    chart: "independent",
   },
   {
     id: "narrative.mini_arc_density",
@@ -211,6 +337,7 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Count of identifiable mini arcs across beats.",
     scaleDirection: "low=few arcs, high=many arcs",
     aliases: ["mini_arc_density", "structure"],
+    chart: "independent",
   },
   {
     id: "narrative.foreshadow_callbacks",
@@ -220,6 +347,7 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Occurrences of open questions and later callbacks.",
     scaleDirection: "low=rare, high=frequent",
     aliases: ["foreshadow_callbacks", "callbacks"],
+    chart: "independent",
   },
   {
     id: "narrative.transition_clarity",
@@ -229,6 +357,7 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Verbal/visual bridges that guide the listener.",
     scaleDirection: "low=jarring, high=guided",
     aliases: ["transition_clarity"],
+    chart: "independent",
   },
   {
     id: "narrative.hooks",
@@ -238,6 +367,7 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Clarity and potency of hook beats in the timeline.",
     scaleDirection: "low=weak, high=strong",
     aliases: ["hooks"],
+    chart: "independent",
   },
   {
     id: "narrative.pattern_interrupts",
@@ -247,6 +377,61 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Moments that deliberately break the flow or expectation.",
     scaleDirection: "low=smooth, high=disruptive",
     aliases: ["interrupts", "pattern_interrupts"],
+    chart: "independent",
+  },
+];
+
+const narrativeSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "narrative.guided_vs_freeform",
+    domain: "narrative",
+    label: "Guided arc ↔ freeform",
+    shortDescription: "How directed the arc feels versus loose meandering.",
+    howMeasured: "Transition clarity plus presence of intentional arcs.",
+    scaleDirection: "low=guided, mid=balanced, high=freeform",
+    spectrumLabels: { low: "guided", mid: "balanced", high: "freeform" },
+    chart: "spectrum",
+    derivedFrom: ["narrative.transition_clarity", "narrative.mini_arc_density"],
+    spectrumWeights: { "narrative.transition_clarity": -1, "narrative.mini_arc_density": 1 },
+  },
+  {
+    id: "narrative.story_vs_exposition",
+    domain: "narrative",
+    label: "Story-led ↔ expository",
+    shortDescription: "Story-driven beats versus straight explanation.",
+    howMeasured: "Share of narrative beats vs explanatory beats.",
+    scaleDirection: "low=expository, mid=blended, high=story-led",
+    spectrumLabels: { low: "expository", mid: "blended", high: "story-led" },
+    chart: "spectrum",
+    derivedFrom: ["narrative.story_presence"],
+    spectrumWeights: { "narrative.story_presence": 1 },
+  },
+  {
+    id: "narrative.device_light_vs_heavy",
+    domain: "narrative",
+    label: "Device-light ↔ device-heavy",
+    shortDescription: "Use of callbacks, foreshadow, interrupts, reversals.",
+    howMeasured: "Density of callbacks/foreshadow/pattern interrupts.",
+    scaleDirection: "low=light, mid=selective, high=heavy",
+    spectrumLabels: { low: "light", mid: "selective", high: "heavy" },
+    chart: "spectrum",
+    derivedFrom: ["narrative.foreshadow_callbacks", "narrative.pattern_interrupts"],
+    spectrumWeights: {
+      "narrative.foreshadow_callbacks": 1,
+      "narrative.pattern_interrupts": 1,
+    },
+  },
+  {
+    id: "narrative.tension_curve",
+    domain: "narrative",
+    label: "Flat ↔ rising/releasing",
+    shortDescription: "Whether tension builds/releases across beats.",
+    howMeasured: "Mini-arc density + hook strength across timeline.",
+    scaleDirection: "low=flat, mid=gentle, high=pronounced",
+    spectrumLabels: { low: "flat", mid: "gentle", high: "pronounced" },
+    chart: "spectrum",
+    derivedFrom: ["narrative.mini_arc_density", "narrative.hooks"],
+    spectrumWeights: { "narrative.mini_arc_density": 1, "narrative.hooks": 1 },
   },
 ];
 
@@ -259,6 +444,7 @@ const visualAxes: AxisMetadata[] = [
     howMeasured: "Percentage of runtime in the primary setup vs other locations.",
     scaleDirection: "low=frequent changes, high=stable",
     aliases: ["environment_stability", "stability"],
+    chart: "independent",
   },
   {
     id: "visual.talking_vs_broll_vs_graphics",
@@ -268,6 +454,7 @@ const visualAxes: AxisMetadata[] = [
     howMeasured: "Share of runtime across talking head vs supporting visuals.",
     scaleDirection: "low=talking-heavy, high=visual-heavy mix",
     aliases: ["talking_vs_broll_vs_graphics"],
+    chart: "independent",
   },
   {
     id: "visual.movement",
@@ -277,6 +464,7 @@ const visualAxes: AxisMetadata[] = [
     howMeasured: "Perceived movement level across shots.",
     scaleDirection: "low=static, high=active",
     aliases: ["movement"],
+    chart: "independent",
   },
   {
     id: "visual.expression",
@@ -286,6 +474,68 @@ const visualAxes: AxisMetadata[] = [
     howMeasured: "Range of expressions and direct engagement with camera.",
     scaleDirection: "low=neutral, high=expressive",
     aliases: ["expression"],
+    chart: "independent",
+  },
+  {
+    id: "visual.pattern_interrupts",
+    domain: "visual",
+    label: "Pattern interrupts",
+    shortDescription: "Visual resets like memes, overlays, or jump zooms.",
+    howMeasured: "Count of notable visual interrupt moments.",
+    scaleDirection: "low=rare, high=frequent",
+    aliases: ["pattern_interrupts"],
+    chart: "independent",
+  },
+];
+
+const visualSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "visual.static_vs_dynamic",
+    domain: "visual",
+    label: "Static ↔ dynamic",
+    shortDescription: "Still framing versus lots of movement or setup changes.",
+    howMeasured: "Blend of movement level and environment changes.",
+    scaleDirection: "low=static, mid=controlled, high=dynamic",
+    spectrumLabels: { low: "static", mid: "controlled", high: "dynamic" },
+    chart: "spectrum",
+    derivedFrom: ["visual.movement", "visual.environment_stability"],
+    spectrumWeights: { "visual.movement": 1, "visual.environment_stability": -1 },
+  },
+  {
+    id: "visual.minimal_vs_graphic",
+    domain: "visual",
+    label: "Minimal ↔ graphic-rich",
+    shortDescription: "Clean talking head versus heavy overlays/graphics.",
+    howMeasured: "Talking/B-roll/graphics mix proportions.",
+    scaleDirection: "low=minimal, mid=balanced, high=graphic-rich",
+    spectrumLabels: { low: "minimal", mid: "balanced", high: "graphic-rich" },
+    chart: "spectrum",
+    derivedFrom: ["visual.talking_vs_broll_vs_graphics"],
+    spectrumWeights: { "visual.talking_vs_broll_vs_graphics": 1 },
+  },
+  {
+    id: "visual.stable_vs_roaming",
+    domain: "visual",
+    label: "Stable ↔ roaming",
+    shortDescription: "Single-setup steadiness versus many setups/angles.",
+    howMeasured: "Environment stability plus movement across locations.",
+    scaleDirection: "low=stable, mid=varied, high=roaming",
+    spectrumLabels: { low: "stable", mid: "varied", high: "roaming" },
+    chart: "spectrum",
+    derivedFrom: ["visual.environment_stability"],
+    spectrumWeights: { "visual.environment_stability": -1 },
+  },
+  {
+    id: "visual.clean_vs_stylized",
+    domain: "visual",
+    label: "Clean ↔ stylized",
+    shortDescription: "Plain visuals versus frequent pattern interrupts/overlays.",
+    howMeasured: "Presence of visual pattern interrupts/overlays.",
+    scaleDirection: "low=clean, mid=accented, high=stylized",
+    spectrumLabels: { low: "clean", mid: "accented", high: "stylized" },
+    chart: "spectrum",
+    derivedFrom: ["visual.talking_vs_broll_vs_graphics", "visual.pattern_interrupts"],
+    spectrumWeights: { "visual.talking_vs_broll_vs_graphics": 1, "visual.pattern_interrupts": 1 },
   },
 ];
 
@@ -298,6 +548,7 @@ const editingAxes: AxisMetadata[] = [
     howMeasured: "Estimated shot duration across the video.",
     scaleDirection: "low=long shots, high=rapid cuts",
     aliases: ["cut_rate", "cutPace"],
+    chart: "independent",
   },
   {
     id: "editing.pattern_interrupts",
@@ -307,6 +558,7 @@ const editingAxes: AxisMetadata[] = [
     howMeasured: "Count of notable interrupt moments in edits.",
     scaleDirection: "low=rare, high=frequent",
     aliases: ["pattern_interrupts", "patternInterrupts"],
+    chart: "independent",
   },
   {
     id: "editing.broll_coverage",
@@ -316,6 +568,58 @@ const editingAxes: AxisMetadata[] = [
     howMeasured: "Percent of the video with b-roll layered over narration.",
     scaleDirection: "low=minimal, high=heavy b-roll",
     aliases: ["broll_coverage", "broll", "brollPresence"],
+    chart: "independent",
+  },
+];
+
+const editingSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "editing.slow_vs_fast_cuts",
+    domain: "editing",
+    label: "Slow cuts ↔ fast cuts",
+    shortDescription: "Overall pace of cuts.",
+    howMeasured: "Directly from cut_rate distribution.",
+    scaleDirection: "low=slow, mid=steady, high=fast",
+    spectrumLabels: { low: "slow", mid: "steady", high: "fast" },
+    chart: "spectrum",
+    derivedFrom: ["editing.cut_rate"],
+    spectrumWeights: { "editing.cut_rate": 1 },
+  },
+  {
+    id: "editing.clean_vs_interrupt_heavy",
+    domain: "editing",
+    label: "Clean ↔ interrupt-heavy",
+    shortDescription: "Minimal flourishes versus frequent resets/memes/zooms.",
+    howMeasured: "Pattern interrupt density across runtime.",
+    scaleDirection: "low=clean, mid=accented, high=interrupt-heavy",
+    spectrumLabels: { low: "clean", mid: "accented", high: "interrupt-heavy" },
+    chart: "spectrum",
+    derivedFrom: ["editing.pattern_interrupts"],
+    spectrumWeights: { "editing.pattern_interrupts": 1 },
+  },
+  {
+    id: "editing.sparse_vs_layered_broll",
+    domain: "editing",
+    label: "Sparse ↔ layered b-roll",
+    shortDescription: "Amount of b-roll layered over narration.",
+    howMeasured: "B-roll coverage percentage across runtime.",
+    scaleDirection: "low=sparse, mid=balanced, high=layered",
+    spectrumLabels: { low: "sparse", mid: "balanced", high: "layered" },
+    chart: "spectrum",
+    derivedFrom: ["editing.broll_coverage"],
+    spectrumWeights: { "editing.broll_coverage": 1 },
+  },
+  {
+    id: "editing.smooth_vs_choppy",
+    domain: "editing",
+    label: "Smooth ↔ choppy",
+    shortDescription: "Even pacing versus abrupt rhythm shifts.",
+    howMeasured: "Variation of cut_rate across timeline + interrupts placement.",
+    scaleDirection: "low=smooth, mid=varied, high=choppy",
+    spectrumLabels: { low: "smooth", mid: "varied", high: "choppy" },
+    chart: "spectrum",
+    derivedFrom: ["editing.cut_rate", "editing.pattern_interrupts"],
+    spectrumWeights: { "editing.cut_rate": 1, "editing.pattern_interrupts": 1 },
   },
 ];
 
@@ -328,6 +632,7 @@ const soundAxes: AxisMetadata[] = [
     howMeasured: "Count of transitions between music beds or tracks.",
     scaleDirection: "low=single/none, high=frequent changes",
     aliases: ["music_changes"],
+    chart: "independent",
   },
   {
     id: "sound.music_coverage",
@@ -337,6 +642,7 @@ const soundAxes: AxisMetadata[] = [
     howMeasured: "Approximate percentage of runtime with background music.",
     scaleDirection: "low=none, high=continuous",
     aliases: ["musicCoverage"],
+    chart: "independent",
   },
   {
     id: "sound.music_balance",
@@ -346,6 +652,7 @@ const soundAxes: AxisMetadata[] = [
     howMeasured: "Relative loudness of music compared to the voice track.",
     scaleDirection: "low=understated, high=overpowering",
     aliases: ["musicBalance"],
+    chart: "independent",
   },
   {
     id: "sound.sfx_density",
@@ -355,6 +662,7 @@ const soundAxes: AxisMetadata[] = [
     howMeasured: "Notable SFX count across the video.",
     scaleDirection: "low=rare, high=frequent",
     aliases: ["sfx_density", "sfxPurpose"],
+    chart: "independent",
   },
   {
     id: "sound.silence_for_emphasis",
@@ -364,19 +672,89 @@ const soundAxes: AxisMetadata[] = [
     howMeasured: "Distinct spans of silence used to punctuate ideas.",
     scaleDirection: "low=none, high=frequent",
     aliases: ["silence_for_emphasis"],
+    chart: "independent",
+  },
+];
+
+const soundSpectrumAxes: AxisMetadata[] = [
+  {
+    id: "sound.dry_vs_musical",
+    domain: "sound",
+    label: "Dry ↔ musical bed",
+    shortDescription: "Bare voice versus consistent underscore.",
+    howMeasured: "Music coverage share across runtime.",
+    scaleDirection: "low=dry, mid=light bed, high=continuous bed",
+    spectrumLabels: { low: "dry", mid: "light bed", high: "continuous" },
+    chart: "spectrum",
+    derivedFrom: ["sound.music_coverage"],
+    spectrumWeights: { "sound.music_coverage": 1 },
+  },
+  {
+    id: "sound.understated_vs_overpowering",
+    domain: "sound",
+    label: "Understated ↔ overpowering mix",
+    shortDescription: "Whether music overtakes the voice.",
+    howMeasured: "Balance of music vs voice loudness.",
+    scaleDirection: "low=understated, mid=balanced, high=overpowering",
+    spectrumLabels: { low: "understated", mid: "balanced", high: "overpowering" },
+    chart: "spectrum",
+    derivedFrom: ["sound.music_balance"],
+    spectrumWeights: { "sound.music_balance": 1 },
+  },
+  {
+    id: "sound.minimal_vs_sfx_heavy",
+    domain: "sound",
+    label: "Minimal ↔ SFX-heavy",
+    shortDescription: "Use of sound effects for emphasis or gags.",
+    howMeasured: "SFX density per minute across the video.",
+    scaleDirection: "low=minimal, mid=selective, high=heavy",
+    spectrumLabels: { low: "minimal", mid: "selective", high: "heavy" },
+    chart: "spectrum",
+    derivedFrom: ["sound.sfx_density"],
+    spectrumWeights: { "sound.sfx_density": 1 },
+  },
+  {
+    id: "sound.silence_usage",
+    domain: "sound",
+    label: "Silence rare ↔ silence often",
+    shortDescription: "Intentional quiet spans for emphasis.",
+    howMeasured: "Count/duration of purposeful silence spans.",
+    scaleDirection: "low=rare, mid=occasional, high=often",
+    spectrumLabels: { low: "rare", mid: "occasional", high: "often" },
+    chart: "spectrum",
+    derivedFrom: ["sound.silence_for_emphasis"],
+    spectrumWeights: { "sound.silence_for_emphasis": 1 },
   },
 ];
 
 export const metaAxesMetadata = metaAxes;
 export const domainAxesMetadata: AxisMetadata[] = [
   ...voiceAxes,
+  ...voiceSpectrumAxes,
   ...languageAxes,
+  ...languageSpectrumAxes,
   ...narrativeAxes,
+  ...narrativeSpectrumAxes,
   ...visualAxes,
+  ...visualSpectrumAxes,
   ...editingAxes,
+  ...editingSpectrumAxes,
   ...soundAxes,
+  ...soundSpectrumAxes,
 ];
 export const allAxesMetadata: AxisMetadata[] = [...metaAxesMetadata, ...domainAxesMetadata];
+
+export const chartAxesByDomain: Record<
+  DomainKey,
+  { independent: AxisMetadata[]; spectrum: AxisMetadata[] }
+> = {
+  voice: { independent: voiceAxes, spectrum: voiceSpectrumAxes },
+  language: { independent: languageAxes, spectrum: languageSpectrumAxes },
+  narrative: { independent: narrativeAxes, spectrum: narrativeSpectrumAxes },
+  visual: { independent: visualAxes, spectrum: visualSpectrumAxes },
+  editing: { independent: editingAxes, spectrum: editingSpectrumAxes },
+  sound: { independent: soundAxes, spectrum: soundSpectrumAxes },
+};
 
 const axisIndex = new Map<string, AxisMetadata>();
 allAxesMetadata.forEach((axis) => {

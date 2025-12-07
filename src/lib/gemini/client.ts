@@ -266,7 +266,10 @@ const buildMultimodalBody = (input: {
   }
 
   if (input.jsonSchema) {
-    body.responseSchema = input.jsonSchema;
+    body.generationConfig = {
+      ...(body.generationConfig as Record<string, unknown>),
+      responseSchema: input.jsonSchema,
+    };
   }
 
   return body;

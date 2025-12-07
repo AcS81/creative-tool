@@ -16,6 +16,8 @@ export interface GeminiVoiceMetrics {
   pauses: GeminiObservedMetric;
   loudness_range: GeminiObservedMetric;
   pitch_variation: GeminiObservedMetric;
+  clarity: GeminiObservedMetric;
+  warmth: GeminiObservedMetric;
 }
 
 export interface GeminiLanguageMetrics {
@@ -31,7 +33,7 @@ export interface GeminiNarrativeMetrics {
   mini_arc_density: GeminiObservedMetric;
   foreshadow_callbacks: GeminiObservedMetric;
   transition_clarity: GeminiObservedMetric;
-  story_presence?: GeminiObservedMetric;
+  story_presence: GeminiObservedMetric;
   devices?: Array<{
     type: string;
     timestamp: number;
@@ -41,11 +43,14 @@ export interface GeminiNarrativeMetrics {
 export interface GeminiVisualEditSoundMetrics {
   environment_stability: GeminiObservedMetric;
   talking_vs_broll_vs_graphics: GeminiObservedMetric;
+  movement: GeminiObservedMetric;
+  expression: GeminiObservedMetric;
   cut_rate: GeminiObservedMetric;
   pattern_interrupts: GeminiObservedMetric;
   broll_coverage: GeminiObservedMetric;
   music_coverage: GeminiObservedMetric;
   music_changes: GeminiObservedMetric;
+  music_balance: GeminiObservedMetric;
   sfx_density: GeminiObservedMetric;
   silence_for_emphasis: GeminiObservedMetric;
 }

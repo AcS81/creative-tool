@@ -1,9 +1,11 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { DomainProfile } from "../lib/types";
 import { Chip } from "./Chip";
 import { DomainScoreBars } from "./DomainScoreBars";
 import { describeArchetype, type DomainKey } from "../lib/archetypes/descriptions";
 import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
+import { DomainSpectrum } from "./DomainSpectrum";
+import { DomainRadar } from "./DomainRadar";
 
 type Props = {
   name: string;
@@ -16,6 +18,7 @@ type Props = {
 };
 
 export function DomainView({ name, domain, profile, visual, tags, insights, extra }: Props) {
+  const [showExactMetrics, setShowExactMetrics] = useState(false);
   const derivedTags = profile.scores
     .sort((a, b) => b.value - a.value)
     .slice(0, 3)
@@ -52,7 +55,10 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
       </div>
 
       <div className="grid gap-6 md:grid-cols-[1.1fr,1fr]">
-        {visual ? <div className="mt-2">{visual}</div> : null}
+        <div className="mt-2 space-y-4">
+          {visual ?? <DomainRadar profile={profile} />}
+          <DomainSpectrum domain={domain} profile={profile} />
+        </div>
         <div className="rounded-lg border border-border/60 bg-surface-strong p-4 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Score mix</p>
           <DomainScoreBars profile={profile} />
@@ -61,7 +67,16 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
 
       <div className="grid gap-3 rounded-lg border border-border/60 bg-surface-strong p-4 shadow-sm md:grid-cols-2">
         <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Axis details</p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">Axis details</p>
+            <button
+              type="button"
+              onClick={() => setShowExactMetrics((v) => !v)}
+              className="text-[11px] font-semibold text-foreground/70 underline-offset-2 hover:underline"
+            >
+              {showExactMetrics ? "Hide exact metrics" : "Show exact metrics"}
+            </button>
+          </div>
           <ul className="space-y-2 text-sm text-foreground">
             {profile.scores.map((score) => {
               const meta = resolveAxisMetadata(score.key);
@@ -74,7 +89,7 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
                     <span>{meta?.label ?? score.label ?? score.key}</span>
                     <span>{value} / 100</span>
                   </div>
-                  {detail?.rawValue ? (
+                  {detail?.rawValue && showExactMetrics ? (
                     <p className="text-[12px] text-foreground/80">Raw: {detail.rawValue}</p>
                   ) : null}
                   <p className="text-xs text-muted">

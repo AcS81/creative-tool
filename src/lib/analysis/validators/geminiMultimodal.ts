@@ -29,6 +29,8 @@ const voiceSchema = z
     pauses: observedMetricSchema,
     loudness_range: observedMetricSchema,
     pitch_variation: observedMetricSchema,
+    clarity: observedMetricSchema,
+    warmth: observedMetricSchema,
   })
   .passthrough();
 
@@ -48,6 +50,7 @@ const narrativeSchema = z
     mini_arc_density: observedMetricSchema,
     foreshadow_callbacks: observedMetricSchema,
     transition_clarity: observedMetricSchema,
+    story_presence: observedMetricSchema,
   })
   .passthrough();
 
@@ -55,11 +58,14 @@ const visualEditSoundSchema = z
   .object({
     environment_stability: observedMetricSchema,
     talking_vs_broll_vs_graphics: observedMetricSchema,
+    movement: observedMetricSchema,
+    expression: observedMetricSchema,
     cut_rate: observedMetricSchema,
     pattern_interrupts: observedMetricSchema,
     broll_coverage: observedMetricSchema,
     music_coverage: observedMetricSchema,
     music_changes: observedMetricSchema,
+    music_balance: observedMetricSchema,
     sfx_density: observedMetricSchema,
     silence_for_emphasis: observedMetricSchema,
   })

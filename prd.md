@@ -50,7 +50,7 @@ CreatorSight takes a YouTube video (via URL) and:
 	•	An overall creator archetype.
 	•	Similarity to a library of reference creators (top ~100 YouTubers analyzed in advance).
 	4.	Displays everything in a visual, archetype-based UI:
-	•	Radar/pentagram charts per domain
+	•	Radar/pentagram charts per domain plus a second spectrum-style chart (hexagram/diamond) per domain
 	•	Archetype cards with example channels
 	•	“Where you’re unusual vs typical”
 	•	“Who you’re most like” in the YouTube universe.
@@ -174,7 +174,7 @@ Internal User – You (or the team)
 
 4.2 Voice View (“Your Voice”)
 
-Left: Voice pentagram (5 axes)
+Left: Voice pentagram (5 axes, independent facets)
 	•	Energy (low–high)
 	•	Expressiveness (flat–varied)
 	•	Clarity (muddy–precise)
@@ -191,6 +191,8 @@ Right: Archetype card
 	•	2–3 sentence description.
 	•	Example creators with similar voice fingerprints.
 
+Below: Spectrum chart (3–4 axes with meaningful midpoints, e.g. Pace balance, Calm ↔ Animated, Structured ↔ Riffing, Intimate ↔ Broadcast). Copy emphasizes what low/mid/high mean; mid can be desirable.
+
 Below: Breakdown of B1–B3 in simple bars / labels:
 	•	Prosody (pitch, loudness, speech rate, resets).
 	•	Habits (filler words, questions, “I vs you vs we”).
@@ -203,7 +205,8 @@ Same pattern will apply to other domains, just with different axes/archetypes.
 4.3 Other domain views (same pattern)
 
 Each domain gets:
-	1.	Radar/pentagram with ~5 key axes.
+	1.	Radar/pentagram with ~5 key independent axes.
+	2.	Second chart: 3–4 spectrums (hexagram/diamond) with balanced midpoints; show “unobserved/low-confidence” states and short copy on what each side means.
 	2.	Domain archetype card (with example creators).
 	3.	Domain explanation (1–2 paragraphs of LLM-generated text).
 	4.	Some simple supporting visuals:

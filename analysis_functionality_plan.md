@@ -85,14 +85,32 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 
 ---
 
-## 5) Prompt Content (embedded in client)
+## 5) Dual-chart model (independent radar + spectrum shape)
+- **Chart A (independent radar)**: keeps the current pentagram-style axes where each facet stands alone (no implied midpoint). Use this for traits that are not inherently “more is better”, e.g., pitch variation, filler control, environment stability.
+- **Chart B (spectrum shape – hexagram/diamond)**: 3–4 axes per domain where a midpoint is meaningful. Each spectrum has low/mid/high labels to show balance rather than “chase the max”. Spectrums also expose “unobserved/low-confidence” states and short copy on what low/mid/high look like.
+- **Quant + qual together**: numeric bands stay (0–100) but tooltips and legend copy emphasize interpretation and when “mid” is desirable. Overlay a faint reference/archetype outline plus the user polygon for both shapes.
+- **Bucketization**: reuse returned metrics → buckets → bands:
+  - Independent axes: direct mapping from returned scores.
+  - Spectrum axes: use signed weights so opposing sides push in opposite directions around a midpoint (e.g., structured↔riffing uses pauses as low-weight, filler as high-weight; stable↔roaming uses stability as low-weight, movement as high-weight).
+- **Per-domain wiring (existing metrics → the two charts)**:
+  - Voice: Chart A = pace, filler, pauses, loudness, pitch; Chart B = pace balance, calm↔animated (pitch+loudness), structured↔riffing (pauses+filler), intimate↔broadcast (projection).
+  - Language: Chart A = concreteness, metaphor, references, humor, teaching_vs_riffing; Chart B = abstract↔concrete, instructional↔exploratory, playful↔serious, sparse↔reference-rich.
+  - Narrative: Chart A = story presence, mini arcs, foreshadow/callbacks, transition clarity, hooks, pattern interrupts; Chart B = guided↔freeform, story-led↔expository, device-light↔heavy, flat↔rising tension.
+  - Visual: Chart A = stability, talking/b-roll/graphics mix, movement, expression, shot variety; Chart B = static↔dynamic, minimal↔graphic-rich, stable↔roaming, clean↔stylized.
+  - Editing: Chart A = cut rate, pattern interrupts, b-roll coverage, rhythm consistency; Chart B = slow↔fast cuts, clean↔interrupt-heavy, sparse↔layered b-roll, smooth↔choppy.
+  - Sound: Chart A = music coverage, music changes, music vs voice, SFX density, silence for emphasis; Chart B = dry↔musical bed, understated↔overpowering mix, minimal↔SFX-heavy, silence rare↔often.
+- **Per-domain micro-viz**: timelines (beats/cuts/music), badges (SFX/B-roll), and raw measurements stay adjacent so qualitative text is primary and numbers act as context.
+
+---
+
+## 6) Prompt Content (embedded in client)
 - System: “You are a video analysis engine. You watch the attached YouTube video via file_data. You must measure the requested metrics from the audio + visual content, then emit strict JSON matching the schema. Do not guess or hallucinate; if a metric is not observable, set `value: "unobserved"` and `score: 0`.”
 - User: include definitions for each metric (speaking rate, filler, concreteness, simile/metaphor, hook/setup/escalation/payoff/outro, environment stability, b-roll, cut pace, pattern interrupts, music coverage, SFX, silence). Require timestamps for beats.
 - Response: `responseMimeType: "application/json"`.
 
 ---
 
-## 6) Implementation Steps (repo-specific)
+## 7) Implementation Steps (repo-specific)
 1) **Gemini client rewrite** (`src/lib/gemini/client.ts`): add multimodal request builder using `file_data` for YouTube URL; add fallback path for temp upload if direct fetch rejected. Keep schema validation.  
 2) **Domain analyzer consolidation** (`src/lib/analysis/geminiDomains.ts` → new multimodal call): move to a single-call schema (above) instead of six separate text-only calls. Parse into DomainProfiles + supporting beats/cuts/music stats.  
 3) **Axis metadata single source**: keep one module for labels/explanations; frontend reads from it for tooltips and descriptions.  
@@ -102,21 +120,21 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 
 ---
 
-## 7) Validation Plan
+## 8) Validation Plan
 - Use a video with clear music bed and a simple story arc; verify returned `music_changes`, `beats`, and `cut_rate` match reality.  
 - Check that removing captions still works (Gemini should rely on audio/video).  
 - Ensure any failure to fetch via `file_data` triggers the fallback and surfaces a “lower confidence” flag in diagnostics.
 
 ---
 
-## 8) Risks & Mitigations
+## 9) Risks & Mitigations
 - **Entitlement/quotas**: file_data access to YouTube may be gated; mitigate with temp-upload fallback.  
 - **Latency/cost**: single multimodal call is heavier; keep temperature low and request only needed fields.  
 - **Schema drift**: enforce zod schema and reject non-conforming responses; display partial results with clear flags.
 
 ---
 
-## 9) Runtime Flags and Diagnostics
+## 10) Runtime Flags and Diagnostics
 - `ANALYSIS_MODE=mock` → deterministic offline pipeline. `ANALYSIS_MODE=gemini` → requires Gemini + YouTube keys.
 - Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present. Text-only v1 is **removed**; `ANALYSIS_VERSION=v1` now throws a configuration error instead of routing to the deprecated path.
 - Optional override: `ANALYSIS_VERSION=v2` keeps the canonical path explicit; no extra flag needed in normal dev/prod.
