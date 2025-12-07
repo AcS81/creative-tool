@@ -14,7 +14,8 @@
     "seed": "CACHE_DIR=.prisma/cache tsx prisma/seed.ts",
     "test": "vitest run",
     "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts",
-    "eval:golden": "tsx scripts/run-multimodal-golden.ts"
+    "eval:golden": "tsx scripts/run-multimodal-golden.ts",
+    "golden:multimodal": "node scripts/run-multimodal-golden.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
