@@ -19,3 +19,6 @@ export interface AnalyzeVideoResult {
     performanceErrorMessage?: string;
   };
 }
+
+// Multimodal analysis v2 response contracts.
+export * from "./types/multimodal";
