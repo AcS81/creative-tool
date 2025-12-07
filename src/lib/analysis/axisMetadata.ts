@@ -1,220 +1,385 @@
+import type { DomainKey } from "../archetypes/descriptions";
+
+export type MetaAxisId =
+  | "voiceIntensity"
+  | "conceptualDepth"
+  | "narrativeStructureStrength"
+  | "visualDynamism"
+  | "productionPolish";
+
+export type DomainMetricId = `${DomainKey}.${string}`;
+export type AxisId = MetaAxisId | DomainMetricId;
+
 export type AxisMetadata = {
-  id: string;
+  id: AxisId;
+  domain: DomainKey | "meta";
   label: string;
-  description: string;
-  domain?: string;
+  shortDescription: string;
+  howMeasured: string;
+  scaleDirection: string;
+  aliases?: string[];
 };
 
-export const metaAxesMetadata: AxisMetadata[] = [
+const metaAxes: AxisMetadata[] = [
   {
     id: "voiceIntensity",
+    domain: "meta",
     label: "Voice intensity",
-    description: "How energetic and projected the delivery feels.",
+    shortDescription: "How energetic or projected the delivery feels.",
+    howMeasured: "Average of voice pacing, loudness range, and prosody signals.",
+    scaleDirection: "low=calm/soft, high=projected/urgent",
   },
   {
     id: "conceptualDepth",
+    domain: "meta",
     label: "Conceptual depth",
-    description: "How much abstract thinking and depth shows up.",
+    shortDescription: "Balance of abstract thinking vs concrete examples.",
+    howMeasured: "Blend of language concreteness, metaphors, and reference density.",
+    scaleDirection: "low=concrete, high=abstract/idea-heavy",
   },
   {
     id: "narrativeStructureStrength",
+    domain: "meta",
     label: "Narrative structure",
-    description: "How clearly the story beats and arcs land.",
+    shortDescription: "Clarity of beats, arcs, and payoffs.",
+    howMeasured: "Presence of hooks, transitions, and mini-arcs across the video.",
+    scaleDirection: "low=loose, high=deliberate arc",
   },
   {
     id: "visualDynamism",
+    domain: "meta",
     label: "Visual dynamism",
-    description: "How much motion and visual change the viewer sees.",
+    shortDescription: "How much the visuals change or move.",
+    howMeasured: "Movement, environment changes, cut pace, and pattern interrupts.",
+    scaleDirection: "low=static, high=varied/kinetic",
   },
   {
     id: "productionPolish",
+    domain: "meta",
     label: "Production polish",
-    description: "Perceived finish across cuts, mix, and overall sheen.",
+    shortDescription: "Overall smoothness of edits and mix.",
+    howMeasured: "Cut smoothness, mix balance, and absence of rough edges.",
+    scaleDirection: "low=rough, high=polished",
   },
 ];
 
-type DomainMetricMetadata = Record<
-  string,
+const voiceAxes: AxisMetadata[] = [
   {
-    id: string;
-    label: string;
-    description: string;
+    id: "voice.speaking_rate",
+    domain: "voice",
+    label: "Speech pace",
+    shortDescription: "How fast the speaker moves through words.",
+    howMeasured: "Estimated words per minute across the video.",
+    scaleDirection: "low=slow, high=fast",
+    aliases: ["speaking_rate"],
+  },
+  {
+    id: "voice.filler_rate",
+    domain: "voice",
+    label: "Filler rate",
+    shortDescription: "Frequency of fillers like um/uh/like.",
+    howMeasured: "Fillers per minute relative to total speech.",
+    scaleDirection: "low=few, high=frequent",
+    aliases: ["filler_rate"],
+  },
+  {
+    id: "voice.pauses",
+    domain: "voice",
+    label: "Pauses/resets",
+    shortDescription: "Use of pauses and reset rhythms.",
+    howMeasured: "Average pause length and intentional resets.",
+    scaleDirection: "low=rare/short, high=frequent/longer",
+    aliases: ["pauses", "flow"],
+  },
+  {
+    id: "voice.loudness_range",
+    domain: "voice",
+    label: "Loudness range",
+    shortDescription: "Dynamic range of the voice.",
+    howMeasured: "Spread between quietest and loudest delivery moments.",
+    scaleDirection: "low=flat, high=dynamic",
+    aliases: ["loudness_range", "energy"],
+  },
+  {
+    id: "voice.pitch_variation",
+    domain: "voice",
+    label: "Pitch variation",
+    shortDescription: "How much pitch moves to emphasize ideas.",
+    howMeasured: "Pitch range/variance across phrases.",
+    scaleDirection: "low=monotone, high=varied",
+    aliases: ["pitch_variation", "expressiveness"],
+  },
+  {
+    id: "voice.clarity",
+    domain: "voice",
+    label: "Clarity",
+    shortDescription: "How crisp and intelligible the diction is.",
+    howMeasured: "Perceived articulation and enunciation of words.",
+    scaleDirection: "low=muddy, high=crisp",
+  },
+  {
+    id: "voice.warmth",
+    domain: "voice",
+    label: "Warmth",
+    shortDescription: "Friendliness or intimacy of tone.",
+    howMeasured: "Tone color and phrasing that feels inviting vs distant.",
+    scaleDirection: "low=cold, high=warm",
+  },
+];
+
+const languageAxes: AxisMetadata[] = [
+  {
+    id: "language.concreteness",
+    domain: "language",
+    label: "Concreteness",
+    shortDescription: "Concrete examples vs abstraction.",
+    howMeasured: "Share of concrete nouns and tangible references.",
+    scaleDirection: "low=abstract, high=concrete",
+    aliases: ["concreteness", "abstractVsConcrete"],
+  },
+  {
+    id: "language.metaphor_density",
+    domain: "language",
+    label: "Metaphor density",
+    shortDescription: "Use of metaphors or similes to illustrate ideas.",
+    howMeasured: "Metaphors per thousand words or per segment.",
+    scaleDirection: "low=literal, high=figurative",
+    aliases: ["metaphor_density"],
+  },
+  {
+    id: "language.references",
+    domain: "language",
+    label: "References",
+    shortDescription: "Mentions of cultural, historical, or scientific touchpoints.",
+    howMeasured: "Count and diversity of cited references.",
+    scaleDirection: "low=few, high=frequent",
+    aliases: ["references"],
+  },
+  {
+    id: "language.humor",
+    domain: "language",
+    label: "Humor",
+    shortDescription: "Presence of jokes or playful turns.",
+    howMeasured: "Notable punchlines, asides, or comedic beats.",
+    scaleDirection: "low=serious, high=playful",
+    aliases: ["humor"],
+  },
+  {
+    id: "language.teaching_vs_riffing",
+    domain: "language",
+    label: "Teaching vs riffing",
+    shortDescription: "Structured instruction vs loose commentary.",
+    howMeasured: "Share of explicit instruction relative to tangents/riffs.",
+    scaleDirection: "low=riffing, high=instructional",
+    aliases: ["teaching_vs_riffing", "explanationWeight"],
+  },
+  {
+    id: "language.story_presence",
+    domain: "language",
+    label: "Story presence",
+    shortDescription: "Amount of narrative or anecdotal framing.",
+    howMeasured: "Density of story-driven phrasing vs straight exposition.",
+    scaleDirection: "low=explanatory, high=story-driven",
+    aliases: ["storyPresence"],
+  },
+  {
+    id: "language.visualizability",
+    domain: "language",
+    label: "Visualizability",
+    shortDescription: "How easy it is to picture what is said.",
+    howMeasured: "Imagery, sensory cues, and concrete descriptors.",
+    scaleDirection: "low=abstract, high=visual",
+    aliases: ["visualizability"],
+  },
+];
+
+const narrativeAxes: AxisMetadata[] = [
+  {
+    id: "narrative.mini_arc_density",
+    domain: "narrative",
+    label: "Mini-arc density",
+    shortDescription: "Presence of small setups/payoffs within the video.",
+    howMeasured: "Count of identifiable mini arcs across beats.",
+    scaleDirection: "low=few arcs, high=many arcs",
+    aliases: ["mini_arc_density", "structure"],
+  },
+  {
+    id: "narrative.foreshadow_callbacks",
+    domain: "narrative",
+    label: "Foreshadow & callbacks",
+    shortDescription: "Use of open loops, foreshadowing, and callbacks.",
+    howMeasured: "Occurrences of open questions and later callbacks.",
+    scaleDirection: "low=rare, high=frequent",
+    aliases: ["foreshadow_callbacks", "callbacks"],
+  },
+  {
+    id: "narrative.transition_clarity",
+    domain: "narrative",
+    label: "Transition clarity",
+    shortDescription: "Smoothness of movement between sections.",
+    howMeasured: "Verbal/visual bridges that guide the listener.",
+    scaleDirection: "low=jarring, high=guided",
+    aliases: ["transition_clarity"],
+  },
+  {
+    id: "narrative.hooks",
+    domain: "narrative",
+    label: "Hooks",
+    shortDescription: "Strength of the opening and re-engagement hooks.",
+    howMeasured: "Clarity and potency of hook beats in the timeline.",
+    scaleDirection: "low=weak, high=strong",
+    aliases: ["hooks"],
+  },
+  {
+    id: "narrative.pattern_interrupts",
+    domain: "narrative",
+    label: "Pattern interrupts",
+    shortDescription: "Narrative-level resets or contrasts.",
+    howMeasured: "Moments that deliberately break the flow or expectation.",
+    scaleDirection: "low=smooth, high=disruptive",
+    aliases: ["interrupts", "pattern_interrupts"],
+  },
+];
+
+const visualAxes: AxisMetadata[] = [
+  {
+    id: "visual.environment_stability",
+    domain: "visual",
+    label: "Environment stability",
+    shortDescription: "How often the setup or background changes.",
+    howMeasured: "Percentage of runtime in the primary setup vs other locations.",
+    scaleDirection: "low=frequent changes, high=stable",
+    aliases: ["environment_stability", "stability"],
+  },
+  {
+    id: "visual.talking_vs_broll_vs_graphics",
+    domain: "visual",
+    label: "Talking/B-roll/graphics mix",
+    shortDescription: "Balance between talking head, b-roll, and overlays.",
+    howMeasured: "Share of runtime across talking head vs supporting visuals.",
+    scaleDirection: "low=talking-heavy, high=visual-heavy mix",
+    aliases: ["talking_vs_broll_vs_graphics"],
+  },
+  {
+    id: "visual.movement",
+    domain: "visual",
+    label: "Movement",
+    shortDescription: "Camera and body motion on screen.",
+    howMeasured: "Perceived movement level across shots.",
+    scaleDirection: "low=static, high=active",
+    aliases: ["movement"],
+  },
+  {
+    id: "visual.expression",
+    domain: "visual",
+    label: "Expression",
+    shortDescription: "Facial expressiveness and eye contact.",
+    howMeasured: "Range of expressions and direct engagement with camera.",
+    scaleDirection: "low=neutral, high=expressive",
+    aliases: ["expression"],
+  },
+];
+
+const editingAxes: AxisMetadata[] = [
+  {
+    id: "editing.cut_rate",
+    domain: "editing",
+    label: "Cut rate",
+    shortDescription: "Average time between cuts.",
+    howMeasured: "Estimated shot duration across the video.",
+    scaleDirection: "low=long shots, high=rapid cuts",
+    aliases: ["cut_rate", "cutPace"],
+  },
+  {
+    id: "editing.pattern_interrupts",
+    domain: "editing",
+    label: "Pattern interrupts",
+    shortDescription: "Visual resets like memes, overlays, or jump zooms.",
+    howMeasured: "Count of notable interrupt moments in edits.",
+    scaleDirection: "low=rare, high=frequent",
+    aliases: ["pattern_interrupts", "patternInterrupts"],
+  },
+  {
+    id: "editing.broll_coverage",
+    domain: "editing",
+    label: "B-roll coverage",
+    shortDescription: "Portion of runtime covered by b-roll.",
+    howMeasured: "Percent of the video with b-roll layered over narration.",
+    scaleDirection: "low=minimal, high=heavy b-roll",
+    aliases: ["broll_coverage", "broll", "brollPresence"],
+  },
+];
+
+const soundAxes: AxisMetadata[] = [
+  {
+    id: "sound.music_changes",
+    domain: "sound",
+    label: "Music changes",
+    shortDescription: "Distinct background music shifts.",
+    howMeasured: "Count of transitions between music beds or tracks.",
+    scaleDirection: "low=single/none, high=frequent changes",
+    aliases: ["music_changes"],
+  },
+  {
+    id: "sound.music_coverage",
+    domain: "sound",
+    label: "Music coverage",
+    shortDescription: "Portion of the video with music under voice.",
+    howMeasured: "Approximate percentage of runtime with background music.",
+    scaleDirection: "low=none, high=continuous",
+    aliases: ["musicCoverage"],
+  },
+  {
+    id: "sound.music_balance",
+    domain: "sound",
+    label: "Music vs voice",
+    shortDescription: "Balance between music loudness and narration.",
+    howMeasured: "Relative loudness of music compared to the voice track.",
+    scaleDirection: "low=understated, high=overpowering",
+    aliases: ["musicBalance"],
+  },
+  {
+    id: "sound.sfx_density",
+    domain: "sound",
+    label: "SFX density",
+    shortDescription: "Use of sound effects for emphasis.",
+    howMeasured: "Notable SFX count across the video.",
+    scaleDirection: "low=rare, high=frequent",
+    aliases: ["sfx_density", "sfxPurpose"],
+  },
+  {
+    id: "sound.silence_for_emphasis",
+    domain: "sound",
+    label: "Silence for emphasis",
+    shortDescription: "Intentional use of quiet moments.",
+    howMeasured: "Distinct spans of silence used to punctuate ideas.",
+    scaleDirection: "low=none, high=frequent",
+    aliases: ["silence_for_emphasis"],
+  },
+];
+
+export const metaAxesMetadata = metaAxes;
+export const domainAxesMetadata: AxisMetadata[] = [
+  ...voiceAxes,
+  ...languageAxes,
+  ...narrativeAxes,
+  ...visualAxes,
+  ...editingAxes,
+  ...soundAxes,
+];
+export const allAxesMetadata: AxisMetadata[] = [...metaAxesMetadata, ...domainAxesMetadata];
+
+const axisIndex = new Map<string, AxisMetadata>();
+allAxesMetadata.forEach((axis) => {
+  axisIndex.set(axis.id, axis);
+  const metricPart = axis.id.includes(".") ? axis.id.split(".")[1] : undefined;
+  if (metricPart) {
+    axisIndex.set(metricPart, axis);
   }
->;
+  axis.aliases?.forEach((alias) => axisIndex.set(alias, axis));
+});
 
-export const domainMetricMetadata: Record<string, DomainMetricMetadata> = {
-  voice: {
-    energy: { id: "energy", label: "Energy", description: "Perceived vocal drive and loudness." },
-    expressiveness: {
-      id: "expressiveness",
-      label: "Expressiveness",
-      description: "Pitch and tone variation used to shape phrases.",
-    },
-    clarity: { id: "clarity", label: "Clarity", description: "Diction and ease of comprehension." },
-    warmth: { id: "warmth", label: "Warmth", description: "Intimacy and friendliness in tone." },
-    flow: { id: "flow", label: "Flow/Resets", description: "Cadence smoothness and reset cadence." },
-    speaking_rate: {
-      id: "speaking_rate",
-      label: "Speaking Rate",
-      description: "Words per minute and pacing feel.",
-    },
-    filler_rate: { id: "filler_rate", label: "Filler Rate", description: "Frequency of fillers per minute." },
-    pauses: { id: "pauses", label: "Pauses/Resets", description: "Pause length and reset rhythm." },
-    loudness_range: {
-      id: "loudness_range",
-      label: "Loudness Range",
-      description: "Dynamic range across the delivery.",
-    },
-    pitch_variation: {
-      id: "pitch_variation",
-      label: "Pitch Variation",
-      description: "How much pitch moves to emphasize ideas.",
-    },
-  },
-  language: {
-    abstractVsConcrete: {
-      id: "abstractVsConcrete",
-      label: "Abstract vs Concrete",
-      description: "Balance of tangible examples vs abstract ideas.",
-    },
-    storyPresence: {
-      id: "storyPresence",
-      label: "Story Presence",
-      description: "How often narrative elements appear.",
-    },
-    explanationWeight: {
-      id: "explanationWeight",
-      label: "Explanation Weight",
-      description: "Share of structured explanation vs commentary.",
-    },
-    visualizability: {
-      id: "visualizability",
-      label: "Visualizability",
-      description: "How easy it is to picture what is said.",
-    },
-    concreteness: {
-      id: "concreteness",
-      label: "Concreteness",
-      description: "Concrete nouns/examples density.",
-    },
-    metaphor_density: {
-      id: "metaphor_density",
-      label: "Metaphor Density",
-      description: "Frequency of metaphors/similes per word count.",
-    },
-    references: {
-      id: "references",
-      label: "References",
-      description: "Cultural/historical/scientific references used.",
-    },
-    humor: { id: "humor", label: "Humor", description: "Jokes or humorous asides frequency." },
-    teaching_vs_riffing: {
-      id: "teaching_vs_riffing",
-      label: "Teaching vs Riffing",
-      description: "Instructional share vs riffs/tangents.",
-    },
-  },
-  narrative: {
-    structure: {
-      id: "structure",
-      label: "Structure Strength",
-      description: "How clearly the story arc is built.",
-    },
-    hooks: { id: "hooks", label: "Hooks", description: "Strength and frequency of hooks." },
-    callbacks: {
-      id: "callbacks",
-      label: "Callbacks",
-      description: "Use of callbacks/foreshadowing to tie beats.",
-    },
-    interrupts: {
-      id: "interrupts",
-      label: "Pattern Interrupts",
-      description: "Attention resets inside the narrative.",
-    },
-    mini_arc_density: {
-      id: "mini_arc_density",
-      label: "Mini Arc Density",
-      description: "Count of mini arcs within the video.",
-    },
-    foreshadow_callbacks: {
-      id: "foreshadow_callbacks",
-      label: "Foreshadow & Callbacks",
-      description: "Use of open loops and callbacks.",
-    },
-    transition_clarity: {
-      id: "transition_clarity",
-      label: "Transition Clarity",
-      description: "How cleanly segments transition.",
-    },
-  },
-  visual: {
-    movement: { id: "movement", label: "Movement", description: "Body and camera movement level." },
-    stability: {
-      id: "stability",
-      label: "Background Stability",
-      description: "How often the background/setup changes.",
-    },
-    expression: {
-      id: "expression",
-      label: "Expression",
-      description: "Facial expression and eye contact dynamism.",
-    },
-    environment_stability: {
-      id: "environment_stability",
-      label: "Environment Stability",
-      description: "Percentage of time in the same setup.",
-    },
-    talking_vs_broll_vs_graphics: {
-      id: "talking_vs_broll_vs_graphics",
-      label: "Talking/B-roll/Graphics Mix",
-      description: "Share of talking head vs b-roll vs on-screen graphics.",
-    },
-  },
-  editing: {
-    cutPace: { id: "cutPace", label: "Cut Pace", description: "Tempo and frequency of cuts." },
-    patternInterrupts: {
-      id: "patternInterrupts",
-      label: "Pattern Interrupts",
-      description: "Unexpected visual/audio resets.",
-    },
-    broll: { id: "broll", label: "B-roll Presence", description: "B-roll frequency and coverage." },
-    cut_rate: { id: "cut_rate", label: "Cut Rate", description: "Average seconds between cuts." },
-    broll_coverage: { id: "broll_coverage", label: "B-roll Coverage", description: "Share of runtime with b-roll." },
-  },
-  sound: {
-    musicCoverage: {
-      id: "musicCoverage",
-      label: "Music Coverage",
-      description: "Percentage of runtime with music under.",
-    },
-    musicBalance: {
-      id: "musicBalance",
-      label: "Music vs Voice",
-      description: "Balance of music level vs narration.",
-    },
-    sfxPurpose: { id: "sfxPurpose", label: "SFX Purposefulness", description: "Use of SFX for emphasis." },
-    music_changes: {
-      id: "music_changes",
-      label: "Music Changes",
-      description: "Count and style of music transitions.",
-    },
-    sfx_density: { id: "sfx_density", label: "SFX Density", description: "Notable SFX count." },
-    silence_for_emphasis: {
-      id: "silence_for_emphasis",
-      label: "Silence for Emphasis",
-      description: "Purposeful silence spans.",
-    },
-  },
-};
+export const resolveAxisMetadata = (key: string): AxisMetadata | undefined => axisIndex.get(key);
 
-export const getAxisLabel = (id: string, domain?: string) => {
-  const domainMap = domain ? domainMetricMetadata[domain] : undefined;
-  const metric = domainMap?.[id];
-  return metric?.label ?? metaAxesMetadata.find((axis) => axis.id === id)?.label ?? id;
-};
-
-export const getAxisDescription = (id: string, domain?: string) => {
-  const domainMap = domain ? domainMetricMetadata[domain] : undefined;
-  const metric = domainMap?.[id];
-  return metric?.description ?? metaAxesMetadata.find((axis) => axis.id === id)?.description ?? "";
-};
+export const getAxesForDomain = (domain: DomainKey): AxisMetadata[] =>
+  domainAxesMetadata.filter((axis) => axis.domain === domain);

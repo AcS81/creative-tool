@@ -7,6 +7,8 @@ import {
 } from "../gemini/client";
 import type { GeminiMultimodalResponse, GeminiObservedMetric } from "./types/multimodal";
 import { parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
+import type { DomainKey } from "../archetypes/descriptions";
+import { resolveAxisMetadata } from "./axisMetadata";
 
 type MultimodalProfiles = {
   voice: DomainProfile;
@@ -138,31 +140,10 @@ export const multimodalResponseJsonSchema = responseJsonSchema;
 export const multimodalPrompt = userPrompt;
 export const multimodalSystemInstruction = systemInstruction;
 
-const metricLabelMap: Record<string, string> = {
-  speaking_rate: "Speaking Rate",
-  filler_rate: "Filler Rate",
-  pauses: "Pauses / Resets",
-  loudness_range: "Loudness Range",
-  pitch_variation: "Pitch Variation",
-  concreteness: "Concreteness",
-  metaphor_density: "Metaphor Density",
-  references: "References",
-  humor: "Humor",
-  teaching_vs_riffing: "Teaching vs Riffing",
-  mini_arc_density: "Mini Arc Density",
-  foreshadow_callbacks: "Foreshadow & Callbacks",
-  transition_clarity: "Transition Clarity",
-  environment_stability: "Environment Stability",
-  talking_vs_broll_vs_graphics: "Talking/B-roll/Graphics Mix",
-  cut_rate: "Cut Rate",
-  pattern_interrupts: "Pattern Interrupts",
-  broll_coverage: "B-roll Coverage",
-  music_changes: "Music Changes",
-  sfx_density: "SFX Density",
-  silence_for_emphasis: "Silence for Emphasis",
-};
+const axisId = (domain: DomainKey, metricKey: string): string => `${domain}.${metricKey}`;
 
 const toScores = (
+  domain: DomainKey,
   metricKeys: string[],
   metrics: Record<string, GeminiObservedMetric>,
 ): DomainProfile["scores"] =>
@@ -171,19 +152,28 @@ const toScores = (
       const metric = metrics[key];
       if (!metric) return null;
       const safeScore = Number.isFinite(metric.score) ? metric.score : 0;
-      return { key, label: metricLabelMap[key] ?? key, value: safeScore };
+      const axisKey = axisId(domain, key);
+      const meta = resolveAxisMetadata(axisKey) ?? resolveAxisMetadata(key);
+      return { key: meta?.id ?? axisKey, label: meta?.label ?? key, value: safeScore };
     })
     .filter(Boolean) as DomainProfile["scores"];
 
 const unobserved = (metricKeys: string[], metrics: Record<string, GeminiObservedMetric>) =>
   metricKeys.filter((key) => metrics[key]?.value === "unobserved" || metrics[key]?.score === 0);
 
-const summarize = (domainName: string, metricKeys: string[], metrics: Record<string, GeminiObservedMetric>) => {
+const summarize = (
+  domain: DomainKey,
+  domainName: string,
+  metricKeys: string[],
+  metrics: Record<string, GeminiObservedMetric>,
+) => {
   const observed = metricKeys
     .map((key) => ({ key, metric: metrics[key] }))
     .filter((m) => m.metric && m.metric.value !== "unobserved");
 
-  const snippets = observed.slice(0, 2).map(({ key, metric }) => `${metricLabelMap[key] ?? key}: ${metric.value}`);
+  const snippets = observed
+    .slice(0, 2)
+    .map(({ key, metric }) => `${resolveAxisMetadata(axisId(domain, key))?.label ?? key}: ${metric.value}`);
   if (snippets.length === 0) return `${domainName} metrics could not be observed with confidence.`;
   return `${domainName} highlights — ${snippets.join("; ")}.`;
 };
@@ -197,18 +187,22 @@ const toBeatSegments = (beats: GeminiMultimodalResponse["narrative"]["beats"]): 
   }));
 
 const buildDomainProfile = (
+  domain: DomainKey,
   domainName: string,
   metricKeys: string[],
   metrics: Record<string, GeminiObservedMetric>,
   extraHighlight?: string,
 ): DomainProfile => {
-  const scores = toScores(metricKeys, metrics);
+  const scores = toScores(domain, metricKeys, metrics);
   const missing = unobserved(metricKeys, metrics);
-  const highlights = [...(extraHighlight ? [extraHighlight] : []), ...(missing.length ? [`Unobserved: ${missing.join(", ")}`] : [])];
+  const highlights = [
+    ...(extraHighlight ? [extraHighlight] : []),
+    ...(missing.length ? [`Unobserved: ${missing.join(", ")}`] : []),
+  ];
 
   return {
     primaryArchetype: `Multimodal ${domainName}`,
-    summaryText: summarize(domainName, metricKeys, metrics),
+    summaryText: summarize(domain, domainName, metricKeys, metrics),
     scores,
     highlights: highlights.length > 0 ? highlights : undefined,
   };
@@ -216,18 +210,21 @@ const buildDomainProfile = (
 
 const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean): MultimodalProfiles => {
   const voice = buildDomainProfile(
+    "voice",
     "Voice",
     ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
     response.voice,
     fromFallback ? "Used fallback media path" : undefined,
   );
   const language = buildDomainProfile(
+    "language",
     "Language",
     ["concreteness", "metaphor_density", "references", "humor", "teaching_vs_riffing"],
     response.language,
     fromFallback ? "Used fallback media path" : undefined,
   );
   const narrative = buildDomainProfile(
+    "narrative",
     "Narrative",
     ["mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
@@ -237,6 +234,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
   const ves = response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>;
 
   const visual = buildDomainProfile(
+    "visual",
     "Visual",
     ["environment_stability", "talking_vs_broll_vs_graphics", "pattern_interrupts"],
     ves,
@@ -244,6 +242,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
   );
 
   const editing = buildDomainProfile(
+    "editing",
     "Editing",
     ["cut_rate", "pattern_interrupts", "broll_coverage"],
     ves,
@@ -251,6 +250,7 @@ const buildProfiles = (response: GeminiMultimodalResponse, fromFallback: boolean
   );
 
   const sound = buildDomainProfile(
+    "sound",
     "Sound",
     ["music_changes", "sfx_density", "silence_for_emphasis"],
     ves,

@@ -1,6 +1,8 @@
 import { validateFingerprint } from "../schemas/fingerprint";
 import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
 import type { DomainScore, DomainProfile, VideoFingerprintJson } from "../types";
+import type { DomainKey } from "../archetypes/descriptions";
+import { getAxesForDomain } from "./axisMetadata";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -21,13 +23,22 @@ const score = (key: string, label: string, value: number): DomainScore => ({
   value,
 });
 
-const buildDomain = (label: string, base: number): DomainProfile => ({
-  primaryArchetype: `${label} Archetype`,
-  secondaryArchetype: `Alt ${label} Archetype`,
-  summaryText: `${label} summary based on mock analysis.`,
-  scores: [score(`${label.toLowerCase()}-axis`, `${label} Axis`, clamp(base))],
-  highlights: [`Mock highlight for ${label.toLowerCase()}`],
-});
+const buildDomain = (domain: DomainKey, base: number): DomainProfile => {
+  const label = domain.charAt(0).toUpperCase() + domain.slice(1);
+  const axes = getAxesForDomain(domain).slice(0, 3);
+  const scores =
+    axes.length > 0
+      ? axes.map((axis, idx) => score(axis.id, axis.label, clamp(base + idx * 4)))
+      : [score(`${domain}-axis`, `${label} Axis`, clamp(base))];
+
+  return {
+    primaryArchetype: `${label} Archetype`,
+    secondaryArchetype: `Alt ${label} Archetype`,
+    summaryText: `${label} summary based on mock analysis.`,
+    scores,
+    highlights: [`Mock highlight for ${domain}`],
+  };
+};
 
 const archetypeForMeta = (meta: VideoFingerprintJson["metaAxes"]) => {
   if (meta.voiceIntensity > 70 && meta.visualDynamism > 65) return "Hyperactive Commentator";
@@ -46,17 +57,17 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
       voiceIntensity: deriveScore(seed, 1),
       conceptualDepth: deriveScore(seed, 2),
       narrativeStructureStrength: deriveScore(seed, 3),
-      visualDynamism: deriveScore(seed, 4),
-      productionPolish: deriveScore(seed, 5),
-    },
-    perDomain: {
-      voiceProfile: buildDomain("Voice", deriveScore(seed, 6)),
-      languageProfile: buildDomain("Language", deriveScore(seed, 7)),
-      narrativeProfile: buildDomain("Narrative", deriveScore(seed, 8)),
-      visualProfile: buildDomain("Visual", deriveScore(seed, 9)),
-      editingProfile: buildDomain("Editing", deriveScore(seed, 10)),
-      soundProfile: buildDomain("Sound", deriveScore(seed, 11)),
-    },
+    visualDynamism: deriveScore(seed, 4),
+    productionPolish: deriveScore(seed, 5),
+  },
+  perDomain: {
+    voiceProfile: buildDomain("voice", deriveScore(seed, 6)),
+    languageProfile: buildDomain("language", deriveScore(seed, 7)),
+    narrativeProfile: buildDomain("narrative", deriveScore(seed, 8)),
+    visualProfile: buildDomain("visual", deriveScore(seed, 9)),
+    editingProfile: buildDomain("editing", deriveScore(seed, 10)),
+    soundProfile: buildDomain("sound", deriveScore(seed, 11)),
+  },
     overallArchetype: "",
     supporting: {
       transcriptSegments: [

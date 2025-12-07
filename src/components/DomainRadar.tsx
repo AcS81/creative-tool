@@ -1,25 +1,14 @@
-import {
-  PolarAngleAxis,
-  PolarGrid,
-  Radar,
-  RadarChart,
-  ResponsiveContainer,
-} from "recharts";
+import { PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer } from "recharts";
 import type { DomainProfile } from "../lib/types/fingerprint";
-import { domainMetricMetadata, getAxisLabel } from "../lib/analysis/axisMetadata";
+import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
 
 type Props = {
   profile: DomainProfile;
 };
 
 export function DomainRadar({ profile }: Props) {
-  const mappedDomain =
-    Object.entries(domainMetricMetadata).find(([, metrics]) =>
-      profile.scores.some((score) => metrics[score.key]),
-    )?.[0] || undefined;
-
   const data = profile.scores.map((score) => ({
-    axis: getAxisLabel(score.key, mappedDomain),
+    axis: resolveAxisMetadata(score.key)?.label ?? score.label ?? score.key,
     value: Math.max(0, Math.min(100, score.value)),
   }));
 

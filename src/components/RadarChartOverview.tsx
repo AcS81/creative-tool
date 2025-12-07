@@ -27,11 +27,11 @@ const toChartData = (
   meta: VideoFingerprintJson["metaAxes"],
   comparison?: VideoFingerprintJson["metaAxes"],
 ): ChartDatum[] =>
-  metaAxesMetadata.map(({ id, label, description }) => ({
+  metaAxesMetadata.map(({ id, label, shortDescription }) => ({
     axis: label,
     value: meta[id as keyof typeof meta],
     comparison: comparison?.[id as keyof typeof meta],
-    description,
+    description: shortDescription,
   }));
 
 function CustomTooltip({ active, payload, label }: any) {
@@ -65,19 +65,17 @@ export function RadarChartOverview({ fingerprint, comparisonValues, comparisonLa
           <span className="inline-block h-3 w-3 rounded-sm bg-[#2563eb]" />
           You
         </span>
-        {comparisonValues ? (
-          <span className="inline-flex items-center gap-2">
-            <span className="inline-block h-3 w-3 rounded-sm border border-border bg-gray-200" />
-            {comparisonLabel ?? "Reference avg"}
-          </span>
-        ) : null}
-      </div>
+            {comparisonValues ? (
+              <span className="inline-flex items-center gap-2">
+                <span className="inline-block h-3 w-3 rounded-sm border border-border bg-gray-200" />
+                {comparisonLabel ?? "Reference avg"}
+              </span>
+            ) : null}
+          </div>
       <div className="grid gap-2 text-[12px] text-muted md:grid-cols-5">
-        <span>Voice intensity</span>
-        <span>Conceptual depth</span>
-        <span>Narrative structure</span>
-        <span>Visual dynamism</span>
-        <span>Production polish</span>
+        {metaAxesMetadata.map((axis) => (
+          <span key={axis.id}>{axis.label}</span>
+        ))}
       </div>
       <div className="h-[360px] w-full">
         <ResponsiveContainer>

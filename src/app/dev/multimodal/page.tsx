@@ -124,7 +124,7 @@ export default function MultimodalDevPage() {
                       <span>{axis.label}</span>
                       <span>{Math.round(result.fingerprint?.metaAxes[axis.id as keyof typeof result.fingerprint.metaAxes] ?? 0)}</span>
                     </div>
-                    <p className="text-xs text-muted">{axis.description}</p>
+                    <p className="text-xs text-muted">{axis.shortDescription}</p>
                   </li>
                 ))}
               </ul>

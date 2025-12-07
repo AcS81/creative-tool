@@ -2,6 +2,7 @@ import { z } from "zod";
 import { ConfigError, getAppConfig, type AppConfig } from "../config";
 import type { SceneSegment, TranscriptSegment, DomainProfile } from "../types";
 import { GeminiApiError } from "../gemini/client";
+import { resolveAxisMetadata } from "./axisMetadata";
 
 type DomainInput = {
   transcriptSegments: TranscriptSegment[];
@@ -35,6 +36,11 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 const truncate = <T>(items: T[], limit = 10): T[] => items.slice(0, limit);
+
+const axis = (id: string) => {
+  const meta = resolveAxisMetadata(id);
+  return { key: meta?.id ?? id, label: meta?.label ?? id };
+};
 
 const buildPrompt = (definition: DomainDefinition, input: DomainInput) => {
   const transcript = truncate(input.transcriptSegments, 12);
@@ -145,58 +151,58 @@ const defs: Record<string, DomainDefinition> = {
     name: "Voice",
     guidance: "Assess energy, expressiveness, clarity, warmth, flow/resets.",
     defaultScores: [
-      { key: "energy", label: "Energy" },
-      { key: "expressiveness", label: "Expressiveness" },
-      { key: "clarity", label: "Clarity" },
-      { key: "warmth", label: "Warmth" },
-      { key: "flow", label: "Flow/Resets" },
+      axis("voice.speaking_rate"),
+      axis("voice.loudness_range"),
+      axis("voice.pitch_variation"),
+      axis("voice.clarity"),
+      axis("voice.warmth"),
     ],
   },
   language: {
     name: "Language",
     guidance: "Assess abstract vs concrete, story vs explanation, visualizability, example density.",
     defaultScores: [
-      { key: "abstractVsConcrete", label: "Abstract vs Concrete" },
-      { key: "storyPresence", label: "Story Presence" },
-      { key: "explanationWeight", label: "Explanation Weight" },
-      { key: "visualizability", label: "Visualizability" },
+      axis("language.concreteness"),
+      axis("language.story_presence"),
+      axis("language.teaching_vs_riffing"),
+      axis("language.visualizability"),
     ],
   },
   narrative: {
     name: "Narrative",
     guidance: "Assess hooks, setup/payoff strength, devices like contrast/callback/interrupt.",
     defaultScores: [
-      { key: "structure", label: "Structure Strength" },
-      { key: "hooks", label: "Hooks" },
-      { key: "callbacks", label: "Callbacks" },
-      { key: "interrupts", label: "Pattern Interrupts" },
+      axis("narrative.hooks"),
+      axis("narrative.mini_arc_density"),
+      axis("narrative.foreshadow_callbacks"),
+      axis("narrative.transition_clarity"),
     ],
   },
   visual: {
     name: "Visual",
     guidance: "Assess movement, background stability, facial expression, eye contact style.",
     defaultScores: [
-      { key: "movement", label: "Movement" },
-      { key: "stability", label: "Background Stability" },
-      { key: "expression", label: "Expression" },
+      axis("visual.movement"),
+      axis("visual.environment_stability"),
+      axis("visual.expression"),
     ],
   },
   editing: {
     name: "Editing",
     guidance: "Assess cut pace, pattern interrupts, transitions, B-roll presence.",
     defaultScores: [
-      { key: "cutPace", label: "Cut Pace" },
-      { key: "patternInterrupts", label: "Pattern Interrupts" },
-      { key: "brollPresence", label: "B-roll Presence" },
+      axis("editing.cut_rate"),
+      axis("editing.pattern_interrupts"),
+      axis("editing.broll_coverage"),
     ],
   },
   sound: {
     name: "Sound",
     guidance: "Assess music coverage and balance, SFX usage, silence/dead-air handling.",
     defaultScores: [
-      { key: "musicCoverage", label: "Music Coverage" },
-      { key: "musicBalance", label: "Music vs Voice" },
-      { key: "sfxPurpose", label: "SFX Purposefulness" },
+      axis("sound.music_coverage"),
+      axis("sound.music_balance"),
+      axis("sound.sfx_density"),
     ],
   },
 };
