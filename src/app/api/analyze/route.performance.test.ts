@@ -68,7 +68,7 @@ const ensureReferenceSeed = async () => {
   const existing = await prisma.creatorProfile.findFirst({ where: { type: "reference" } });
   if (existing) return;
   const fingerprint = validateFingerprint({
-    version: "1.1.0",
+    version: "1.2.0",
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: 60,

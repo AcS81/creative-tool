@@ -10,7 +10,7 @@ const sampleDomain = (label: string) => ({
 });
 
 const baseFingerprint = {
-  version: "1.1.0",
+  version: "1.2.0",
   createdAt: new Date().toISOString(),
   metaAxes: {
     voiceIntensity: 65,
@@ -40,7 +40,7 @@ const baseFingerprint = {
 describe("fingerprint schema", () => {
   it("accepts a valid fingerprint", () => {
     const validated = validateFingerprint(baseFingerprint);
-    expect(validated.version).toBe("1.1.0");
+    expect(validated.version).toBe("1.2.0");
     expect(validated.perDomain.voiceProfile.primaryArchetype).toContain("Voice");
     expect(validated.hasPerformanceData).toBe(false);
   });
@@ -63,7 +63,7 @@ describe("fingerprint schema", () => {
 
   it("throws descriptive error for unsupported version", () => {
     const legacy = { ...baseFingerprint, version: "1.0.0" };
-    expect(() => validateFingerprint(legacy)).toThrow(/unsupported version 1.0.0/i);
+    expect(() => validateFingerprint(legacy)).toThrow(/version/i);
   });
 
   it("accepts an optional performance profile", () => {

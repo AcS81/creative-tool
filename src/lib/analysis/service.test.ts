@@ -48,7 +48,7 @@ describe("analyzeVideo service", () => {
     }));
 
     const result = await analyzeVideo({ videoId: "abc123" });
-    expect(result.fingerprint.version).toBe("1.1.0");
+    expect(result.fingerprint.version).toBe("1.2.0");
     expect(result.fingerprint.metaAxes.voiceIntensity).toBeGreaterThan(0);
     expect(result.fingerprint.metaAxes.productionPolish).toBeLessThanOrEqual(100);
     expect(result.fingerprint.perDomain.voiceProfile.scores.length).toBeGreaterThan(0);
@@ -60,6 +60,6 @@ describe("analyzeVideo service", () => {
     process.env.ANALYSIS_MODE = "mock";
     const result = await analyzeVideo({ videoId: "mock-video" });
     expect(result.diagnostics?.source).toBe("mock");
-    expect(result.fingerprint.version).toBe("1.1.0");
+    expect(result.fingerprint.version).toBe("1.2.0");
   });
 });

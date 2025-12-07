@@ -10,39 +10,28 @@ import {
   analyzeVisual,
   analyzeVoice,
 } from "./geminiDomains";
-import type { BeatSegment, DomainProfile, MetaAxes, VideoFingerprintJson, SceneSegment, TranscriptSegment } from "../types";
+import type {
+  BeatSegment,
+  DomainProfile,
+  MetaAxes,
+  VideoFingerprintJson,
+  SceneSegment,
+  TranscriptSegment,
+  FingerprintPerDomain,
+} from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
 import { fetchVideoAnalytics } from "../youtube/analytics";
 import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
+import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
 
 type AnalyzeOptions = {
   config?: AppConfig;
   useMock?: boolean;
   auth?: AuthContext | null;
 };
-
-const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
-
-const averageScore = (scores: DomainProfile["scores"]) =>
-  scores.reduce((sum, score) => sum + score.value, 0) / Math.max(scores.length, 1);
-
-const computeMetaAxes = (domains: {
-  voice: DomainProfile;
-  language: DomainProfile;
-  narrative: DomainProfile;
-  visual: DomainProfile;
-  editing: DomainProfile;
-  sound: DomainProfile;
-}): MetaAxes => ({
-  voiceIntensity: clamp(averageScore(domains.voice.scores)),
-  conceptualDepth: clamp(averageScore(domains.language.scores)),
-  narrativeStructureStrength: clamp(averageScore(domains.narrative.scores)),
-  visualDynamism: clamp((averageScore(domains.visual.scores) + averageScore(domains.editing.scores)) / 2),
-  productionPolish: clamp((averageScore(domains.editing.scores) + averageScore(domains.sound.scores)) / 2),
-});
 
 const archetypeForMeta = (meta: MetaAxes) => {
   if (meta.voiceIntensity > 70 && meta.visualDynamism > 65) return "Hyperactive Commentator";
@@ -120,29 +109,20 @@ export async function analyzeVideo(
     [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] = results;
   }
 
-  const metaAxes = computeMetaAxes({
-    voice: voiceProfile,
-    language: languageProfile,
-    narrative: narrativeProfile,
-    visual: visualProfile,
-    editing: editingProfile,
-    sound: soundProfile,
-  });
+  const perDomain: FingerprintPerDomain = {
+    voiceProfile,
+    languageProfile,
+    narrativeProfile,
+    visualProfile,
+    editingProfile,
+    soundProfile,
+  };
 
+  const metaAxes = computeMetaAxesFromProfiles(perDomain);
   const overallArchetype = archetypeForMeta(metaAxes);
 
-  let fingerprint: VideoFingerprintJson = {
-    version: "1.1.0",
-    createdAt: new Date().toISOString(),
+  let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
-    perDomain: {
-      voiceProfile,
-      languageProfile,
-      narrativeProfile,
-      visualProfile,
-      editingProfile,
-      soundProfile,
-    },
     overallArchetype,
     supporting: useMultimodal
       ? {
@@ -153,7 +133,7 @@ export async function analyzeVideo(
           sceneSegments: transcriptAndScenes?.sceneSegments,
         },
     hasPerformanceData: false,
-  };
+  });
 
   let performanceAttached = false;
   let performanceErrorType: string | undefined;

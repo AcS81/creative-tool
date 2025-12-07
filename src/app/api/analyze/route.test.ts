@@ -27,7 +27,7 @@ const sampleDomain = (label: string, value: number) => ({
 
 const buildFingerprint = (offset: number) =>
   validateFingerprint({
-    version: "1.1.0",
+    version: "1.2.0",
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: 50 + offset,
@@ -104,7 +104,7 @@ describe("POST /api/analyze", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.videoAnalysisId).toBeTruthy();
-    expect(json.fingerprint?.version).toBe("1.1.0");
+    expect(json.fingerprint?.version).toBe("1.2.0");
     expect(Array.isArray(json.nearestReferences)).toBe(true);
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();

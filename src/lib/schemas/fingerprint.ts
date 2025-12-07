@@ -56,8 +56,10 @@ const performanceProfileSchema = z.object({
   insights: z.array(z.string().min(1)).optional(),
 });
 
+const fingerprintVersionSchema = z.union([z.literal("1.1.0"), z.literal("1.2.0")]);
+
 export const fingerprintSchema = z.object({
-  version: z.literal("1.1.0"),
+  version: fingerprintVersionSchema,
   createdAt: z
     .string()
     .datetime({ offset: true, message: "createdAt must be an ISO datetime string" }),
@@ -105,11 +107,6 @@ export const fingerprintSchema = z.object({
 export type FingerprintSchema = z.infer<typeof fingerprintSchema>;
 
 export function validateFingerprint(json: unknown): VideoFingerprintJson {
-  const rawVersion = (json as any)?.version;
-  if (rawVersion && rawVersion !== "1.1.0") {
-    throw new Error(`Invalid fingerprint: unsupported version ${rawVersion}, expected 1.1.0`);
-  }
-
   const parsed = fingerprintSchema.safeParse(json);
   if (!parsed.success) {
     const message = parsed.error.issues

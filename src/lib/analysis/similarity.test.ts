@@ -3,7 +3,7 @@ import { computeAverageMetaAxes, distanceOnMetaAxes, findNearestReferences } fro
 import type { VideoFingerprintJson } from "../types";
 
 const fp = (voice: number, key: string): VideoFingerprintJson => ({
-  version: "1.1.0",
+  version: "1.2.0",
   createdAt: new Date().toISOString(),
   metaAxes: {
     voiceIntensity: voice,

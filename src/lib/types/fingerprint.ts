@@ -107,7 +107,7 @@ export interface PerformanceProfile {
 }
 
 export interface VideoFingerprintJson {
-  version: "1.1.0";
+  version: "1.1.0" | "1.2.0";
   createdAt: string;
   metaAxes: MetaAxes;
   perDomain: FingerprintPerDomain;

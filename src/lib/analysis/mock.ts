@@ -40,7 +40,7 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   const seed = hashStringToNumber(input.videoId);
 
   const fingerprint: VideoFingerprintJson = {
-    version: "1.1.0",
+    version: "1.2.0",
     createdAt: new Date().toISOString(),
     metaAxes: {
       voiceIntensity: deriveScore(seed, 1),
