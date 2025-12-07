@@ -5,25 +5,39 @@ type Props = {
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
   insights?: string[];
+  youtubeConnected?: boolean;
+  performanceError?: string;
 };
 
 const formatPercent = (value?: number) =>
   typeof value === "number" ? `${value.toFixed(1)}%` : "—";
 
-export function PerformanceView({ performanceProfile, hasPerformanceData, insights }: Props) {
+export function PerformanceView({
+  performanceProfile,
+  hasPerformanceData,
+  insights,
+  youtubeConnected,
+  performanceError,
+}: Props) {
   if (!hasPerformanceData || !performanceProfile) {
+    const fallbackText = youtubeConnected
+      ? performanceError
+        ? `YouTube is connected but analytics could not be retrieved: ${performanceError}`
+        : "YouTube is connected. Analyze a video you own to pull retention, CTR, and engagement."
+      : "Connect YouTube via OAuth to pull retention, CTR, and engagement for owned videos.";
+
     return (
       <div className="space-y-3 rounded-md border border-border bg-surface p-6 text-sm">
         <p className="font-semibold text-foreground">Performance data unavailable</p>
-        <p className="text-muted">
-          Connect YouTube via OAuth to pull retention, CTR, and engagement for owned videos.
-        </p>
-        <a
-          href="/api/auth/youtube/start"
-          className="cs-button inline-flex w-fit justify-center text-xs"
-        >
-          Connect YouTube
-        </a>
+        <p className="text-muted">{fallbackText}</p>
+        {!youtubeConnected && (
+          <a
+            href="/api/auth/youtube/start"
+            className="cs-button inline-flex w-fit justify-center text-xs"
+          >
+            Connect YouTube
+          </a>
+        )}
       </div>
     );
   }

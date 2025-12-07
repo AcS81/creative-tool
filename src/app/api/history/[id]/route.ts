@@ -7,8 +7,9 @@ import { fetchReferenceData, safeParseFingerprint } from "../../analyze/utils";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  context: { params: Promise<{ id: string }> },
 ) {
+  const params = await context.params;
   const cookieHeader = request.headers.get("cookie");
   const { sessionId, isNew } = ensureSessionId(cookieHeader);
 
@@ -83,4 +84,3 @@ export async function GET(
 
   return response;
 }
-

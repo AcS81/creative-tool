@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
@@ -45,6 +45,12 @@ type AnalyzeResponse = {
     durationSeconds?: number;
     thumbnailUrl?: string;
   };
+  diagnostics?: {
+    source?: string;
+    performanceAttached?: boolean;
+    performanceErrorType?: string;
+    performanceErrorMessage?: string;
+  };
 };
 
 type RecentAnalysisSummary = {
@@ -56,6 +62,13 @@ type RecentAnalysisSummary = {
   createdAt: string;
   status: string;
   durationSeconds: number;
+};
+
+type YoutubeConnectionStatus = {
+  performanceEnabled: boolean;
+  connected: boolean;
+  tokens?: number;
+  error?: string;
 };
 
 const tabKeys = [
@@ -74,7 +87,11 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
-  const [disconnectMessage, setDisconnectMessage] = useState<string | null>(null);
+  const [youtubeStatus, setYoutubeStatus] = useState<YoutubeConnectionStatus | null>(null);
+  const [youtubeStatusLoading, setYoutubeStatusLoading] = useState(true);
+  const [youtubeMessage, setYoutubeMessage] = useState<{ text: string; tone?: "success" | "error" | "muted" } | null>(
+    null,
+  );
   const [activeTab, setActiveTab] = useState<
     "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound" | "performance"
   >("overview");
@@ -87,7 +104,27 @@ export default function Home() {
 
   const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+
+  const loadYoutubeStatus = useCallback(async () => {
+    try {
+      setYoutubeStatusLoading(true);
+      const res = await fetch("/api/auth/youtube/status");
+      if (!res.ok) {
+        throw new Error("Could not load status");
+      }
+      const body = (await res.json()) as YoutubeConnectionStatus & { error?: string };
+      setYoutubeStatus(body);
+      if (body.error) {
+        setYoutubeMessage({ text: body.error, tone: "error" });
+      }
+    } catch {
+      setYoutubeStatus(null);
+      setYoutubeMessage({ text: "Could not load YouTube connection status.", tone: "error" });
+    } finally {
+      setYoutubeStatusLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
@@ -97,6 +134,40 @@ export default function Home() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
+
+  useEffect(() => {
+    void loadYoutubeStatus();
+  }, [loadYoutubeStatus]);
+
+  useEffect(() => {
+    const youtubeParam = searchParams.get("youtube");
+    const reason = searchParams.get("reason");
+    if (!youtubeParam) return;
+
+    if (youtubeParam === "connected") {
+      setYoutubeMessage({
+        text: "YouTube connected. Analyze videos you own to see performance data.",
+        tone: "success",
+      });
+      void loadYoutubeStatus();
+    } else if (youtubeParam === "denied") {
+      setYoutubeMessage({
+        text: `YouTube connection was not authorized${reason ? `: ${reason}` : ""}.`,
+        tone: "error",
+      });
+    } else if (youtubeParam === "error") {
+      setYoutubeMessage({
+        text: "Could not complete YouTube OAuth. Please try again.",
+        tone: "error",
+      });
+    }
+
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("youtube");
+    next.delete("reason");
+    const qs = next.toString();
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+  }, [loadYoutubeStatus, pathname, router, searchParams]);
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -163,7 +234,7 @@ export default function Home() {
     e.preventDefault();
     setError(null);
     setResult(null);
-    setDisconnectMessage(null);
+    setYoutubeMessage(null);
 
     if (!isValidYouTubeUrl(url)) {
       setError("Please enter a valid YouTube URL.");
@@ -204,20 +275,64 @@ export default function Home() {
   };
 
   const handleDisconnect = async () => {
-    setDisconnectMessage(null);
+    setYoutubeMessage(null);
     try {
       const res = await fetch("/api/auth/youtube/disconnect", { method: "POST" });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        setDisconnectMessage(body?.message ?? "Could not revoke YouTube tokens.");
+        setYoutubeMessage({
+          text: body?.message ?? "Could not revoke YouTube tokens.",
+          tone: "error",
+        });
         return;
       }
       const body = await res.json();
-      setDisconnectMessage(`YouTube connection revoked (${body.revoked ?? 0} token(s) removed).`);
+      const revoked = typeof body?.revoked === "number" ? body.revoked : 0;
+      setYoutubeMessage({
+        text:
+          revoked > 0
+            ? `YouTube connection revoked (${revoked} token${revoked === 1 ? "" : "s"} removed).`
+            : "No YouTube connection found to revoke.",
+        tone: "success",
+      });
+      await loadYoutubeStatus();
     } catch {
-      setDisconnectMessage("Could not revoke YouTube tokens. Please try again.");
+      setYoutubeMessage({ text: "Could not revoke YouTube tokens. Please try again.", tone: "error" });
     }
   };
+
+  const handleLoadHistoryAnalysis = async (id: string) => {
+    setLoading(true);
+    setError(null);
+    setActiveTab("overview");
+    try {
+      const res = await fetch(`/api/history/${id}`);
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.message ?? "Could not load this past analysis.");
+        return;
+      }
+      const loaded = (await res.json()) as AnalyzeResponse;
+      setResult(loaded);
+    } catch {
+      setError("Could not load this past analysis.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const youtubeConnected = youtubeStatus?.connected === true;
+  const performanceReady = youtubeStatus?.performanceEnabled !== false;
+  const youtubeStatusBadge = youtubeStatusLoading ? (
+    <span className="cs-pill bg-surface-strong text-[11px] text-muted">Checking YouTube…</span>
+  ) : youtubeStatus?.performanceEnabled === false ? (
+    <span className="cs-pill bg-amber-100 text-[11px] font-semibold text-amber-800">Performance mode off</span>
+  ) : youtubeConnected ? (
+    <span className="cs-pill bg-emerald-100 text-[11px] font-semibold text-emerald-700">YouTube connected</span>
+  ) : (
+    <span className="cs-pill bg-surface-strong text-[11px] text-muted">YouTube not connected</span>
+  );
+  const youtubeCtaLabel = youtubeConnected ? "Reconnect YouTube" : "Connect YouTube";
 
   return (
     <AppShell>
@@ -232,6 +347,22 @@ export default function Home() {
             We validate the link, run the configured analysis pipeline, and preview your archetype,
             radar, and closest reference creators.
           </p>
+          <div className="flex flex-wrap items-center gap-2">
+            {youtubeStatusBadge}
+            {youtubeMessage ? (
+              <span
+                className={`text-xs ${
+                  youtubeMessage.tone === "error"
+                    ? "text-red-600"
+                    : youtubeMessage.tone === "success"
+                      ? "text-emerald-700"
+                      : "text-muted"
+                }`}
+              >
+                {youtubeMessage.text}
+              </span>
+            ) : null}
+          </div>
         </div>
 
         <form
@@ -273,25 +404,34 @@ export default function Home() {
               Try a sample analysis
             </button>
             <a
-              className="cs-link mt-3 inline-flex items-center text-sm font-semibold text-accent hover:underline"
+              className={`cs-link mt-3 inline-flex items-center text-sm font-semibold ${
+                performanceReady ? "text-accent hover:underline" : "text-muted"
+              }`}
               href="/api/auth/youtube/start"
             >
-              Connect YouTube (OAuth)
+              {youtubeCtaLabel}
             </a>
+            <p className="text-xs text-muted">
+              {performanceReady
+                ? youtubeConnected
+                  ? "Connected. Analyze owned videos to see analytics in Performance."
+                  : "Connect to unlock retention and CTR metrics for videos you own."
+                : "Performance mode is disabled in this environment."}
+            </p>
           </div>
         </form>
       </div>
 
       {loading && (
         <div className="cs-card space-y-4 p-6">
-          <p className="text-sm font-semibold text-muted">Analyzing your video…</p>
+          <p className="text-sm font-semibold text-muted">Loading your analysis…</p>
           <div className="grid gap-3">
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-strong" />
             <div className="h-4 w-1/3 animate-pulse rounded bg-surface-strong" />
             <div className="h-40 animate-pulse rounded bg-surface-strong" />
           </div>
           <p className="text-xs text-muted">
-            This may take up to a few minutes in Gemini mode; the page will populate on completion.
+            New analyses may take a couple of minutes; loading saved ones is quicker.
           </p>
         </div>
       )}
@@ -325,20 +465,44 @@ export default function Home() {
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <a
-                className="cs-button inline-flex w-fit justify-center text-xs"
+                className={`cs-button inline-flex w-fit justify-center text-xs ${
+                  performanceReady ? "" : "cursor-not-allowed opacity-60"
+                }`}
                 href="/api/auth/youtube/start"
+                aria-disabled={!performanceReady}
               >
-                Connect YouTube
+                {youtubeCtaLabel}
               </a>
               <button
                 type="button"
-                className="cs-button-secondary text-xs"
+                className="cs-button-secondary text-xs disabled:cursor-not-allowed disabled:opacity-60"
                 onClick={handleDisconnect}
+                disabled={!performanceReady || youtubeStatusLoading || !youtubeConnected}
               >
                 Disconnect YouTube
               </button>
-              {disconnectMessage && <span className="text-xs text-muted">{disconnectMessage}</span>}
+              {youtubeStatusBadge}
+              {youtubeMessage ? (
+                <span
+                  className={`text-xs ${
+                    youtubeMessage.tone === "error"
+                      ? "text-red-600"
+                      : youtubeMessage.tone === "success"
+                        ? "text-emerald-700"
+                        : "text-muted"
+                  }`}
+                >
+                  {youtubeMessage.text}
+                </span>
+              ) : null}
             </div>
+            <p className="text-xs text-muted">
+              {performanceReady
+                ? youtubeConnected
+                  ? "YouTube is connected. Performance metrics will populate when analyzing videos you own."
+                  : "Connect with the YouTube account that owns your videos to unlock performance data."
+                : "Performance mode is disabled in this environment."}
+            </p>
           </div>
         </div>
       )}
@@ -418,149 +582,62 @@ export default function Home() {
 
                 <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
                   <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-muted">Insights</p>
-                  <ul className="list-disc space-y-1 pl-4 text-sm text-foreground/85">
-                    {(result.insightDetails?.bullets ?? result.insights ?? []).map((insight, idx) => (
-                      <li key={idx}>{insight}</li>
-                    ))}
-                    {(!result.insights || result.insights.length === 0) && (
-                      <li className="text-muted">Not enough reference data yet.</li>
-                    )}
-                  </ul>
-                  {result.fingerprint.hasPerformanceData && result.fingerprint.performanceProfile && (
-                    <div className="mt-4 rounded-md border border-border/80 bg-surface-strong p-3">
-                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">
-                        Performance at a glance
-                      </p>
-                      <p className="mt-1 text-sm text-foreground">
-                        {result.fingerprint.performanceProfile.summaryText}
-                      </p>
-                      <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
-                        <span>
-                          Hook retention: {Math.round(result.fingerprint.performanceProfile.scores.hookRetention)}%
-                        </span>
-                        <span>•</span>
-                        <span>
-                          CTR:{" "}
-                          {typeof result.fingerprint.performanceProfile.metrics.ctr === "number"
-                            ? `${result.fingerprint.performanceProfile.metrics.ctr.toFixed(1)}%`
-                            : "—"}
-                        </span>
+                    <p className="text-sm font-semibold text-muted">Insights</p>
+                    <ul className="list-disc space-y-1 pl-4 text-sm text-foreground/85">
+                      {(result.insightDetails?.bullets ?? result.insights ?? []).map((insight, idx) => (
+                        <li key={idx}>{insight}</li>
+                      ))}
+                      {(!result.insights || result.insights.length === 0) && (
+                        <li className="text-muted">Not enough reference data yet.</li>
+                      )}
+                    </ul>
+                    {result.fingerprint.hasPerformanceData && result.fingerprint.performanceProfile && (
+                      <div className="mt-4 rounded-md border border-border/80 bg-surface-strong p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted">
+                          Performance at a glance
+                        </p>
+                        <p className="mt-1 text-sm text-foreground">
+                          {result.fingerprint.performanceProfile.summaryText}
+                        </p>
+                        <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
+                          <span>
+                            Hook retention: {Math.round(result.fingerprint.performanceProfile.scores.hookRetention)}%
+                          </span>
+                          <span>•</span>
+                          <span>
+                            CTR:{" "}
+                            {typeof result.fingerprint.performanceProfile.metrics.ctr === "number"
+                              ? `${result.fingerprint.performanceProfile.metrics.ctr.toFixed(1)}%`
+                              : "—"}
+                          </span>
+                        </div>
                       </div>
+                    )}
+                  </div>
+                  <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+                    <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
+                    <div className="grid gap-3">
+                      {result.nearestReferences.map((ref) => (
+                        <div
+                          key={ref.creatorId}
+                          className="rounded-md border border-border bg-surface-strong p-3 shadow-sm"
+                        >
+                          <p className="text-base font-semibold">{ref.displayName}</p>
+                          <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
+                          {ref.closestAxis ? (
+                            <p className="mt-1 text-xs text-muted">
+                              Closest on {ref.closestAxis.label} ({Math.round(ref.closestAxis.delta)} pts)
+                            </p>
+                          ) : null}
+                        </div>
+                      ))}
+                      {result.nearestReferences.length === 0 && (
+                        <p className="text-sm text-muted">No reference data available yet.</p>
+                      )}
                     </div>
-                  )}
-                </div>
-                <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
-                  <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
-                  <div className="grid gap-3">
-                    {result.nearestReferences.map((ref) => (
-                      <div
-                        key={ref.creatorId}
-                        className="rounded-md border border-border bg-surface-strong p-3 shadow-sm"
-                      >
-                        <p className="text-base font-semibold">{ref.displayName}</p>
-                        <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
-                        {ref.closestAxis ? (
-                          <p className="mt-1 text-xs text-muted">
-                            Closest on {ref.closestAxis.label} ({Math.round(ref.closestAxis.delta)} pts)
-                          </p>
-                        ) : null}
-                      </div>
-                    ))}
-                    {result.nearestReferences.length === 0 && (
-                      <p className="text-sm text-muted">No reference data available yet.</p>
-                    )}
-                  </div>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-[minmax(0,2fr),minmax(0,1.1fr)]">
-                  <div className="cs-panel p-4 shadow-sm">
-                    <h3 className="text-sm font-semibold text-muted">Recent analyses (this browser)</h3>
-                    {historyLoading && (
-                      <p className="mt-2 text-sm text-muted">Loading recent analyses…</p>
-                    )}
-                    {!historyLoading && historyError && (
-                      <p className="mt-2 text-sm text-red-600">{historyError}</p>
-                    )}
-                    {!historyLoading && !historyError && recentAnalyses.length === 0 && (
-                      <p className="mt-2 text-sm text-muted">
-                        Run an analysis to see it listed here.
-                      </p>
-                    )}
-                    {!historyLoading && !historyError && recentAnalyses.length > 0 && (
-                      <ul className="mt-3 space-y-2">
-                        {recentAnalyses.map((item) => (
-                          <li
-                            key={item.id}
-                            className="flex items-center justify-between gap-3 rounded-md border border-border/70 bg-surface-strong p-3 text-sm"
-                          >
-                            <div className="flex items-center gap-3">
-                              {item.thumbnailUrl ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.thumbnailUrl}
-                                  alt={item.title}
-                                  className="h-10 w-16 rounded-md object-cover"
-                                />
-                              ) : (
-                                <div className="flex h-10 w-16 items-center justify-center rounded-md bg-accent/10 text-[10px] font-semibold text-accent">
-                                  {item.youtubeVideoId.slice(0, 6)}
-                                </div>
-                              )}
-                              <div className="space-y-0.5">
-                                <p className="text-sm font-semibold text-foreground line-clamp-2">
-                                  {item.title}
-                                </p>
-                                <p className="text-xs text-muted">
-                                  {item.channelTitle ?? "Unknown channel"}
-                                </p>
-                                <p className="text-[11px] text-muted">
-                                  {new Date(item.createdAt).toLocaleString()}
-                                </p>
-                              </div>
-                            </div>
-                            <button
-                              type="button"
-                              className="cs-button-secondary shrink-0 text-xs"
-                              onClick={async () => {
-                                try {
-                                  setLoading(true);
-                                  setError(null);
-                                  const res = await fetch(`/api/history/${item.id}`);
-                                  if (!res.ok) {
-                                    const body = await res.json().catch(() => ({}));
-                                    setError(
-                                      body?.message ?? "Could not load this past analysis.",
-                                    );
-                                    return;
-                                  }
-                                  const loaded = (await res.json()) as AnalyzeResponse;
-                                  setResult(loaded);
-                                  setActiveTab("overview");
-                                } catch {
-                                  setError("Could not load this past analysis.");
-                                } finally {
-                                  setLoading(false);
-                                }
-                              }}
-                            >
-                              View analysis
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="cs-panel p-4 shadow-sm">
-                    <p className="cs-kicker text-[10px]">Tip</p>
-                    <p className="mt-1 text-sm text-muted">
-                      History is kept anonymously in this browser only. Clearing cookies or using
-                      another browser starts a fresh session.
-                    </p>
                   </div>
                 </div>
               </div>
-            </div>
           )}
 
             {activeTab !== "overview" && (
@@ -630,6 +707,8 @@ export default function Home() {
                   <PerformanceView
                     performanceProfile={result.fingerprint.performanceProfile}
                     hasPerformanceData={result.fingerprint.hasPerformanceData}
+                    youtubeConnected={youtubeConnected}
+                    performanceError={youtubeConnected ? result.diagnostics?.performanceErrorMessage : undefined}
                     insights={
                       result.fingerprint.performanceProfile
                         ? performanceCoaching(result.fingerprint.performanceProfile, result.fingerprint.metaAxes)
@@ -645,6 +724,96 @@ export default function Home() {
           </AnalysisLayout>
         </div>
       )}
+
+      <div className="cs-card w-full p-6">
+        <div className="grid gap-4 md:grid-cols-[minmax(0,2fr),minmax(0,1.1fr)]">
+          <div className="cs-panel p-4 shadow-sm">
+            <h3 className="text-sm font-semibold text-muted">Recent analyses (this browser)</h3>
+            {historyLoading && (
+              <p className="mt-2 text-sm text-muted">Loading recent analyses…</p>
+            )}
+            {!historyLoading && historyError && (
+              <p className="mt-2 text-sm text-red-600">{historyError}</p>
+            )}
+            {!historyLoading && !historyError && recentAnalyses.length === 0 && (
+              <p className="mt-2 text-sm text-muted">
+                Run an analysis to see it listed here.
+              </p>
+            )}
+            {!historyLoading && !historyError && recentAnalyses.length > 0 && (
+              <ul className="mt-3 space-y-2">
+                {recentAnalyses.map((item) => {
+                  const statusLabel =
+                    item.status === "complete"
+                      ? "Complete"
+                      : item.status === "failed"
+                        ? "Failed"
+                        : "Processing";
+                  const statusBadgeClasses =
+                    item.status === "complete"
+                      ? "bg-emerald-100 text-emerald-700"
+                      : item.status === "failed"
+                        ? "bg-red-100 text-red-700"
+                        : "bg-amber-100 text-amber-800";
+
+                  return (
+                    <li
+                      key={item.id}
+                      className="flex flex-col gap-3 rounded-md border border-border/70 bg-surface-strong p-3 text-sm sm:flex-row sm:items-center sm:justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        {item.thumbnailUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.thumbnailUrl}
+                            alt={item.title}
+                            className="h-10 w-16 rounded-md object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-16 items-center justify-center rounded-md bg-accent/10 text-[10px] font-semibold text-accent">
+                            {item.youtubeVideoId.slice(0, 6)}
+                          </div>
+                        )}
+                        <div className="space-y-0.5">
+                          <p className="line-clamp-2 text-sm font-semibold text-foreground">
+                            {item.title}
+                          </p>
+                          <p className="text-xs text-muted">
+                            {item.channelTitle ?? "Unknown channel"}
+                          </p>
+                          <p className="text-[11px] text-muted">
+                            {new Date(item.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-end gap-2">
+                        <span className={`cs-pill px-2 py-1 text-[11px] font-semibold ${statusBadgeClasses}`}>
+                          {statusLabel}
+                        </span>
+                        <button
+                          type="button"
+                          className="cs-button-secondary shrink-0 text-xs disabled:cursor-not-allowed disabled:opacity-60"
+                          onClick={() => handleLoadHistoryAnalysis(item.id)}
+                          disabled={item.status !== "complete" || loading}
+                        >
+                          View analysis
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <div className="cs-panel p-4 shadow-sm">
+            <p className="cs-kicker text-[10px]">Tip</p>
+            <p className="mt-1 text-sm text-muted">
+              History is kept anonymously in this browser only. Clearing cookies or using another browser
+              starts a fresh session.
+            </p>
+          </div>
+        </div>
+      </div>
       </div>
     </AppShell>
   );

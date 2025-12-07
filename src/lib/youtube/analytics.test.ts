@@ -88,6 +88,54 @@ describe("youtube analytics", () => {
     expect(analytics.ctr).toBeCloseTo(7.5);
   });
 
+  it("falls back when impressionsCtr is unsupported", async () => {
+    const userId = await seedToken();
+
+    const fetchSpy = vi.spyOn(global, "fetch");
+    // Retention success
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          columnHeaders: [
+            { name: "elapsedVideoTimeRatio" },
+            { name: "audienceWatchRatio" },
+          ],
+          rows: [[0, 1]],
+        }),
+      } as any)
+      // Totals attempt with impressionsCtr -> fail
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 400,
+        statusText: "Bad Request",
+        json: async () => ({ error: { message: "Unknown identifier (impressionsCtr)" } }),
+      } as any)
+      // Totals retry without CTR
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          columnHeaders: [
+            { name: "views" },
+            { name: "likes" },
+            { name: "comments" },
+            { name: "averageViewDuration" },
+          ],
+          rows: [[100, 5, 1, 120]],
+        }),
+      } as any);
+
+    const analytics = await fetchVideoAnalytics(
+      { videoId: "vid123", channelId: "chan123", auth: { userId } },
+      {},
+    );
+
+    expect(analytics.views).toBe(100);
+    expect(analytics.avgViewDurationSeconds).toBe(120);
+    expect(analytics.ctr).toBeUndefined();
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+  });
+
   it("throws forbidden when no token exists", async () => {
     await expect(
       fetchVideoAnalytics({ videoId: "v", channelId: "c", auth: { userId: "missing" } }),

@@ -8,10 +8,10 @@ export async function GET(request: Request) {
   const errorParam = searchParams.get("error");
 
   if (errorParam) {
-    return NextResponse.json(
-      { error: "OAuthDenied", message: `YouTube connection was not authorized: ${errorParam}` },
-      { status: 400 },
-    );
+    const redirectUrl = new URL("/", request.url);
+    redirectUrl.searchParams.set("youtube", "denied");
+    redirectUrl.searchParams.set("reason", errorParam);
+    return NextResponse.redirect(redirectUrl);
   }
 
   if (!code) {
@@ -24,15 +24,16 @@ export async function GET(request: Request) {
   try {
     const tokens = await exchangeCodeForTokens(code);
     await persistYoutubeTokens(tokens);
-    return NextResponse.redirect(new URL("/", request.url));
+    const redirectUrl = new URL("/", request.url);
+    redirectUrl.searchParams.set("youtube", "connected");
+    return NextResponse.redirect(redirectUrl);
   } catch (error) {
     if (error instanceof ConfigError) {
       return NextResponse.json({ error: error.code, message: error.message }, { status: 500 });
     }
     console.error("OAuth callback error:", error);
-    return NextResponse.json(
-      { error: "OAuthCallbackFailed", message: "Failed to complete YouTube OAuth." },
-      { status: 500 },
-    );
+    const redirectUrl = new URL("/", request.url);
+    redirectUrl.searchParams.set("youtube", "error");
+    return NextResponse.redirect(redirectUrl);
   }
 }

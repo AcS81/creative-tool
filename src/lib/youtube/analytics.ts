@@ -40,6 +40,14 @@ type AnalyticsOptions = {
 
 const ANALYTICS_BASE = "https://youtubeanalytics.googleapis.com/v2/reports";
 
+type DateRange = { start: string; end: string };
+
+const formatDate = (date: Date) => date.toISOString().slice(0, 10);
+const buildDateRange = (): DateRange => ({
+  start: "2000-01-01",
+  end: formatDate(new Date()),
+});
+
 const resolveTokens = async (userId: string, config: AppConfig) => {
   if (!config.tokenEncryptionKey) {
     throw new ConfigError("TOKEN_ENCRYPTION_KEY is required to decrypt OAuth tokens.");
@@ -98,11 +106,11 @@ const fetchReport = async (url: string, accessToken: string) => {
   }
 };
 
-const buildRetentionUrl = (videoId: string, channelId: string) => {
+const buildRetentionUrl = (videoId: string, channelId: string, dateRange: DateRange) => {
   const url = new URL(ANALYTICS_BASE);
   url.searchParams.set("ids", `channel==${channelId}`);
-  url.searchParams.set("startDate", "2000-01-01");
-  url.searchParams.set("endDate", "2100-01-01");
+  url.searchParams.set("startDate", dateRange.start);
+  url.searchParams.set("endDate", dateRange.end);
   url.searchParams.set("filters", `video==${videoId}`);
   url.searchParams.set("metrics", "audienceWatchRatio,relativeRetentionPerformance");
   url.searchParams.set("dimensions", "elapsedVideoTimeRatio");
@@ -110,16 +118,15 @@ const buildRetentionUrl = (videoId: string, channelId: string) => {
   return url.toString();
 };
 
-const buildTotalsUrl = (videoId: string, channelId: string) => {
+const buildTotalsUrl = (videoId: string, channelId: string, includeCtr: boolean, dateRange: DateRange) => {
   const url = new URL(ANALYTICS_BASE);
   url.searchParams.set("ids", `channel==${channelId}`);
-  url.searchParams.set("startDate", "2000-01-01");
-  url.searchParams.set("endDate", "2100-01-01");
+  url.searchParams.set("startDate", dateRange.start);
+  url.searchParams.set("endDate", dateRange.end);
   url.searchParams.set("filters", `video==${videoId}`);
-  url.searchParams.set(
-    "metrics",
-    "views,likes,comments,averageViewDuration,averageViewPercentage,impressionsCtr",
-  );
+  const metrics = ["views", "likes", "comments", "averageViewDuration", "averageViewPercentage"];
+  if (includeCtr) metrics.push("impressionsCtr");
+  url.searchParams.set("metrics", metrics.join(","));
   url.searchParams.set("dimensions", "video");
   return url.toString();
 };
@@ -185,10 +192,22 @@ export async function fetchVideoAnalytics(
 
   const { accessToken } = await resolveTokens(auth.userId, config);
 
-  const [retentionPayload, totalsPayload] = await Promise.all([
-    fetchReport(buildRetentionUrl(videoId, channelId), accessToken),
-    fetchReport(buildTotalsUrl(videoId, channelId), accessToken),
-  ]);
+  const dateRange = buildDateRange();
+
+  const retentionPayload = await fetchReport(buildRetentionUrl(videoId, channelId, dateRange), accessToken);
+
+  let totalsPayload: any;
+  try {
+    totalsPayload = await fetchReport(buildTotalsUrl(videoId, channelId, true, dateRange), accessToken);
+  } catch (error) {
+    const message = (error as Error | undefined)?.message?.toLowerCase?.() ?? "";
+    if (message.includes("impressionsctr") || message.includes("unknown identifier")) {
+      // Retry without CTR metrics if the API rejects impressionsCtr for this account/video.
+      totalsPayload = await fetchReport(buildTotalsUrl(videoId, channelId, false, dateRange), accessToken);
+    } else {
+      throw error;
+    }
+  }
 
   const retentionSeries = normalizeRetention(retentionPayload);
   const totals = normalizeTotals(totalsPayload);
