@@ -1,5 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { validateFingerprint } from "../src/lib/schemas/fingerprint";
+import { buildVideoFingerprint } from "../src/lib/analysis/fingerprint/videoFingerprint";
+import { getAxesForDomain, resolveAxisMetadata } from "../src/lib/analysis/axisMetadata";
 
 const prisma = new PrismaClient();
 
@@ -180,87 +182,56 @@ const referenceCreators: SeedCreator[] = [
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
-const scoreSet = (base: number, entries: Array<{ key: string; label: string; offset: number }>) =>
-  entries.map(({ key, label, offset }) => ({
-    key,
-    label,
-    value: clamp(base + offset),
+const canonicalScores = (domain: keyof SeedCreator["domains"], base: number) => {
+  const axes = getAxesForDomain(domain as any)
+    .filter((axis) => axis.id.includes("."))
+    .slice(0, 5);
+  return axes.map((axis, idx) => ({
+    key: axis.id,
+    label: axis.label,
+    value: clamp(base + idx * 2 - 2),
   }));
-
-const domainScores = (domain: keyof SeedCreator["domains"], base: number) => {
-  switch (domain) {
-    case "voice":
-      return scoreSet(base, [
-        { key: "energy", label: "Energy", offset: 2 },
-        { key: "expressiveness", label: "Expressiveness", offset: 0 },
-        { key: "clarity", label: "Clarity", offset: -1 },
-        { key: "warmth", label: "Warmth", offset: 1 },
-        { key: "flow", label: "Flow/Resets", offset: -2 },
-      ]);
-    case "language":
-      return scoreSet(base, [
-        { key: "abstract", label: "Abstract", offset: 2 },
-        { key: "concrete", label: "Concrete", offset: -2 },
-        { key: "storyRatio", label: "Story Ratio", offset: 1 },
-        { key: "explanation", label: "Explanation", offset: 0 },
-      ]);
-    case "narrative":
-      return scoreSet(base, [
-        { key: "structure", label: "Structure Strength", offset: 2 },
-        { key: "hooks", label: "Hooks", offset: 1 },
-        { key: "callbacks", label: "Callbacks", offset: -1 },
-      ]);
-    case "visual":
-      return scoreSet(base, [
-        { key: "movement", label: "Movement", offset: 1 },
-        { key: "expression", label: "Expression", offset: 0 },
-        { key: "stability", label: "Background Stability", offset: -1 },
-      ]);
-    case "editing":
-      return scoreSet(base, [
-        { key: "cutPace", label: "Cut Pace", offset: 2 },
-        { key: "patternInterrupts", label: "Pattern Interrupts", offset: 0 },
-        { key: "broll", label: "B-roll Presence", offset: -1 },
-      ]);
-    case "sound":
-      return scoreSet(base, [
-        { key: "musicCoverage", label: "Music Coverage", offset: 0 },
-        { key: "musicBalance", label: "Music vs Voice", offset: -1 },
-        { key: "sfxPurpose", label: "SFX Purposefulness", offset: 1 },
-      ]);
-    default:
-      return scoreSet(base, [{ key: "default", label: "Default", offset: 0 }]);
-  }
 };
 
-const makeDomain = (config: DomainConfig, domainKey: keyof SeedCreator["domains"]) => ({
-  primaryArchetype: config.archetype,
-  summaryText: config.summaryText,
-  scores: domainScores(domainKey, config.base),
-  highlights: config.highlights ?? [`Notable ${domainKey} trait`],
-});
-
-const makeFingerprint = (seed: SeedCreator, base: number) => {
-  const fingerprint = {
-    version: "1.1.0" as const,
-    createdAt: new Date().toISOString(),
-    metaAxes: seed.metaAxes,
-    perDomain: {
-      voiceProfile: makeDomain(seed.domains.voice, "voice"),
-      languageProfile: makeDomain(seed.domains.language, "language"),
-      narrativeProfile: makeDomain(seed.domains.narrative, "narrative"),
-      visualProfile: makeDomain(seed.domains.visual, "visual"),
-      editingProfile: makeDomain(seed.domains.editing, "editing"),
-      soundProfile: makeDomain(seed.domains.sound, "sound"),
-    },
-    overallArchetype: seed.displayName,
+const makeDomain = (config: DomainConfig, domainKey: keyof SeedCreator["domains"]) => {
+  const scores = canonicalScores(domainKey, config.base);
+  return {
+    primaryArchetype: config.archetype,
+    summaryText: config.summaryText,
+    scores,
+    highlights: config.highlights ?? [`Notable ${domainKey} trait`],
+    axisDetails: scores.reduce<Record<string, { rawValue: string; explanation?: string; observed?: boolean }>>(
+      (acc, score) => {
+        const meta = resolveAxisMetadata(score.key);
+        acc[score.key] = { rawValue: `${score.value}`, explanation: meta?.shortDescription, observed: true };
+        return acc;
+      },
+      {},
+    ),
   };
+};
+
+const makeFingerprint = (seed: SeedCreator) => {
+  const perDomain = {
+    voiceProfile: makeDomain(seed.domains.voice, "voice"),
+    languageProfile: makeDomain(seed.domains.language, "language"),
+    narrativeProfile: makeDomain(seed.domains.narrative, "narrative"),
+    visualProfile: makeDomain(seed.domains.visual, "visual"),
+    editingProfile: makeDomain(seed.domains.editing, "editing"),
+    soundProfile: makeDomain(seed.domains.sound, "sound"),
+  };
+
+  const fingerprint = buildVideoFingerprint(perDomain, {
+    metaAxes: seed.metaAxes,
+    overallArchetype: seed.displayName,
+    version: "1.2.0",
+  });
 
   return validateFingerprint(fingerprint);
 };
 
 async function seedReferenceCreator(seed: SeedCreator, index: number) {
-  const fingerprint = makeFingerprint(seed, index * 5);
+  const fingerprint = makeFingerprint(seed);
 
   const creator = await prisma.creatorProfile.upsert({
     where: { channelId: seed.channelId },

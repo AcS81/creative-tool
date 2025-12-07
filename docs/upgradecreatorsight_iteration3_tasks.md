@@ -163,11 +163,12 @@ When this iteration is done:
   - [ ] Iterate over all `CreatorProfile` records with `type = "reference"`.  
   - [ ] Re-run analysis via the **multimodal pipeline** for their canonical videos.  
   - [ ] Persist updated v2 fingerprints in the DB.  
+-  - ✅ Added `scripts/refresh-reference-library.ts` (guarded by `ALLOW_REFERENCE_REFRESH=true`) to re-run multimodal analysis for all reference creators and upsert fingerprints.
 - [ ] Update `prisma/seed.ts` (or seed data files) to:
-  - [ ] Seed reference creators with v2 fingerprints by default.  
-  - [ ] Ensure seeded fingerprints pass `validateFingerprint` and align with `axisMetadata`.  
-- [ ] Verify and, if needed, recalibrate similarity helpers (`computeAverageMetaAxes`, `findNearestReferences`):
-  - [ ] Confirm they operate on the v2 meta axes and any critical domain scores.  
+  - ✅ Seed reference creators with v2 fingerprints by default.  
+  - ✅ Ensure seeded fingerprints pass `validateFingerprint` and align with `axisMetadata`.  
+- ✅ Verify and, if needed, recalibrate similarity helpers (`computeAverageMetaAxes`, `findNearestReferences`):
+  - ✅ Confirmed they operate solely on v2 meta axes (no v1 fields).  
 
 **Constraints**
 
