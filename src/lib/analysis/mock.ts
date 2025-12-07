@@ -95,6 +95,7 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
     diagnostics: {
       source: "mock",
       hashSeed: seed,
+      analysisPath: "mock",
     },
   };
 }

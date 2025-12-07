@@ -35,6 +35,9 @@ export async function POST(request: Request) {
       fromFallback: analysis.diagnostics.fromFallback,
       unobservedCounts: analysis.diagnostics.unobservedCounts,
       fingerprint,
+      diagnostics: {
+        source: "gemini-v2-multimodal",
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

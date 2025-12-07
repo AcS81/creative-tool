@@ -112,5 +112,6 @@ describe("POST /api/analyze", () => {
     expect(json.metadata?.title).toBe("Sample Test Video");
     expect(json.metadata?.durationSeconds).toBe(120);
     expect(json.metadata?.thumbnailUrl).toBe("http://thumb");
+    expect(json.diagnostics?.source).toBe("mock");
   });
 });

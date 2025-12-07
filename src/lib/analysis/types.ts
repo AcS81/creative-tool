@@ -20,6 +20,8 @@ export interface AnalyzeVideoResult {
     analysisVersion?: "v1_text" | "v2_multimodal";
     usedFallback?: boolean;
     unobservedCounts?: Record<string, number>;
+    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
+    analysisErrorMessage?: string;
   };
 }
 

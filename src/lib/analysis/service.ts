@@ -65,6 +65,8 @@ export async function analyzeVideo(
   let beats: BeatSegment[] | undefined;
   let axisDetails: Record<string, AxisDetail> | undefined;
   let multimodalDiagnostics: AnalyzeVideoResult["diagnostics"] | undefined;
+  let analysisPath: AnalyzeVideoResult["diagnostics"]["analysisPath"] | undefined;
+  let analysisErrorMessage: string | undefined;
   let transcriptAndScenes:
     | {
         transcriptSegments: TranscriptSegment[];
@@ -72,26 +74,38 @@ export async function analyzeVideo(
       }
     | undefined;
 
+  let ranMultimodal = false;
+
   if (useMultimodal) {
-    const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
-    voiceProfile = multimodal.profiles.voice;
-    languageProfile = multimodal.profiles.language;
-    narrativeProfile = multimodal.profiles.narrative;
-    visualProfile = multimodal.profiles.visual;
-    editingProfile = multimodal.profiles.editing;
-    soundProfile = multimodal.profiles.sound;
-    beats = multimodal.beats;
-    axisDetails = multimodal.axisDetails;
-    multimodalDiagnostics = {
-      source: "gemini",
-      performanceAttached: false,
-      performanceErrorType: undefined,
-      performanceErrorMessage: undefined,
-      analysisVersion: "v2_multimodal",
-      usedFallback: multimodal.diagnostics.fromFallback,
-      unobservedCounts: multimodal.diagnostics.unobservedCounts,
-    };
-  } else {
+    try {
+      const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+      voiceProfile = multimodal.profiles.voice;
+      languageProfile = multimodal.profiles.language;
+      narrativeProfile = multimodal.profiles.narrative;
+      visualProfile = multimodal.profiles.visual;
+      editingProfile = multimodal.profiles.editing;
+      soundProfile = multimodal.profiles.sound;
+      beats = multimodal.beats;
+      axisDetails = multimodal.axisDetails;
+      multimodalDiagnostics = {
+        source: "gemini",
+        performanceAttached: false,
+        performanceErrorType: undefined,
+        performanceErrorMessage: undefined,
+        analysisVersion: "v2_multimodal",
+        usedFallback: multimodal.diagnostics.fromFallback,
+        unobservedCounts: multimodal.diagnostics.unobservedCounts,
+        analysisPath: "gemini-v2-multimodal",
+      };
+      analysisPath = "gemini-v2-multimodal";
+      ranMultimodal = true;
+    } catch (error) {
+      console.warn("Multimodal analysis failed; falling back to text-only path", error);
+      analysisErrorMessage = error instanceof Error ? error.message : "Unknown multimodal error";
+    }
+  }
+
+  if (!ranMultimodal) {
     transcriptAndScenes = await getTranscriptAndScenes({ videoUrl }, { config });
 
     const domainInput = {
@@ -110,6 +124,13 @@ export async function analyzeVideo(
     ]);
 
     [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] = results;
+    analysisPath = "gemini-v1-text";
+    multimodalDiagnostics = {
+      ...(multimodalDiagnostics ?? {}),
+      analysisVersion: "v1_text",
+      analysisPath,
+      analysisErrorMessage,
+    };
   }
 
   const perDomain: FingerprintPerDomain = {
@@ -186,6 +207,8 @@ export async function analyzeVideo(
       performanceAttached,
       performanceErrorType,
       performanceErrorMessage,
+      analysisPath,
+      analysisErrorMessage,
       ...(multimodalDiagnostics ?? {}),
     },
   };
