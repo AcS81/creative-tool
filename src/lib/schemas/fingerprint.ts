@@ -100,6 +100,7 @@ const baseFingerprintShape = {
         .array(
           segmentSchema.extend({
             label: z.string().min(1),
+            role: z.enum(["hook", "setup", "escalation", "payoff", "outro", "cta", "break"]).optional(),
             devices: z.array(z.string().min(1)).default([]),
           }),
         )

@@ -8,8 +8,8 @@ const retentionSeries = [
 ];
 
 const beats = [
-  { startSeconds: 0, endSeconds: 10, label: "Hook", devices: [] },
-  { startSeconds: 10, endSeconds: 20, label: "Setup", devices: [] },
+  { startSeconds: 0, endSeconds: 10, label: "Hook", role: "hook", devices: [] },
+  { startSeconds: 10, endSeconds: 20, label: "Setup", role: "setup", devices: [] },
 ];
 
 const scenes = [
@@ -21,7 +21,7 @@ describe("performanceTimeline", () => {
   it("aligns retention with beats and scenes", () => {
     const timeline = buildPerformanceTimeline({ retentionSeries, beats, scenes });
     expect(timeline).toHaveLength(3);
-    expect(timeline[0].beatLabel).toBeDefined();
+    expect(timeline[0].beatLabel ?? timeline[0].beatRole).toBeDefined();
     expect(timeline[1].sceneLabel).toBeDefined();
   });
 

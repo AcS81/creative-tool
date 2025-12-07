@@ -76,10 +76,13 @@ export interface SceneSegment {
   shortSummary: string;
 }
 
+export type BeatRole = "hook" | "setup" | "escalation" | "payoff" | "outro" | "cta" | "break";
+
 export interface BeatSegment {
   startSeconds: number;
   endSeconds: number;
   label: string;
+  role?: BeatRole;
   devices: string[];
 }
 
@@ -87,6 +90,7 @@ export interface RetentionPoint {
   timeRatio: number; // 0-1 ratio of video progress
   audienceRetention: number; // normalized percentage 0-100
   beatLabel?: string;
+  beatRole?: BeatRole;
   sceneLabel?: string;
 }
 

@@ -1,5 +1,5 @@
 import type { AppConfig } from "../config";
-import type { AxisDetail, BeatSegment, DomainProfile } from "../types";
+import type { AxisDetail, BeatRole, BeatSegment, DomainProfile } from "../types";
 import {
   callGeminiMultimodalJson,
   GeminiApiError,
@@ -208,12 +208,24 @@ const summarize = (
   return `${domainName} highlights — ${snippets.join("; ")}.`;
 };
 
+const normalizeBeatRole = (label: string): BeatRole | undefined => {
+  const lower = label.toLowerCase();
+  if (lower.includes("hook")) return "hook";
+  if (lower.includes("setup") || lower.includes("intro")) return "setup";
+  if (lower.includes("escalation") || lower.includes("build")) return "escalation";
+  if (lower.includes("payoff") || lower.includes("climax")) return "payoff";
+  if (lower.includes("outro") || lower.includes("cta")) return "outro";
+  if (lower.includes("break")) return "break";
+  return undefined;
+};
+
 const toBeatSegments = (
   beats: GeminiMultimodalResponse["narrative"]["beats"],
   devices?: GeminiMultimodalResponse["narrative"]["devices"],
 ): BeatSegment[] =>
   beats.map((beat) => ({
     label: beat.label,
+    role: normalizeBeatRole(beat.label),
     startSeconds: beat.start,
     endSeconds: beat.end,
     devices:

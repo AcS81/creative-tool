@@ -86,6 +86,7 @@ export const buildPerformanceProfile = ({
         timeRatio: p.timeRatio,
         audienceRetention: p.retention,
         beatLabel: p.beatLabel,
+        beatRole: p.beatRole,
         sceneLabel: p.sceneLabel,
       })),
     },

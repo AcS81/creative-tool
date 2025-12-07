@@ -5,6 +5,7 @@ export type AlignedPoint = {
   timeRatio: number;
   retention: number;
   beatLabel?: string;
+  beatRole?: BeatSegment["role"];
   sceneLabel?: string;
 };
 
@@ -19,6 +20,23 @@ const segmentRatio = (segment: { startSeconds: number; endSeconds: number }, dur
   const duration = durationSeconds && durationSeconds > 0 ? durationSeconds : segment.endSeconds || 1;
   const midpoint = (segment.startSeconds + segment.endSeconds) / 2;
   return midpoint / Math.max(duration, 1);
+};
+
+const findNearestBeat = (
+  ratio: number,
+  beats?: BeatSegment[],
+  durationSeconds?: number,
+): { label?: string; role?: BeatSegment["role"] } | undefined => {
+  if (!beats?.length) return undefined;
+  let best: { label: string; role?: BeatSegment["role"]; dist: number } | null = null;
+  for (const beat of beats) {
+    const segRatio = segmentRatio(beat, durationSeconds);
+    const dist = Math.abs(segRatio - ratio);
+    if (!best || dist < best.dist) {
+      best = { label: beat.label, role: beat.role, dist };
+    }
+  }
+  return best ? { label: best.label, role: best.role } : undefined;
 };
 
 const findNearestLabel = <T extends { startSeconds: number; endSeconds: number; label: string }>({
@@ -50,10 +68,14 @@ export const buildPerformanceTimeline = ({
   durationSeconds,
 }: BuildTimelineInput): AlignedPoint[] => {
   if (!retentionSeries?.length) return [];
-  return retentionSeries.map((point) => ({
-    timeRatio: point.timeRatio,
-    retention: point.audienceRetention,
-    beatLabel: findNearestLabel({ ratio: point.timeRatio, segments: beats, durationSeconds }),
-    sceneLabel: findNearestLabel({ ratio: point.timeRatio, segments: scenes, durationSeconds }),
-  }));
+  return retentionSeries.map((point) => {
+    const beat = findNearestBeat(point.timeRatio, beats, durationSeconds);
+    return {
+      timeRatio: point.timeRatio,
+      retention: point.audienceRetention,
+      beatLabel: beat?.label,
+      beatRole: beat?.role,
+      sceneLabel: findNearestLabel({ ratio: point.timeRatio, segments: scenes, durationSeconds }),
+    };
+  });
 };

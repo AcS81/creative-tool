@@ -4,6 +4,7 @@ type Beat = {
   startSeconds: number;
   endSeconds: number;
   label: string;
+  role?: string;
   devices?: string[];
 };
 
@@ -22,8 +23,8 @@ export function DomainTimeline({
     beats?.length ? beats : transcriptSegments?.map((seg) => ({ ...seg, label: seg.text, devices: [] })) ?? [];
   const maxTime = Math.max(...items.map((item) => item.endSeconds), 1);
 
-  const roleColor = (label: string) => {
-    const lower = label.toLowerCase();
+  const roleColor = (label: string, role?: string) => {
+    const lower = (role ?? label).toLowerCase();
     if (lower.includes("hook")) return "bg-emerald-500";
     if (lower.includes("setup")) return "bg-blue-500";
     if (lower.includes("escalation")) return "bg-indigo-500";
@@ -60,7 +61,8 @@ export function DomainTimeline({
               </span>
               <div className="relative h-2 w-full rounded bg-slate-200">
                 <div
-                  className={`absolute left-0 top-0 h-2 rounded ${roleColor(item.label)}`}
+                  className={`absolute left-0 top-0 h-2 rounded ${roleColor(item.label, item.role)}`}
+                  // Prefer normalized role for color and label if present.
                   style={{ marginLeft: `${startPct}%`, width: `${width}%` }}
                 />
               </div>
@@ -68,7 +70,7 @@ export function DomainTimeline({
                 {Math.round(item.endSeconds)}s
               </span>
               <div className="flex flex-1 items-center gap-2">
-                <span className="line-clamp-1 w-32 text-foreground">{item.label}</span>
+                <span className="line-clamp-1 w-32 text-foreground">{item.role ?? item.label}</span>
                 {item.devices?.slice(0, 3).map((device) => (
                   <span
                     key={`${device}-${idx}`}

@@ -17,9 +17,9 @@ const analytics: VideoAnalytics = {
 };
 
 const timeline: AlignedPoint[] = [
-  { timeRatio: 0, retention: 100, beatLabel: "Hook" },
-  { timeRatio: 0.5, retention: 72, beatLabel: "Mid" },
-  { timeRatio: 1, retention: 48, beatLabel: "End" },
+  { timeRatio: 0, retention: 100, beatLabel: "Hook", beatRole: "hook" },
+  { timeRatio: 0.5, retention: 72, beatLabel: "Mid", beatRole: "escalation" },
+  { timeRatio: 1, retention: 48, beatLabel: "End", beatRole: "outro" },
 ];
 
 describe("buildPerformanceProfile", () => {
