@@ -19,8 +19,10 @@ export function DomainTimeline({
     return null;
   }
 
-  const items =
-    beats?.length ? beats : transcriptSegments?.map((seg) => ({ ...seg, label: seg.text, devices: [] })) ?? [];
+  const items: Beat[] =
+    beats?.length
+      ? beats
+      : transcriptSegments?.map((seg) => ({ ...seg, label: seg.text, role: undefined, devices: [] })) ?? [];
   const maxTime = Math.max(...items.map((item) => item.endSeconds), 1);
 
   const roleColor = (label: string, role?: string) => {

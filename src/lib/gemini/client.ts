@@ -245,6 +245,15 @@ const buildMultimodalBody = (input: {
   jsonSchema?: unknown;
   systemInstruction?: string;
 }) => {
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.2,
+    responseMimeType: "application/json",
+  };
+
+  if (input.jsonSchema) {
+    generationConfig.responseSchema = input.jsonSchema;
+  }
+
   const body: Record<string, unknown> = {
     contents: [
       {
@@ -252,10 +261,7 @@ const buildMultimodalBody = (input: {
         parts: [input.videoPart, { text: input.prompt }],
       },
     ],
-    generationConfig: {
-      temperature: 0.2,
-      responseMimeType: "application/json",
-    },
+    generationConfig,
   };
 
   if (input.systemInstruction) {
@@ -263,10 +269,6 @@ const buildMultimodalBody = (input: {
       role: "system",
       parts: [{ text: input.systemInstruction }],
     };
-  }
-
-  if (input.jsonSchema) {
-    body.responseSchema = input.jsonSchema;
   }
 
   return body;
