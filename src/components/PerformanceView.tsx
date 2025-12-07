@@ -1,4 +1,4 @@
-import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { PerformanceProfile } from "../lib/types";
 
 type Props = {
@@ -11,6 +11,17 @@ type Props = {
 
 const formatPercent = (value?: number) =>
   typeof value === "number" ? `${value.toFixed(1)}%` : "—";
+
+const roleColor = (role?: string) => {
+  const lower = (role ?? "").toLowerCase();
+  if (lower.includes("hook")) return "#10b981";
+  if (lower.includes("setup")) return "#3b82f6";
+  if (lower.includes("escalation")) return "#6366f1";
+  if (lower.includes("payoff") || lower.includes("climax")) return "#8b5cf6";
+  if (lower.includes("outro") || lower.includes("cta")) return "#f59e0b";
+  if (lower.includes("break")) return "#94a3b8";
+  return "#a855f7";
+};
 
 export function PerformanceView({
   performanceProfile,
@@ -45,6 +56,17 @@ export function PerformanceView({
   const metrics = performanceProfile.metrics;
   const series = metrics.retentionSeries ?? [];
   const performanceInsights = insights ?? performanceProfile.insights ?? [];
+  const beatMarkers = Array.from(
+    new Map(
+      series
+        .filter((p) => p.beatRole || p.beatLabel)
+        .map((p) => {
+          const label = (p.beatRole ?? p.beatLabel) as string;
+          const key = `${label}-${Math.round((p.timeRatio ?? 0) * 100)}`;
+          return [key, { label, timeRatio: p.timeRatio }];
+        }),
+    ).values(),
+  );
 
   return (
     <div className="space-y-4">
@@ -76,7 +98,14 @@ export function PerformanceView({
 
       <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold text-muted">Retention over time</p>
+          <div>
+            <p className="text-sm font-semibold text-muted">Retention over time</p>
+            {beatMarkers.length > 0 && (
+              <p className="text-[11px] text-muted">
+                Beat markers show hook/setup/payoff aligned to the timeline.
+              </p>
+            )}
+          </div>
           <p className="text-xs text-muted">0–100% of video</p>
         </div>
         {series.length === 0 ? (
@@ -98,7 +127,14 @@ export function PerformanceView({
                   tickFormatter={(v) => `${v}%`}
                 />
                 <Tooltip
-                  formatter={(value: any) => `${value.toFixed ? value.toFixed(1) : value}%`}
+                  formatter={(value: any, _name, payload) => {
+                    const beat = payload?.payload?.beatRole ?? payload?.payload?.beatLabel;
+                    const scene = payload?.payload?.sceneLabel;
+                    const parts = [`${value.toFixed ? value.toFixed(1) : value}% retained`];
+                    if (beat) parts.push(`Beat: ${beat}`);
+                    if (scene) parts.push(`Scene: ${scene}`);
+                    return parts.join(" • ");
+                  }}
                   labelFormatter={(label) => `${Math.round(Number(label) * 100)}% of video`}
                 />
                 <Line
@@ -109,6 +145,20 @@ export function PerformanceView({
                   dot={false}
                   isAnimationActive={false}
                 />
+                {beatMarkers.map((marker) => (
+                  <ReferenceLine
+                    key={`${marker.label}-${marker.timeRatio}`}
+                    x={marker.timeRatio}
+                    stroke={roleColor(marker.label)}
+                    strokeDasharray="3 3"
+                    label={{
+                      value: marker.label,
+                      position: "top",
+                      fill: "#475569",
+                      fontSize: 10,
+                    }}
+                  />
+                ))}
               </LineChart>
             </ResponsiveContainer>
           </div>

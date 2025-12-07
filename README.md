@@ -51,6 +51,7 @@ The current app covers the PRD MVP features:
 - **Mock only** (`ANALYSIS_MODE=mock`, default): deterministic, offline-friendly analysis that exercises the full fingerprint + UI without external APIs. Good for local dev and quick demos.
 - **Gemini creative-only** (`ANALYSIS_MODE=gemini` with `GEMINI_API_KEY`, `YOUTUBE_API_KEY`): real Gemini + YouTube Data API, covering transcript, domains, fingerprints, and reference similarity (no Analytics/performance overlay).
 - **Gemini + Analytics** (`ANALYSIS_MODE=gemini` + performance envs): adds YouTube Analytics (retention, CTR, engagement) and computes a performance domain + coaching on top of the creative fingerprint.
+- Performance tab overlays retention with multimodal beats (hook/setup/escalation/payoff/outro) when available; without Analytics, the creative view stays unchanged.
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.

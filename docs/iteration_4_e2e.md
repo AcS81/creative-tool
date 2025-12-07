@@ -54,6 +54,7 @@ This flow verifies the full Performance domain (H) using YouTube Analytics for a
    - Overview shows the usual archetype, radar, and insights **plus** a “Performance at a glance” card when Analytics data is available.
    - The **Performance** tab displays:
      - A retention curve over time (0–100% of video).
+     - Beat markers (hook/setup/escalation/payoff/outro) aligned to the timeline when multimodal beats are available.
      - Basic metrics (views, CTR, avg view duration, likes, comments).
      - Performance coaching bullets that reference retention and metrics.
    - Other tabs (Voice/Language/Narrative/Visual/Editing/Sound) still show their usual creative insights.
