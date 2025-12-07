@@ -128,7 +128,7 @@ export async function POST(request: Request) {
       insights: insights.bullets,
       insightDetails: insights,
       domainInsights,
-      diagnostics: analysisResult.diagnostics ?? { source: "gemini-v1-text" },
+      diagnostics: analysisResult.diagnostics ?? { source: "gemini-v2-multimodal" },
       metadata: {
         title: metadata.title,
         channelTitle: metadata.channelTitle,

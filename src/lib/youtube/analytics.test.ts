@@ -4,6 +4,19 @@ import { encryptString } from "../auth/crypto";
 import { fetchVideoAnalytics, YoutubeAnalyticsError } from "./analytics";
 
 const originalEnv = { ...process.env };
+const originalFindUnique = prisma.youtubeAuthToken.findUnique.bind(prisma.youtubeAuthToken);
+
+const buildMockToken = (userId = "user-1") => ({
+  id: "token-1",
+  userId,
+  accessTokenEncrypted: encryptString("access-token", process.env.TOKEN_ENCRYPTION_KEY as string),
+  refreshTokenEncrypted: encryptString("refresh-token", process.env.TOKEN_ENCRYPTION_KEY as string),
+  scope: "scope",
+  tokenType: "Bearer",
+  expiry: null,
+  createdAt: new Date(),
+  updatedAt: new Date(),
+});
 
 describe("youtube analytics", () => {
   beforeEach(async () => {
@@ -19,28 +32,14 @@ describe("youtube analytics", () => {
 
   afterEach(async () => {
     vi.restoreAllMocks();
+    (prisma.youtubeAuthToken as any).findUnique = originalFindUnique;
+    process.env = { ...originalEnv };
     await prisma.youtubeAuthToken.deleteMany();
     await prisma.user.deleteMany();
-    process.env = { ...originalEnv };
   });
 
-  const seedToken = async () => {
-    const user = await prisma.user.create({
-      data: { displayName: "Test User" },
-    });
-    const encrypted = encryptString("access-token", process.env.TOKEN_ENCRYPTION_KEY as string);
-    await prisma.youtubeAuthToken.create({
-      data: {
-        userId: user.id,
-        accessTokenEncrypted: encrypted,
-        refreshTokenEncrypted: encrypted,
-      },
-    });
-    return user.id;
-  };
-
   it("normalizes retention and totals", async () => {
-    const userId = await seedToken();
+    (prisma.youtubeAuthToken as any).findUnique = vi.fn().mockResolvedValue(buildMockToken());
 
     // First call: retention report
     vi.spyOn(global, "fetch")
@@ -75,7 +74,7 @@ describe("youtube analytics", () => {
       } as any);
 
     const analytics = await fetchVideoAnalytics(
-      { videoId: "vid123", channelId: "chan123", auth: { userId } },
+      { videoId: "vid123", channelId: "chan123", auth: { userId: "user-1" } },
       {},
     );
 
@@ -89,7 +88,7 @@ describe("youtube analytics", () => {
   });
 
   it("falls back when impressionsCtr is unsupported", async () => {
-    const userId = await seedToken();
+    (prisma.youtubeAuthToken as any).findUnique = vi.fn().mockResolvedValue(buildMockToken());
 
     const fetchSpy = vi.spyOn(global, "fetch");
     // Retention success
@@ -126,7 +125,7 @@ describe("youtube analytics", () => {
       } as any);
 
     const analytics = await fetchVideoAnalytics(
-      { videoId: "vid123", channelId: "chan123", auth: { userId } },
+      { videoId: "vid123", channelId: "chan123", auth: { userId: "user-1" } },
       {},
     );
 
@@ -137,13 +136,14 @@ describe("youtube analytics", () => {
   });
 
   it("throws forbidden when no token exists", async () => {
+    (prisma.youtubeAuthToken as any).findUnique = vi.fn().mockResolvedValue(null);
     await expect(
       fetchVideoAnalytics({ videoId: "v", channelId: "c", auth: { userId: "missing" } }),
     ).rejects.toBeInstanceOf(YoutubeAnalyticsError);
   });
 
   it("maps quota errors", async () => {
-    const userId = await seedToken();
+    (prisma.youtubeAuthToken as any).findUnique = vi.fn().mockResolvedValue(buildMockToken());
     vi.spyOn(global, "fetch").mockResolvedValueOnce({
       ok: false,
       status: 429,
@@ -152,7 +152,7 @@ describe("youtube analytics", () => {
     } as any);
 
     await expect(
-      fetchVideoAnalytics({ videoId: "v", channelId: "c", auth: { userId } }),
+      fetchVideoAnalytics({ videoId: "v", channelId: "c", auth: { userId: "user-1" } }),
     ).rejects.toMatchObject({ type: "QuotaExceeded" });
   });
 });

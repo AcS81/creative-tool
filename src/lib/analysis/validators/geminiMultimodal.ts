@@ -58,6 +58,7 @@ const visualEditSoundSchema = z
     cut_rate: observedMetricSchema,
     pattern_interrupts: observedMetricSchema,
     broll_coverage: observedMetricSchema,
+    music_coverage: observedMetricSchema,
     music_changes: observedMetricSchema,
     sfx_density: observedMetricSchema,
     silence_for_emphasis: observedMetricSchema,

@@ -87,12 +87,13 @@ export const persistYoutubeTokens = async (tokens: TokenResponse) => {
   const refreshTokenEncrypted = tokens.refresh_token
     ? encryptString(tokens.refresh_token, config.tokenEncryptionKey)
     : null;
+  const normalizedRefreshToken = refreshTokenEncrypted ?? "";
 
   await prisma.youtubeAuthToken.upsert({
     where: { userId: user.id },
     update: {
       accessTokenEncrypted,
-      refreshTokenEncrypted: refreshTokenEncrypted ?? undefined,
+      refreshTokenEncrypted: normalizedRefreshToken,
       scope: tokens.scope,
       tokenType: tokens.token_type,
       expiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,
@@ -100,7 +101,7 @@ export const persistYoutubeTokens = async (tokens: TokenResponse) => {
     create: {
       userId: user.id,
       accessTokenEncrypted,
-      refreshTokenEncrypted: refreshTokenEncrypted ?? undefined,
+      refreshTokenEncrypted: normalizedRefreshToken,
       scope: tokens.scope,
       tokenType: tokens.token_type,
       expiry: tokens.expires_in ? new Date(Date.now() + tokens.expires_in * 1000) : null,

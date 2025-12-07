@@ -65,15 +65,17 @@ const warnMissingUrl = () => {
   process.exit(1);
 };
 
-const summarizeUnobserved = (domain: Record<string, { score: number; value: string }>) =>
-  Object.entries(domain).filter(([, metric]) => metric.value === "unobserved" || metric.score === 0).length;
+const summarizeUnobserved = (domain: unknown) => {
+  const entries = Object.values(domain as Record<string, { score: number; value: string }>);
+  return entries.filter((metric) => metric.value === "unobserved" || metric.score === 0).length;
+};
 
 const summarizeGeminiResponse = (raw: unknown) => {
   const parsed = parseGeminiMultimodalJson(raw);
   const unobserved = {
     voice: summarizeUnobserved(parsed.voice),
     language: summarizeUnobserved(parsed.language),
-    narrative: summarizeUnobserved(parsed.narrative as Record<string, { score: number; value: string }>),
+    narrative: summarizeUnobserved(parsed.narrative),
     visual_edit_sound: summarizeUnobserved(parsed.visual_edit_sound),
   };
 

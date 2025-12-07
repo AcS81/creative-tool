@@ -1,23 +1,9 @@
-import { getAppConfig, type AppConfig } from "../config";
+import { ConfigError, getAppConfig, type AppConfig } from "../config";
 import { mockAnalyzeVideo } from "./mock";
 import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
-import { getTranscriptAndScenes } from "../gemini/client";
-import {
-  analyzeEditing,
-  analyzeLanguage,
-  analyzeNarrative,
-  analyzeSound,
-  analyzeVisual,
-  analyzeVoice,
-} from "./geminiDomains";
 import type {
-  AxisDetail,
-  BeatSegment,
-  DomainProfile,
   MetaAxes,
   VideoFingerprintJson,
-  SceneSegment,
-  TranscriptSegment,
   FingerprintPerDomain,
 } from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
@@ -43,103 +29,38 @@ const archetypeForMeta = (meta: MetaAxes) => {
 
 const buildVideoUrl = (videoId: string) => `https://www.youtube.com/watch?v=${videoId}`;
 
-const isUnsupportedMultimodalError = (error: unknown) => {
-  const code = (error as any)?.code;
-  const status = (error as any)?.status as number | undefined;
-  return (
-    code === "FEATURE_DISABLED" ||
-    code === "CONFIG_MISSING" ||
-    code === "INVALID_URL" ||
-    code === "FALLBACK_FAILED" ||
-    status === 403
-  );
-};
-
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
   const useMock = options.useMock ?? config.analysisMode === "mock";
-  const rolloutForcesV1 = config.analysisVersion === "v1" || config.analysisV2MultimodalEnabled === false;
-  const useMultimodal =
-    config.analysisMode === "gemini" && config.analysisV2MultimodalEnabled !== false && !rolloutForcesV1;
 
   if (useMock !== false) {
     return mockAnalyzeVideo(input);
   }
 
+  if (config.analysisMode !== "gemini" || config.analysisV2MultimodalEnabled === false) {
+    throw new ConfigError("Multimodal analysis is required; set ANALYSIS_MODE=gemini and ENABLE_ANALYSIS_V2_MULTIMODAL=true.");
+  }
+
+  if (config.analysisVersion === "v1") {
+    throw new ConfigError("ANALYSIS_VERSION=v1 is no longer supported; v2 multimodal is canonical.");
+  }
+
   const videoUrl = buildVideoUrl(input.videoId);
-  let voiceProfile: DomainProfile;
-  let languageProfile: DomainProfile;
-  let narrativeProfile: DomainProfile;
-  let visualProfile: DomainProfile;
-  let editingProfile: DomainProfile;
-  let soundProfile: DomainProfile;
-  let beats: BeatSegment[] | undefined;
-  let axisDetails: Record<string, AxisDetail> | undefined;
-  let analysisPath: AnalyzeVideoResult["diagnostics"]["analysisPath"] | undefined;
-  let analysisErrorMessage: string | undefined;
-  let analysisVersionUsed: AnalyzeVideoResult["diagnostics"]["analysisVersion"] | undefined;
-  let unobservedCounts: Record<string, number> | undefined;
-  let multimodalFallbackUsed = false;
-  let transcriptAndScenes:
-    | {
-        transcriptSegments: TranscriptSegment[];
-        sceneSegments: SceneSegment[];
-      }
-    | undefined;
+  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
 
-  let ranMultimodal = false;
-
-  if (useMultimodal) {
-    try {
-      const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
-      voiceProfile = multimodal.profiles.voice;
-      languageProfile = multimodal.profiles.language;
-      narrativeProfile = multimodal.profiles.narrative;
-      visualProfile = multimodal.profiles.visual;
-      editingProfile = multimodal.profiles.editing;
-      soundProfile = multimodal.profiles.sound;
-      beats = multimodal.beats;
-      axisDetails = multimodal.axisDetails;
-      analysisPath = "gemini-v2-multimodal";
-      analysisVersionUsed = "v2";
-      multimodalFallbackUsed = Boolean(multimodal.diagnostics.fromFallback);
-      unobservedCounts = multimodal.diagnostics.unobservedCounts;
-      ranMultimodal = true;
-    } catch (error) {
-      const canFallback = isUnsupportedMultimodalError(error);
-      if (!canFallback) {
-        throw error;
-      }
-      console.warn("Multimodal analysis unavailable; falling back to text-only path", error);
-      analysisErrorMessage = error instanceof Error ? error.message : "Unknown multimodal error";
-    }
-  }
-
-  if (!ranMultimodal) {
-    transcriptAndScenes = await getTranscriptAndScenes({ videoUrl }, { config });
-
-    const domainInput = {
-      transcriptSegments: transcriptAndScenes.transcriptSegments,
-      sceneSegments: transcriptAndScenes.sceneSegments,
-      videoUrl,
-    };
-
-    const results = await Promise.all([
-      analyzeVoice(domainInput, { config }),
-      analyzeLanguage(domainInput, { config }),
-      analyzeNarrative(domainInput, { config }),
-      analyzeVisual(domainInput, { config }),
-      analyzeEditing(domainInput, { config }),
-      analyzeSound(domainInput, { config }),
-    ]);
-
-    [voiceProfile, languageProfile, narrativeProfile, visualProfile, editingProfile, soundProfile] = results;
-    analysisPath = "gemini-v1-text";
-    analysisVersionUsed = "v1";
-  }
+  const voiceProfile = multimodal.profiles.voice;
+  const languageProfile = multimodal.profiles.language;
+  const narrativeProfile = multimodal.profiles.narrative;
+  const visualProfile = multimodal.profiles.visual;
+  const editingProfile = multimodal.profiles.editing;
+  const soundProfile = multimodal.profiles.sound;
+  const beats = multimodal.beats;
+  const axisDetails = multimodal.axisDetails;
+  const unobservedCounts = multimodal.diagnostics.unobservedCounts;
+  const multimodalFallbackUsed = Boolean(multimodal.diagnostics.fromFallback);
 
   const perDomain: FingerprintPerDomain = {
     voiceProfile,
@@ -156,16 +77,10 @@ export async function analyzeVideo(
   let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
     overallArchetype,
-    supporting:
-      analysisPath === "gemini-v2-multimodal"
-        ? {
-            beats,
-            axisDetails,
-          }
-        : {
-            transcriptSegments: transcriptAndScenes?.transcriptSegments,
-            sceneSegments: transcriptAndScenes?.sceneSegments,
-          },
+    supporting: {
+      beats,
+      axisDetails,
+    },
     hasPerformanceData: false,
   });
 
@@ -212,13 +127,13 @@ export async function analyzeVideo(
     fingerprint: validated,
     overallArchetype,
     diagnostics: {
-      source: analysisPath ?? "gemini-v1-text",
+      source: "gemini-v2-multimodal",
       performanceAttached,
       performanceErrorType,
       performanceErrorMessage,
-      analysisPath,
-      analysisErrorMessage,
-      analysisVersion: analysisVersionUsed ?? (analysisPath === "gemini-v2-multimodal" ? "v2" : "v1"),
+      analysisPath: "gemini-v2-multimodal",
+      analysisErrorMessage: undefined,
+      analysisVersion: "v2",
       multimodalFallbackUsed,
       unobservedCounts,
     },

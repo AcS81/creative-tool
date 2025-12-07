@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getAuthContext, requirePerformanceReady } from "./context";
 import prisma from "../db";
 
 const originalEnv = { ...process.env };
+const originalFindFirst = prisma.user.findFirst.bind(prisma.user);
 
 describe("auth context", () => {
   beforeEach(async () => {
@@ -18,6 +19,7 @@ describe("auth context", () => {
 
   afterEach(async () => {
     process.env = { ...originalEnv };
+    (prisma.user as any).findFirst = originalFindFirst;
     await prisma.youtubeAuthToken.deleteMany();
     await prisma.user.deleteMany();
   });
@@ -35,6 +37,8 @@ describe("auth context", () => {
         email: "user@example.com",
       },
     });
+
+    (prisma.user as any).findFirst = vi.fn().mockResolvedValue(user);
 
     const ctx = await getAuthContext();
     expect(ctx).not.toBeNull();

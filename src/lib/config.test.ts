@@ -26,11 +26,10 @@ describe("getAppConfig", () => {
     expect(config.analysisV2MultimodalEnabled).toBe(false);
   });
 
-  it("enables multimodal by default in gemini mode when configured outside test env", () => {
+  it("enables multimodal by default in gemini mode when keys are present", () => {
     process.env.ANALYSIS_MODE = "gemini";
     process.env.GEMINI_API_KEY = "key";
     process.env.YOUTUBE_API_KEY = "yt";
-    process.env.NODE_ENV = "development";
 
     const config = getAppConfig();
     expect(config.analysisMode).toBe("gemini");
@@ -53,7 +52,6 @@ describe("getAppConfig", () => {
     process.env.ANALYSIS_VERSION = "v1";
     process.env.GEMINI_API_KEY = "key";
     process.env.YOUTUBE_API_KEY = "yt";
-    process.env.NODE_ENV = "development";
 
     const config = getAppConfig();
     expect(config.analysisVersion).toBe("v1");
@@ -77,7 +75,6 @@ describe("getAppConfig", () => {
     process.env.ANALYSIS_MODE = "gemini";
     process.env.GEMINI_API_KEY = "key";
     process.env.YOUTUBE_API_KEY = "yt";
-    process.env.NODE_ENV = "test";
     process.env.ENABLE_ANALYSIS_V2_MULTIMODAL = "true";
     const config = getAppConfig();
     expect(config.analysisV2MultimodalEnabled).toBe(true);

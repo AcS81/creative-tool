@@ -93,6 +93,7 @@ When this iteration is done:
 - [ ] Make an explicit decision and document it in `docs/analysis_functionality_plan.md` (or a small `docs/multimodal_launch_notes.md`):  
   - [ ] Option A – **Soft deprecation**: keep v1 code for a limited time as a guarded fallback only.  
   - [ ] Option B – **Removal**: delete v1 text-only analysis code once v2 has been live-tested.  
+  - ✅ Decision: Option B chosen — the text-only Gemini pipeline has been removed and `ANALYSIS_VERSION=v1` now errors.
 - [ ] Implement the chosen path:
   - [ ] If soft-deprecating:
     - [ ] Gate v1 behind a clear “fallback only” branch with prominent comments and logs.  
@@ -397,4 +398,3 @@ Use this checklist to confirm Iteration 3 of the **upgrade track** is complete a
 - [ ] Debug views and README clearly describe how to run and inspect the multimodal pipeline.  
 
 When all of the above are ticked, the **Native Multimodal Analysis Plan** (`docs/analysis_functionality_plan.md`) is effectively **complete**: every creative analysis in CreatorSight uses Gemini’s multimodal view of the video, fingerprints and similarity are grounded in the new metrics, and both creators and developers can trust and understand what the system is doing.
-

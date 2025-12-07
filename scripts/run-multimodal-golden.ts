@@ -1,6 +1,7 @@
 import { analyzeVideoMultimodal } from "../src/lib/analysis/geminiMultimodalAnalyzer";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "../src/lib/analysis/fingerprint/videoFingerprint";
 import type { AppConfig } from "../src/lib/config";
+import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
 
 type GoldenVideo = {
   id: string;
@@ -80,14 +81,24 @@ async function run() {
     performanceEnabled: false,
   };
 
+const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMultimodal>>["profiles"]): FingerprintPerDomain => ({
+  voiceProfile: profiles.voice,
+  languageProfile: profiles.language,
+  narrativeProfile: profiles.narrative,
+  visualProfile: profiles.visual,
+  editingProfile: profiles.editing,
+  soundProfile: profiles.sound,
+});
+
   for (const video of goldenSet) {
     console.log(`\n=== Video ${video.id}: ${video.url}`);
     console.log(`Notes: ${video.notes}`);
     const start = Date.now();
     try {
       const analysis = await analyzeVideoMultimodal({ youtubeUrl: video.url, config });
-      const fingerprint = buildVideoFingerprint(analysis.profiles, {
-        metaAxes: computeMetaAxesFromProfiles(analysis.profiles),
+    const perDomain = toFingerprintDomains(analysis.profiles);
+    const fingerprint = buildVideoFingerprint(perDomain, {
+      metaAxes: computeMetaAxesFromProfiles(perDomain),
         supporting: { beats: analysis.beats, axisDetails: analysis.axisDetails },
       });
       const summary = summarize(video, fingerprint.supporting?.axisDetails);

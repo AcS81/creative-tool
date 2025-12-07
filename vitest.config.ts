@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { defineConfig } from "vitest/config";
 
 export default defineConfig({
@@ -5,5 +6,15 @@ export default defineConfig({
     globals: true,
     environment: "node",
     include: ["src/**/*.test.ts"],
+    pool: "threads",
+    poolOptions: {
+      threads: {
+        singleThread: true,
+      },
+    },
+    setupFiles: ["./vitest.setup.ts"],
+    sequence: {
+      concurrent: false,
+    },
   },
 });

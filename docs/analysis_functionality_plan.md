@@ -118,6 +118,6 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 
 ## 9) Runtime Flags and Diagnostics
 - `ANALYSIS_MODE=mock` → deterministic offline pipeline. `ANALYSIS_MODE=gemini` → requires Gemini + YouTube keys.
-- Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present outside `NODE_ENV=test`. Set `ANALYSIS_VERSION=v1` (or `ENABLE_ANALYSIS_V2_MULTIMODAL=false`) to force the text-only rollback.
-- Optional override: `ANALYSIS_VERSION=v2` enforces the multimodal path; no env flag needed in normal dev/prod.
-- `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v1-text | gemini-v2-multimodal` and includes `diagnostics.multimodalFallbackUsed` when the temp-upload inline path is taken.
+- Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present. Text-only v1 is **removed**; `ANALYSIS_VERSION=v1` now throws a configuration error instead of routing to the deprecated path.
+- Optional override: `ANALYSIS_VERSION=v2` keeps the canonical path explicit; no extra flag needed in normal dev/prod.
+- `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v2-multimodal` for new runs (legacy records may still show `gemini-v1-text`) and includes `diagnostics.multimodalFallbackUsed` when the temp-upload inline path is taken.

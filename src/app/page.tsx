@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
@@ -82,7 +82,7 @@ const tabKeys = [
   "performance",
 ] as const;
 
-export default function Home() {
+function HomeContent() {
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -635,11 +635,6 @@ export default function Home() {
                         >
                           <p className="text-base font-semibold">{ref.displayName}</p>
                           <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
-                          {ref.closestAxis ? (
-                            <p className="mt-1 text-xs text-muted">
-                              Closest on {ref.closestAxis.label} ({Math.round(ref.closestAxis.delta)} pts)
-                            </p>
-                          ) : null}
                         </div>
                       ))}
                       {result.nearestReferences.length === 0 && (
@@ -827,6 +822,14 @@ export default function Home() {
       </div>
       </div>
     </AppShell>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={null}>
+      <HomeContent />
+    </Suspense>
   );
 }
 

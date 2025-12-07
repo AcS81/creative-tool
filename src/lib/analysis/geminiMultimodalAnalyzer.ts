@@ -259,7 +259,7 @@ const buildProfiles = (
     "voice",
     "Voice",
     ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
-    response.voice,
+    response.voice as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
@@ -267,7 +267,7 @@ const buildProfiles = (
     "language",
     "Language",
     ["concreteness", "metaphor_density", "references", "humor", "teaching_vs_riffing"],
-    response.language,
+    response.language as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
   );
@@ -320,23 +320,35 @@ const buildProfiles = (
 };
 
 const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<string, number> => ({
-  voice: unobserved(Object.keys(response.voice), response.voice).length,
-  language: unobserved(Object.keys(response.language), response.language).length,
+  voice: unobserved(
+    Object.keys(response.voice),
+    response.voice as unknown as Record<string, GeminiObservedMetric>,
+  ).length,
+  language: unobserved(
+    Object.keys(response.language),
+    response.language as unknown as Record<string, GeminiObservedMetric>,
+  ).length,
   narrative: unobserved(
     ["mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
   ).length,
-  visual_edit_sound: unobserved(Object.keys(response.visual_edit_sound), response.visual_edit_sound).length,
+  visual_edit_sound: unobserved(
+    Object.keys(response.visual_edit_sound),
+    response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>,
+  ).length,
 });
 
 const toError = (result: GeminiMultimodalResult): GeminiApiError & { code?: GeminiMultimodalErrorCode } => {
-  const message = result.errorMessage || "Unknown Gemini multimodal error";
+  const isError = result.ok === false;
+  const message = isError ? result.errorMessage : "Unknown Gemini multimodal error";
   const type: "InvalidResponse" | "UpstreamError" =
-    result.errorCode === "INVALID_RESPONSE" ? "InvalidResponse" : "UpstreamError";
+    isError && result.errorCode === "INVALID_RESPONSE" ? "InvalidResponse" : "UpstreamError";
   const error = new GeminiApiError(type, message, result.status) as GeminiApiError & {
     code?: GeminiMultimodalErrorCode;
   };
-  error.code = result.errorCode;
+  if (isError) {
+    error.code = result.errorCode;
+  }
   return error;
 };
 

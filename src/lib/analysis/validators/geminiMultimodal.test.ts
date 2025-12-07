@@ -39,6 +39,7 @@ const buildResponse = (): GeminiMultimodalResponse => ({
     cut_rate: metric("avg 2.1s"),
     pattern_interrupts: metric("4 timestamps"),
     broll_coverage: metric("30%"),
+    music_coverage: metric("70%"),
     music_changes: metric("70% runtime, 3 changes"),
     sfx_density: metric("6 notable SFX"),
     silence_for_emphasis: metric("3 spans ~1s"),

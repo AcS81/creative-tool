@@ -1,8 +1,30 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { POST } from "./route";
-import prisma from "../../../lib/db";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
 import type { VideoFingerprintJson } from "../../../lib/types";
+
+const mockPrisma = vi.hoisted(() => ({
+  creatorProfile: {
+    findFirst: vi.fn(),
+    create: vi.fn(),
+  },
+  user: {
+    findFirst: vi.fn(),
+  },
+  videoAnalysis: {
+    create: vi.fn(),
+    update: vi.fn(),
+    findMany: vi.fn(),
+  },
+  videoFingerprint: {
+    create: vi.fn(),
+  },
+}));
+
+vi.mock("../../../lib/db", () => ({
+  default: mockPrisma,
+}));
+
+import { POST } from "./route";
 
 vi.mock("../../../lib/youtube/api", async (importOriginal) => {
   const actual = await importOriginal();
@@ -47,42 +69,67 @@ const buildFingerprint = (offset: number) =>
     overallArchetype: "Test Reference",
   });
 
-beforeAll(async () => {
-  const refId = `ref-${Date.now()}`;
-  const fingerprint = buildFingerprint(5);
-
-  await prisma.creatorProfile.create({
-    data: {
-      id: refId,
-      type: "reference",
-      displayName: "Test Reference Creator",
-      channelId: `channel-${refId}`,
-      analyses: {
-        create: {
-          id: `${refId}-analysis`,
-          youtubeVideoId: "seed-ref-video",
-          title: "Reference Video",
-          durationSeconds: 600,
-          status: "complete",
-          videoFingerprint: {
-            create: {
-              id: `${refId}-fingerprint`,
-              fingerprint: JSON.stringify(fingerprint),
-            },
-          },
-        },
-      },
-    },
-  });
+beforeAll(() => {
+  mockPrisma.creatorProfile.findFirst.mockResolvedValue(null);
 });
 
 describe("POST /api/analyze", () => {
   beforeEach(() => {
     process.env.ANALYSIS_MODE = "mock";
+    process.env.ENABLE_PERFORMANCE = "false";
+    const refId = `ref-${Date.now()}`;
+    const referenceFingerprint = buildFingerprint(5);
+    mockPrisma.user.findFirst.mockResolvedValue({ id: "user-123", displayName: "Test User" });
+    mockPrisma.creatorProfile.create.mockResolvedValue({
+      id: refId,
+      type: "reference",
+      displayName: "Test Reference Creator",
+      channelId: `channel-${refId}`,
+    });
+    mockPrisma.videoAnalysis.create.mockResolvedValue({
+      id: `${refId}-analysis-new`,
+      creatorId: refId,
+      youtubeVideoId: "testvideo123",
+      title: "Sample Test Video",
+      channelTitle: "Channel Name",
+      thumbnailUrl: "http://thumb",
+      durationSeconds: 120,
+      status: "pending",
+      sessionId: "sess",
+    });
+    mockPrisma.videoAnalysis.update.mockResolvedValue({
+      id: `${refId}-analysis-new`,
+      status: "complete",
+    });
+    mockPrisma.videoFingerprint.create.mockResolvedValue({
+      id: `${refId}-fingerprint-new`,
+      fingerprint: JSON.stringify(referenceFingerprint),
+    });
+    mockPrisma.videoAnalysis.findMany.mockResolvedValue([
+      {
+        id: `${refId}-analysis`,
+        creatorId: refId,
+        youtubeVideoId: "seed-ref-video",
+        title: "Reference Video",
+        durationSeconds: 600,
+        status: "complete",
+        createdAt: new Date(),
+        creator: {
+          id: refId,
+          displayName: "Test Reference Creator",
+          type: "reference",
+        },
+        videoFingerprint: {
+          fingerprint: JSON.stringify(referenceFingerprint),
+        },
+      },
+    ]);
   });
 
   afterEach(async () => {
     delete process.env.ANALYSIS_MODE;
+    delete process.env.ENABLE_PERFORMANCE;
+    vi.clearAllMocks();
   });
 
   it("returns analysis result with nearest references", async () => {

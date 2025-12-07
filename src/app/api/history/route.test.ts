@@ -1,34 +1,37 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
+
+const mockFindMany = vi.fn();
+
+vi.mock("../../../lib/db", () => ({
+  default: {
+    videoAnalysis: {
+      findMany: (...args: any[]) => mockFindMany(...args),
+    },
+  },
+}));
+
 import { GET } from "./route";
-import prisma from "../../../lib/db";
 
 describe("GET /api/history", () => {
-  beforeEach(async () => {
-    await prisma.videoFingerprint.deleteMany();
-    await prisma.videoAnalysis.deleteMany();
-    await prisma.creatorProfile.deleteMany();
+  beforeEach(() => {
+    mockFindMany.mockReset();
   });
 
   it("returns recent analyses for the current session", async () => {
-    const creator = await prisma.creatorProfile.create({
-      data: {
-        displayName: "History User",
-        type: "user",
-      },
-    });
+    const analysis = {
+      id: "analysis-1",
+      youtubeVideoId: "vid-history-1",
+      title: "History Video 1",
+      channelTitle: "History Channel",
+      thumbnailUrl: "http://thumb/1",
+      durationSeconds: 90,
+      status: "complete",
+      createdAt: new Date("2024-01-01T00:00:00Z"),
+      creator: { displayName: "History User" },
+      sessionId: "sess-history",
+    };
 
-    const analysis = await prisma.videoAnalysis.create({
-      data: {
-        creatorId: creator.id,
-        youtubeVideoId: "vid-history-1",
-        title: "History Video 1",
-        channelTitle: "History Channel",
-        thumbnailUrl: "http://thumb/1",
-        durationSeconds: 90,
-        status: "complete",
-        sessionId: "sess-history",
-      },
-    });
+    mockFindMany.mockResolvedValue([analysis]);
 
     const res = await GET(
       new Request("http://localhost/api/history", {
@@ -46,4 +49,3 @@ describe("GET /api/history", () => {
     expect(json.items[0].channelTitle).toBe("History Channel");
   });
 });
-

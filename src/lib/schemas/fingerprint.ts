@@ -19,7 +19,7 @@ const domainProfileSchema = z.object({
   summaryText: z.string().min(1, "summaryText is required"),
   scores: z.array(domainScoreSchema).min(1, "at least one score is required"),
   highlights: z.array(z.string().min(1)).optional(),
-  axisDetails: z.record(axisDetailSchema).optional(),
+  axisDetails: z.record(z.string(), axisDetailSchema).optional(),
 });
 
 const metaAxesSchema = z.object({
@@ -105,7 +105,7 @@ export const fingerprintSchema = z.object({
           }),
         )
         .optional(),
-      axisDetails: z.record(axisDetailSchema).optional(),
+      axisDetails: z.record(z.string(), axisDetailSchema).optional(),
     })
     .optional(),
   performanceProfile: performanceProfileSchema.optional(),

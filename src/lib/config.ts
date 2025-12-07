@@ -88,8 +88,7 @@ export const getAppConfig = (): AppConfig => {
   }
 
   const geminiConfigured = analysisMode === "gemini" && Boolean(geminiApiKey) && Boolean(youtubeApiKey);
-  const isTestEnv = process.env.NODE_ENV === "test";
-  const defaultMultimodalEnabled = geminiConfigured && !isTestEnv;
+  const defaultMultimodalEnabled = geminiConfigured;
 
   let analysisVersion: AnalysisVersion;
   let analysisV2MultimodalEnabled: boolean;

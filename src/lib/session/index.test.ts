@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import prisma from "../db";
 import {
   buildSessionCookie,
@@ -9,6 +9,8 @@ import {
 } from "./index";
 
 describe("session helpers", () => {
+  const originalFindMany = prisma.videoAnalysis.findMany.bind(prisma.videoAnalysis);
+
   beforeEach(async () => {
     await prisma.videoFingerprint.deleteMany();
     await prisma.videoAnalysis.deleteMany();
@@ -16,6 +18,7 @@ describe("session helpers", () => {
   });
 
   afterEach(async () => {
+    (prisma.videoAnalysis as any).findMany = originalFindMany;
     await prisma.videoFingerprint.deleteMany();
     await prisma.videoAnalysis.deleteMany();
     await prisma.creatorProfile.deleteMany();
@@ -86,6 +89,11 @@ describe("session helpers", () => {
         sessionId: "sess-other",
       },
     });
+
+    (prisma.videoAnalysis as any).findMany = vi.fn().mockResolvedValue([
+      { ...a1, creator },
+      { ...a2, creator },
+    ]);
 
     const analyses = await getAnalysesForSession("sess-1");
     const ids = analyses.map((a) => a.id);
