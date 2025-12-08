@@ -3,7 +3,7 @@ import { ReactNode } from "react";
 type TabKey =
   | "overview"
   | "voice"
-  | "language"
+  | "delivery"
   | "narrative"
   | "visual"
   | "editing"
@@ -13,7 +13,7 @@ type TabKey =
 const tabs: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "voice", label: "Voice" },
-  { key: "language", label: "Language" },
+  { key: "delivery", label: "Delivery" },
   { key: "narrative", label: "Narrative" },
   { key: "visual", label: "Visual" },
   { key: "editing", label: "Editing" },

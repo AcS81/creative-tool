@@ -278,7 +278,17 @@ const buildProfiles = (
   const language = buildDomainProfile(
     "language",
     "Language",
-    ["concreteness", "metaphor_density", "references", "humor", "teaching_vs_riffing"],
+    [
+      "concreteness",
+      "metaphor_density",
+      "references",
+      "humor",
+      "teaching_vs_riffing",
+      "sentiment",
+      "directive_density",
+      "self_disclosure",
+      "sarcasm_irony",
+    ],
     response.language as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,

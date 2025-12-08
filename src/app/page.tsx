@@ -2,16 +2,17 @@
 
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
-import type { VideoFingerprintJson } from "../lib/types";
+import type { DomainProfile, VideoFingerprintJson } from "../lib/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
 import { AnalysisLayout } from "../components/Layout/AnalysisLayout";
-import { DomainCard } from "../components/DomainCard";
 import { DomainTimeline } from "../components/DomainTimeline";
 import { AppShell } from "../components/AppShell";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Chip } from "../components/Chip";
 import { DomainView } from "../components/DomainView";
 import { DomainRadar } from "../components/DomainRadar";
+import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
+import { DeliveryRelationalSection } from "../components/DeliveryRelationalSection";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 import { PerformanceView } from "../components/PerformanceView";
 import { performanceCoaching } from "../lib/analysis/performanceCoaching";
@@ -74,13 +75,72 @@ type YoutubeConnectionStatus = {
 const tabKeys = [
   "overview",
   "voice",
-  "language",
+  "delivery",
   "narrative",
   "visual",
   "editing",
   "sound",
   "performance",
 ] as const;
+
+type TabKey = (typeof tabKeys)[number];
+
+const clampScore = (value?: number | null, fallback = 50) => Math.max(0, Math.min(100, value ?? fallback));
+
+const findScore = (profile: DomainProfile | undefined, keys: string[]) => {
+  if (!profile) return undefined;
+  for (const score of profile.scores) {
+    const meta = resolveAxisMetadata(score.key);
+    const aliases = meta?.aliases ?? [];
+    const candidates = new Set<string>([score.key]);
+    if (meta?.id) candidates.add(meta.id);
+    aliases.forEach((alias) => candidates.add(alias));
+    for (const key of keys) {
+      if (candidates.has(key)) return score.value;
+    }
+  }
+  return undefined;
+};
+
+const deriveTonePlacement = (fingerprint?: VideoFingerprintJson | null) => {
+  const arousal =
+    findScore(fingerprint?.perDomain.voiceProfile, [
+      "speaking_rate",
+      "loudness_range",
+      "pitch_variation",
+      "energy",
+      "voiceIntensity",
+    ]) ??
+    fingerprint?.metaAxes.voiceIntensity ??
+    50;
+
+  const valence =
+    findScore(fingerprint?.perDomain.languageProfile, ["humor", "warmth", "positivity", "sentiment"]) ??
+    findScore(fingerprint?.perDomain.voiceProfile, ["warmth", "positivity", "sentiment"]) ??
+    50;
+
+  return { arousal: clampScore(arousal), valence: clampScore(valence) };
+};
+
+const deriveConnectionPlacement = (fingerprint?: VideoFingerprintJson | null) => {
+  const closeness =
+    findScore(fingerprint?.perDomain.voiceProfile, ["warmth", "expression"]) ??
+    findScore(fingerprint?.perDomain.languageProfile, ["storyPresence", "self_disclosure", "selfDisclosure"]) ??
+    findScore(fingerprint?.perDomain.narrativeProfile, ["story_presence", "storyPresence"]) ??
+    50;
+
+  const care =
+    findScore(fingerprint?.perDomain.languageProfile, [
+      "explanationWeight",
+      "teaching_vs_riffing",
+      "directive_density",
+      "references",
+    ]) ??
+    findScore(fingerprint?.perDomain.narrativeProfile, ["structure", "hooks"]) ??
+    50;
+
+  return { closeness: clampScore(closeness), care: clampScore(care) };
+};
 
 function HomeContent() {
   const [url, setUrl] = useState("");
@@ -92,15 +152,15 @@ function HomeContent() {
   const [youtubeMessage, setYoutubeMessage] = useState<{ text: string; tone?: "success" | "error" | "muted" } | null>(
     null,
   );
-  const [activeTab, setActiveTab] = useState<
-    "overview" | "voice" | "language" | "narrative" | "visual" | "editing" | "sound" | "performance"
-  >("overview");
+  const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
   const domainProfiles = result?.fingerprint.perDomain;
   const supporting = result?.fingerprint.supporting;
+  const deliveryTone = deriveTonePlacement(result?.fingerprint);
+  const deliveryConnection = deriveConnectionPlacement(result?.fingerprint);
 
   const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -128,9 +188,10 @@ function HomeContent() {
 
   useEffect(() => {
     const tabParam = searchParams.get("tab");
+    const normalizedTab = tabParam === "language" ? "delivery" : tabParam;
     const validTabs = new Set(tabKeys);
-    if (tabParam && validTabs.has(tabParam as (typeof tabKeys)[number]) && tabParam !== activeTab) {
-      setActiveTab(tabParam as typeof activeTab);
+    if (normalizedTab && validTabs.has(normalizedTab as TabKey) && normalizedTab !== activeTab) {
+      setActiveTab(normalizedTab as TabKey);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -220,7 +281,7 @@ function HomeContent() {
       },
       domainInsights: {
         voiceProfile: ["Sample: energetic delivery."],
-        languageProfile: ["Sample: balanced explanation and takes."],
+        languageProfile: ["Sample: balanced delivery and takes."],
         narrativeProfile: ["Sample: clear setups and payoffs."],
         visualProfile: ["Sample: steady framing with motion accents."],
         editingProfile: ["Sample: cut-heavy pacing with polish."],
@@ -529,7 +590,7 @@ function HomeContent() {
                     <div className="flex flex-wrap gap-2">
                       <Chip label={`Voice: ${result.fingerprint.perDomain.voiceProfile.primaryArchetype}`} />
                       <Chip
-                        label={`Language: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
+                        label={`Delivery: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
                       />
                       <Chip
                         label={`Narrative: ${result.fingerprint.perDomain.narrativeProfile.primaryArchetype}`}
@@ -657,13 +718,20 @@ function HomeContent() {
                     insights={result.domainInsights?.voiceProfile}
                   />
                 )}
-                {activeTab === "language" && domainProfiles?.languageProfile && (
+                {activeTab === "delivery" && domainProfiles?.languageProfile && (
                   <DomainView
-                    name="Your Language"
+                    name="Your Delivery"
                     domain="language"
                     profile={domainProfiles.languageProfile}
                     visual={<DomainRadar profile={domainProfiles.languageProfile} />}
                     insights={result.domainInsights?.languageProfile}
+                    detailOverride={
+                      <DeliveryRelationalSection
+                        tone={deliveryTone}
+                        connection={deliveryConnection}
+                        axisDetails={result.fingerprint.supporting?.axisDetails}
+                      />
+                    }
                   />
                 )}
                 {activeTab === "narrative" && domainProfiles?.narrativeProfile && (

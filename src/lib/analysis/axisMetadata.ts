@@ -191,6 +191,42 @@ const languageAxes: AxisMetadata[] = [
     scaleDirection: "low=abstract, high=visual",
     aliases: ["visualizability"],
   },
+  {
+    id: "language.sentiment",
+    domain: "language",
+    label: "Sentiment / positivity",
+    shortDescription: "Overall positive vs negative affect in wording.",
+    howMeasured: "Lexical sentiment and valence across phrases.",
+    scaleDirection: "low=critical/dry, high=positive/warm",
+    aliases: ["positivity", "sentiment"],
+  },
+  {
+    id: "language.directive_density",
+    domain: "language",
+    label: "Directive density",
+    shortDescription: "How often the speaker gives instructions or imperatives.",
+    howMeasured: "Frequency of directive phrases vs open commentary.",
+    scaleDirection: "low=hands-off, high=instructional",
+    aliases: ["directive_density", "directiveness"],
+  },
+  {
+    id: "language.self_disclosure",
+    domain: "language",
+    label: "Self-disclosure",
+    shortDescription: "Personal anecdotes or emotional reveals.",
+    howMeasured: "Presence of first-person sharing and vulnerability cues.",
+    scaleDirection: "low=impersonal, high=personal",
+    aliases: ["self_disclosure", "disclosure"],
+  },
+  {
+    id: "language.sarcasm_irony",
+    domain: "language",
+    label: "Sarcasm / irony",
+    shortDescription: "Dry or ironic delivery that undercuts literal meaning.",
+    howMeasured: "Detections of sarcastic/ironic phrasing and tone markers.",
+    scaleDirection: "low=earnest, high=sarcastic",
+    aliases: ["sarcasm", "irony", "sarcasm_irony"],
+  },
 ];
 
 const narrativeAxes: AxisMetadata[] = [
