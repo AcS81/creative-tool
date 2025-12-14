@@ -238,4 +238,25 @@ describe("callGeminiMultimodalJson", () => {
 
     expect(result).toMatchObject({ ok: false, errorCode: "INVALID_RESPONSE" });
   });
+
+  it("surfaces block reason when Gemini omits candidates", async () => {
+    vi.stubGlobal(
+      "fetch",
+      mockFetch(200, {
+        promptFeedback: { blockReason: "SAFETY", safetyRatings: [{ category: "harassment", probability: "MEDIUM" }] },
+      }) as unknown as typeof fetch,
+    );
+
+    const result = await callGeminiMultimodalJson({
+      youtubeUrl: "https://youtu.be/abc",
+      prompt: "test",
+      config: baseConfig,
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      errorCode: "INVALID_RESPONSE",
+    });
+    expect((result as any).errorMessage).toContain("block reason");
+  });
 });

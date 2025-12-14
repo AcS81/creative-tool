@@ -134,6 +134,7 @@ const systemInstruction = [
   "You are a video analysis engine.",
   "You watch the attached YouTube video via file_data.",
   "Measure the requested metrics directly from audio + visuals.",
+  "Keep responses safe and non-graphic; summarize without quoting explicit content.",
   "If a metric cannot be observed, set value: \"unobserved\" and score: 0.",
   "Respond with strict JSON only.",
 ].join("\n");
@@ -151,6 +152,7 @@ const userPrompt = [
   "- Provide beats using seconds and include hook/setup/escalation/payoff/outro labels when present.",
   "- For narrative.devices, use types: contrast, foreshadow, callback, analogy, reversal, pattern_interrupt, stakes_change.",
   "- JSON only; no prose.",
+  "- If safety filters block content, return an empty object that matches the schema shape with \"unobserved\" values and score: 0 so the client can handle it.",
 ].join("\n");
 
 export const multimodalResponseJsonSchema = responseJsonSchema;

@@ -65,11 +65,38 @@ const buildPrompt = (videoUrl: string) =>
   ].join("\n");
 
 const extractTextCandidate = (payload: any): string | null => {
-  const text = payload?.candidates?.[0]?.content?.parts
-    ?.map((part: any) => part?.text || "")
-    .join("")
-    .trim();
-  return text && text.length > 0 ? text : null;
+  const candidates = Array.isArray(payload?.candidates) ? payload.candidates : [];
+  for (const candidate of candidates) {
+    const parts = Array.isArray(candidate?.content?.parts) ? candidate.content.parts : [];
+    const text = parts
+      .map((part: any) => (typeof part?.text === "string" ? part.text : ""))
+      .join("")
+      .trim();
+    if (text) return text;
+  }
+
+  const directText = typeof payload?.text === "string" ? payload.text.trim() : "";
+  return directText.length > 0 ? directText : null;
+};
+
+const describeBlockReason = (payload: any): string | null => {
+  const blockReason = payload?.promptFeedback?.blockReason || payload?.candidates?.[0]?.finishReason;
+  if (!blockReason) return null;
+  const safety =
+    payload?.promptFeedback?.safetyRatings || payload?.candidates?.[0]?.safetyRatings || [];
+  const categories = Array.isArray(safety)
+    ? safety
+        .map((rating: any) => {
+          const category = rating?.category;
+          const probability = rating?.probability;
+          if (!category || !probability) return null;
+          const shortCategory = String(category).split("/").pop() ?? category;
+          return `${shortCategory}:${probability}`;
+        })
+        .filter(Boolean)
+        .join(", ")
+    : "";
+  return categories ? `${blockReason} (${categories})` : blockReason;
 };
 
 export async function getTranscriptAndScenes(
@@ -126,7 +153,11 @@ export async function getTranscriptAndScenes(
 
   const candidateText = extractTextCandidate(payload);
   if (!candidateText) {
-    throw new GeminiApiError("InvalidResponse", "Gemini API response missing text candidate.");
+    const block = describeBlockReason(payload);
+    const message = block
+      ? `Gemini did not return content (block reason: ${block}).`
+      : "Gemini API response missing text candidate.";
+    throw new GeminiApiError("InvalidResponse", message, response.status, payload);
   }
 
   let parsed: unknown;
@@ -227,7 +258,13 @@ const isValidYoutubeUrl = (raw: string): boolean => {
 const parseCandidateJson = (payload: any): { ok: boolean; data?: unknown; errorMessage?: string } => {
   const candidateText = extractTextCandidate(payload);
   if (!candidateText) {
-    return { ok: false, errorMessage: "Gemini response missing text candidate." };
+    const block = describeBlockReason(payload);
+    return {
+      ok: false,
+      errorMessage: block
+        ? `Gemini did not return content (block reason: ${block}).`
+        : "Gemini response missing text candidate.",
+    };
   }
 
   try {
