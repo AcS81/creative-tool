@@ -13,6 +13,7 @@ import { DomainView } from "../components/DomainView";
 import { DomainRadar } from "../components/DomainRadar";
 import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
 import { DeliveryRelationalSection } from "../components/DeliveryRelationalSection";
+import { MiniArcBar } from "../components/MiniArcBar";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 import { PerformanceView } from "../components/PerformanceView";
 import { performanceCoaching } from "../lib/analysis/performanceCoaching";
@@ -482,6 +483,16 @@ function HomeContent() {
           </div>
         </form>
       </div>
+
+      {result && (
+        <div className="cs-card w-full p-6">
+          <MiniArcBar
+            beats={supporting?.beats}
+            durationSeconds={result.metadata?.durationSeconds}
+            transcriptSegments={supporting?.transcriptSegments}
+          />
+        </div>
+      )}
 
       {loading && (
         <div className="cs-card space-y-4 p-6">

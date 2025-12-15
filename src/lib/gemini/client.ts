@@ -507,6 +507,70 @@ const toFallbackFailed = (message: string): GeminiMultimodalResult => ({
 
 const describeError = (error: unknown) => (error instanceof Error ? error.message : "Unknown error");
 
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+const shouldRetryOutcome = (outcome: GeminiCallOutcome): boolean => {
+  if (outcome.ok) return false;
+  if (outcome.status && RETRYABLE_STATUSES.has(outcome.status)) return true;
+  const message = outcome.errorMessage?.toLowerCase() ?? "";
+  return message.includes("overloaded") || message.includes("unavailable") || message.includes("temporarily");
+};
+
+const shouldForceFallbackOnOverload = (outcome: GeminiCallOutcome): boolean => {
+  if (outcome.ok) return false;
+  if (outcome.shouldFallback) return true;
+  if (outcome.status && RETRYABLE_STATUSES.has(outcome.status)) return true;
+  const message = outcome.errorMessage?.toLowerCase() ?? "";
+  return message.includes("overloaded") || message.includes("unavailable") || message.includes("temporarily");
+};
+
+const waitWithBackoff = async (attempt: number, signal?: AbortSignal) => {
+  const base = 400;
+  const cap = 4000;
+  const delay = Math.min(base * 2 ** attempt, cap) + Math.floor(Math.random() * 150);
+  if (signal?.aborted) throw new Error("Aborted");
+  await new Promise((resolve) => setTimeout(resolve, delay));
+  if (signal?.aborted) throw new Error("Aborted");
+};
+
+const parsePositiveInt = (raw: string | undefined, fallback: number) => {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
+
+const MAX_CONCURRENT_GEMINI = parsePositiveInt(process.env.GEMINI_MAX_CONCURRENCY, 2);
+const geminiQueue: Array<() => void> = [];
+let geminiInFlight = 0;
+
+const acquireGeminiSlot = async () =>
+  new Promise<void>((resolve) => {
+    if (geminiInFlight < MAX_CONCURRENT_GEMINI) {
+      geminiInFlight += 1;
+      resolve();
+      return;
+    }
+    geminiQueue.push(() => {
+      geminiInFlight += 1;
+      resolve();
+    });
+  });
+
+const releaseGeminiSlot = () => {
+  geminiInFlight = Math.max(0, geminiInFlight - 1);
+  const next = geminiQueue.shift();
+  if (next) next();
+};
+
+const withGeminiSlot = async <T>(fn: () => Promise<T>): Promise<T> => {
+  await acquireGeminiSlot();
+  try {
+    return await fn();
+  } finally {
+    releaseGeminiSlot();
+  }
+};
+
 /**
  * Runs a single multimodal Gemini call using `file_data` for the YouTube URL.
  * Falls back once to a temporary inline upload if the primary path is rejected (403/unsupported).
@@ -542,6 +606,37 @@ export const callGeminiMultimodalJson = async (
     return toConfigMissing("GEMINI_API_KEY is not set.");
   }
 
+  const callWithRetries = async (
+    label: string,
+    fn: () => Promise<GeminiCallOutcome>,
+  ): Promise<GeminiCallOutcome> => {
+    const maxAttempts = 3;
+    let attempt = 0;
+    let lastOutcome: GeminiCallOutcome | undefined;
+
+    while (attempt < maxAttempts) {
+      lastOutcome = await fn();
+      if (!shouldRetryOutcome(lastOutcome)) {
+        return lastOutcome;
+      }
+
+      attempt += 1;
+      if (attempt >= maxAttempts) {
+        const errorMessage = lastOutcome.errorMessage
+          ? `${lastOutcome.errorMessage} (after ${maxAttempts} attempts)`
+          : `Gemini unavailable after ${maxAttempts} attempts`;
+        return { ...lastOutcome, errorMessage };
+      }
+
+      logger.warn(
+        `Gemini ${label} attempt ${attempt} failed (status ${lastOutcome.status ?? "unknown"}); retrying...`,
+      );
+      await waitWithBackoff(attempt, request.signal);
+    }
+
+    return lastOutcome as GeminiCallOutcome;
+  };
+
   const attemptFallback = async (): Promise<GeminiMultimodalResult> => {
     logger.warn("Using inline_data fallback path for Gemini multimodal call.");
 
@@ -554,14 +649,18 @@ export const callGeminiMultimodalJson = async (
     }
 
     try {
-      const fallbackOutcome = await callGeminiWithVideoPart({
-        apiKey,
-        videoPart: upload.part,
-        prompt: request.prompt,
-        jsonSchema: request.jsonSchema,
-        systemInstruction: request.systemInstruction,
-        signal: request.signal,
-      });
+      const fallbackOutcome = await callWithRetries("fallback inline_data", () =>
+        withGeminiSlot(() =>
+          callGeminiWithVideoPart({
+            apiKey,
+            videoPart: upload.part,
+            prompt: request.prompt,
+            jsonSchema: request.jsonSchema,
+            systemInstruction: request.systemInstruction,
+            signal: request.signal,
+          }),
+        ),
+      );
 
       if (fallbackOutcome.ok) {
         return {
@@ -590,19 +689,23 @@ export const callGeminiMultimodalJson = async (
     return attemptFallback();
   }
 
-  const primaryOutcome = await callGeminiWithVideoPart({
-    apiKey,
-    videoPart: {
-      file_data: {
-        mime_type: DEFAULT_VIDEO_MIME_TYPE,
-        file_uri: request.youtubeUrl,
-      },
-    },
-    prompt: request.prompt,
-    jsonSchema: request.jsonSchema,
-    systemInstruction: request.systemInstruction,
-    signal: request.signal,
-  });
+  const primaryOutcome = await callWithRetries("primary file_data", () =>
+    withGeminiSlot(() =>
+      callGeminiWithVideoPart({
+        apiKey,
+        videoPart: {
+          file_data: {
+            mime_type: DEFAULT_VIDEO_MIME_TYPE,
+            file_uri: request.youtubeUrl,
+          },
+        },
+        prompt: request.prompt,
+        jsonSchema: request.jsonSchema,
+        systemInstruction: request.systemInstruction,
+        signal: request.signal,
+      }),
+    ),
+  );
 
   if (primaryOutcome.ok) {
     return {
@@ -614,6 +717,13 @@ export const callGeminiMultimodalJson = async (
   }
 
   if (!primaryOutcome.shouldFallback) {
+    if (shouldForceFallbackOnOverload(primaryOutcome)) {
+      logger.warn(
+        `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
+      );
+      return attemptFallback();
+    }
+
     const message =
       primaryOutcome.errorMessage ||
       "Gemini returned an error before fallback could be attempted.";

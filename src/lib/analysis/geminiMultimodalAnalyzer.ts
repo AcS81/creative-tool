@@ -134,7 +134,6 @@ const systemInstruction = [
   "You are a video analysis engine.",
   "You watch the attached YouTube video via file_data.",
   "Measure the requested metrics directly from audio + visuals.",
-  "Keep responses safe and non-graphic; summarize without quoting explicit content.",
   "If a metric cannot be observed, set value: \"unobserved\" and score: 0.",
   "Respond with strict JSON only.",
 ].join("\n");
