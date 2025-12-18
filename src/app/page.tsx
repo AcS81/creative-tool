@@ -160,6 +160,24 @@ const deriveConnectionPlacement = (fingerprint?: VideoFingerprintJson | null) =>
 };
 
 function HomeContent() {
+  const howItWorksSteps = [
+    {
+      title: "Drop a link",
+      description: "Paste any public YouTube URL to start the scan.",
+      icon: "🔗",
+    },
+    {
+      title: "Run the fingerprint",
+      description: "We score voice, narrative, visuals, editing, and sound.",
+      icon: "📊",
+    },
+    {
+      title: "Get coaching",
+      description: "See archetype, nearest references, and improvement tips.",
+      icon: "🎯",
+    },
+  ];
+
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -209,6 +227,12 @@ function HomeContent() {
     const validTabs = new Set(tabKeys);
     if (normalizedTab && validTabs.has(normalizedTab as TabKey) && normalizedTab !== activeTab) {
       setActiveTab(normalizedTab as TabKey);
+    }
+    if (!normalizedTab && typeof window !== "undefined") {
+      const hash = window.location.hash.replace("#", "");
+      if (hash && validTabs.has(hash as TabKey) && hash !== activeTab) {
+        setActiveTab(hash as TabKey);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
@@ -274,7 +298,7 @@ function HomeContent() {
     setActiveTab(tab);
     const next = new URLSearchParams(searchParams.toString());
     next.set("tab", tab);
-    router.replace(`${pathname}?${next.toString()}`, { scroll: false });
+    router.replace(`${pathname}?${next.toString()}#${tab}`, { scroll: false });
   };
 
   const loadSample = () => {
@@ -453,88 +477,109 @@ function HomeContent() {
     <AppShell>
       <div className="flex w-full flex-col gap-8 py-2 sm:py-3">
         <section className="cs-card w-full p-8 sm:p-9 backdrop-blur">
-          <div className="flex flex-col gap-3">
-            <p className="cs-kicker">CreatorSight</p>
-            <h1 className="cs-heading leading-tight text-foreground">
-              Paste a YouTube URL to get a creative fingerprint.
-            </h1>
-            <p className="cs-body max-w-3xl text-muted">
-              We validate the link, run the configured analysis pipeline, and preview your archetype,
-              radar, and closest reference creators.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {youtubeStatusBadge}
-              {youtubeMessage ? (
-                <span
-                  className={`text-xs ${
-                    youtubeMessage.tone === "error"
-                      ? "text-red-600"
-                      : youtubeMessage.tone === "success"
-                        ? "text-emerald-700"
-                        : "text-muted"
-                  }`}
-                >
-                  {youtubeMessage.text}
+          <div className="grid gap-6 md:grid-cols-[1.4fr,1fr] md:items-center">
+            <div className="flex flex-col gap-4">
+              <div className="space-y-2">
+                <p className="cs-kicker">CreatorSight</p>
+                <h1 className="cs-heading leading-tight text-foreground">
+                  YouTube creative fingerprint with instant coaching.
+                </h1>
+                <p className="cs-body max-w-3xl text-muted">
+                  Paste a YouTube link to score voice, narrative, visuals, editing, and sound—then see the closest reference creators and actionable tips.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <a className="cs-button" href="#analysis">
+                  Analyze a video
+                </a>
+                <button type="button" className="cs-button-secondary" onClick={loadSample}>
+                  Try a sample
+                </button>
+                <span className="cs-badge bg-white/80 text-[11px] font-semibold text-accent-contrast">
+                  YouTube + amber UI
                 </span>
-              ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {youtubeStatusBadge}
+                {youtubeMessage ? (
+                  <span
+                    className={`text-xs ${
+                      youtubeMessage.tone === "error"
+                        ? "text-red-600"
+                        : youtubeMessage.tone === "success"
+                          ? "text-emerald-700"
+                          : "text-muted"
+                    }`}
+                  >
+                    {youtubeMessage.text}
+                  </span>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <form
-            id="analysis"
-            onSubmit={handleSubmit}
-            className="mt-8 grid gap-5 md:grid-cols-[1.6fr,1fr]"
-          >
-            <div className="cs-panel p-6 shadow-sm">
-              <label className="cs-label" htmlFor="url">
-                YouTube URL
-              </label>
-              <input
-                id="url"
-                type="url"
-                placeholder="https://www.youtube.com/watch?v=..."
-                className="cs-input mt-2"
-                value={url}
-                onChange={(e) => setUrl(e.target.value)}
-              />
-              {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-              <button type="submit" className="cs-button mt-4" disabled={loading}>
+            <form
+              id="analysis"
+              onSubmit={handleSubmit}
+              className="grid gap-4 rounded-2xl border border-border bg-white/80 p-5 shadow-sm backdrop-blur md:p-6"
+            >
+              <div>
+                <label className="cs-label" htmlFor="url">
+                  YouTube URL
+                </label>
+                <input
+                  id="url"
+                  type="url"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="cs-input mt-2"
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                />
+                {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+              </div>
+              <button type="submit" className="cs-button justify-center" disabled={loading}>
                 {loading ? "Analyzing..." : "Analyze video"}
               </button>
+              <div className="flex items-start gap-3 rounded-md border border-border bg-surface-strong/70 p-3 text-xs text-muted">
+                <span className="text-lg">💡</span>
+                <div>
+                  <p className="font-semibold text-foreground">What to expect</p>
+                  <p>Validate URL, run mock or Gemini pipeline, then show archetype, radar, and domain tabs.</p>
+                  <a
+                    className={`cs-link mt-2 inline-flex items-center text-xs font-semibold ${
+                      performanceReady ? "text-accent hover:underline" : "text-muted"
+                    }`}
+                    href="/api/auth/youtube/start"
+                  >
+                    {youtubeCtaLabel}
+                  </a>
+                  <p className="text-[11px] text-muted">
+                    {performanceReady
+                      ? youtubeConnected
+                        ? "Analyze owned videos to surface retention and CTR."
+                        : "Connect YouTube to unlock performance data."
+                      : "Performance mode is disabled in this environment."}
+                  </p>
+                </div>
+              </div>
+            </form>
+          </div>
+        </section>
+
+        <section className="grid gap-3 rounded-2xl border border-border bg-surface p-5 shadow-sm md:grid-cols-3 md:gap-4">
+          {howItWorksSteps.map((step) => (
+            <div
+              key={step.title}
+              className="flex gap-3 rounded-xl border border-border bg-surface-strong/70 p-4 shadow-sm"
+            >
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-accent to-accent-amber text-lg">
+                {step.icon}
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-semibold text-foreground">{step.title}</p>
+                <p className="text-xs text-muted">{step.description}</p>
+              </div>
             </div>
-            <div className="cs-panel p-6 shadow-sm">
-              <p className="text-sm font-semibold text-muted">What to expect</p>
-              <ul className="mt-3 space-y-2 text-sm text-foreground/80">
-                <li>✅ Validate YouTube URL client-side</li>
-                <li>✅ Call mock or Gemini pipeline</li>
-                <li>✅ Show archetype + nearest neighbours</li>
-                <li>✅ Radar, unusual insights, domain tabs</li>
-                <li>🔒 Connect YouTube to enable performance data (Iteration 4)</li>
-              </ul>
-              <button
-                type="button"
-                className="cs-button mt-4 w-full justify-center"
-                onClick={loadSample}
-              >
-                Try a sample analysis
-              </button>
-              <a
-                className={`cs-link mt-3 inline-flex items-center text-sm font-semibold ${
-                  performanceReady ? "text-accent hover:underline" : "text-muted"
-                }`}
-                href="/api/auth/youtube/start"
-              >
-                {youtubeCtaLabel}
-              </a>
-              <p className="text-xs text-muted">
-                {performanceReady
-                  ? youtubeConnected
-                    ? "Connected. Analyze owned videos to see analytics in Performance."
-                    : "Connect to unlock retention and CTR metrics for videos you own."
-                  : "Performance mode is disabled in this environment."}
-              </p>
-            </div>
-          </form>
+          ))}
         </section>
 
       {result && (
