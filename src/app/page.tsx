@@ -451,91 +451,91 @@ function HomeContent() {
 
   return (
     <AppShell>
-      <div className="mx-auto flex min-h-screen max-w-6xl flex-col gap-8 py-4 lg:py-6">
-      <div className="cs-card w-full p-10 backdrop-blur">
-        <div className="flex flex-col gap-3">
-          <p className="cs-kicker">CreatorSight</p>
-          <h1 className="cs-heading leading-tight text-foreground">
-            Paste a YouTube URL to get a creative fingerprint.
-          </h1>
-          <p className="cs-body max-w-3xl text-muted">
-            We validate the link, run the configured analysis pipeline, and preview your archetype,
-            radar, and closest reference creators.
-          </p>
-          <div className="flex flex-wrap items-center gap-2">
-            {youtubeStatusBadge}
-            {youtubeMessage ? (
-              <span
-                className={`text-xs ${
-                  youtubeMessage.tone === "error"
-                    ? "text-red-600"
-                    : youtubeMessage.tone === "success"
-                      ? "text-emerald-700"
-                      : "text-muted"
-                }`}
-              >
-                {youtubeMessage.text}
-              </span>
-            ) : null}
-          </div>
-        </div>
-
-        <form
-          id="analysis"
-          onSubmit={handleSubmit}
-          className="mt-8 grid gap-4 md:grid-cols-[2fr,1fr]"
-        >
-          <div className="cs-panel p-6 shadow-sm">
-            <label className="cs-label" htmlFor="url">
-              YouTube URL
-            </label>
-            <input
-              id="url"
-              type="url"
-              placeholder="https://www.youtube.com/watch?v=..."
-              className="cs-input mt-2"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-            />
-            {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
-            <button type="submit" className="cs-button mt-4" disabled={loading}>
-              {loading ? "Analyzing..." : "Analyze video"}
-            </button>
-          </div>
-          <div className="cs-panel p-6 shadow-sm">
-            <p className="text-sm font-semibold text-muted">What to expect</p>
-            <ul className="mt-3 space-y-2 text-sm text-foreground/80">
-              <li>✅ Validate YouTube URL client-side</li>
-              <li>✅ Call mock or Gemini pipeline</li>
-              <li>✅ Show archetype + nearest neighbours</li>
-              <li>✅ Radar, unusual insights, domain tabs</li>
-              <li>🔒 Connect YouTube to enable performance data (Iteration 4)</li>
-            </ul>
-            <button
-              type="button"
-              className="cs-button mt-4 w-full justify-center"
-              onClick={loadSample}
-            >
-              Try a sample analysis
-            </button>
-            <a
-              className={`cs-link mt-3 inline-flex items-center text-sm font-semibold ${
-                performanceReady ? "text-accent hover:underline" : "text-muted"
-              }`}
-              href="/api/auth/youtube/start"
-            >
-              {youtubeCtaLabel}
-            </a>
-            <p className="text-xs text-muted">
-              {performanceReady
-                ? youtubeConnected
-                  ? "Connected. Analyze owned videos to see analytics in Performance."
-                  : "Connect to unlock retention and CTR metrics for videos you own."
-                : "Performance mode is disabled in this environment."}
+      <div className="flex w-full flex-col gap-8 py-2 sm:py-3">
+        <section className="cs-card w-full p-8 sm:p-9 backdrop-blur">
+          <div className="flex flex-col gap-3">
+            <p className="cs-kicker">CreatorSight</p>
+            <h1 className="cs-heading leading-tight text-foreground">
+              Paste a YouTube URL to get a creative fingerprint.
+            </h1>
+            <p className="cs-body max-w-3xl text-muted">
+              We validate the link, run the configured analysis pipeline, and preview your archetype,
+              radar, and closest reference creators.
             </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {youtubeStatusBadge}
+              {youtubeMessage ? (
+                <span
+                  className={`text-xs ${
+                    youtubeMessage.tone === "error"
+                      ? "text-red-600"
+                      : youtubeMessage.tone === "success"
+                        ? "text-emerald-700"
+                        : "text-muted"
+                  }`}
+                >
+                  {youtubeMessage.text}
+                </span>
+              ) : null}
+            </div>
           </div>
-        </form>
-      </div>
+
+          <form
+            id="analysis"
+            onSubmit={handleSubmit}
+            className="mt-8 grid gap-5 md:grid-cols-[1.6fr,1fr]"
+          >
+            <div className="cs-panel p-6 shadow-sm">
+              <label className="cs-label" htmlFor="url">
+                YouTube URL
+              </label>
+              <input
+                id="url"
+                type="url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="cs-input mt-2"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+              />
+              {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+              <button type="submit" className="cs-button mt-4" disabled={loading}>
+                {loading ? "Analyzing..." : "Analyze video"}
+              </button>
+            </div>
+            <div className="cs-panel p-6 shadow-sm">
+              <p className="text-sm font-semibold text-muted">What to expect</p>
+              <ul className="mt-3 space-y-2 text-sm text-foreground/80">
+                <li>✅ Validate YouTube URL client-side</li>
+                <li>✅ Call mock or Gemini pipeline</li>
+                <li>✅ Show archetype + nearest neighbours</li>
+                <li>✅ Radar, unusual insights, domain tabs</li>
+                <li>🔒 Connect YouTube to enable performance data (Iteration 4)</li>
+              </ul>
+              <button
+                type="button"
+                className="cs-button mt-4 w-full justify-center"
+                onClick={loadSample}
+              >
+                Try a sample analysis
+              </button>
+              <a
+                className={`cs-link mt-3 inline-flex items-center text-sm font-semibold ${
+                  performanceReady ? "text-accent hover:underline" : "text-muted"
+                }`}
+                href="/api/auth/youtube/start"
+              >
+                {youtubeCtaLabel}
+              </a>
+              <p className="text-xs text-muted">
+                {performanceReady
+                  ? youtubeConnected
+                    ? "Connected. Analyze owned videos to see analytics in Performance."
+                    : "Connect to unlock retention and CTR metrics for videos you own."
+                  : "Performance mode is disabled in this environment."}
+              </p>
+            </div>
+          </form>
+        </section>
 
       {result && (
         <div className="cs-card w-full p-6">

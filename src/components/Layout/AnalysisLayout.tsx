@@ -41,7 +41,7 @@ export function AnalysisLayout({
               onClick={() => onTabChange(tab.key)}
               className={`cs-pill text-sm font-semibold transition ${
                 isActive
-                  ? "border-transparent bg-accent text-white shadow-sm"
+                  ? "border-transparent bg-gradient-to-r from-accent to-accent-amber text-white shadow-sm"
                   : "hover:border-accent/70 hover:text-foreground"
               }`}
               type="button"
