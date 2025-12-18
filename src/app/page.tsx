@@ -18,6 +18,7 @@ import { AlignmentLoadSection } from "../components/AlignmentLoadSection";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 import { PerformanceView } from "../components/PerformanceView";
 import { performanceCoaching } from "../lib/analysis/performanceCoaching";
+import { LanguageTimingMiniChart, VoicePaceMiniChart } from "../components/VoiceLanguageMiniCharts";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -827,7 +828,12 @@ function HomeContent() {
                     profile={domainProfiles.voiceProfile}
                     visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
                     insights={result.domainInsights?.voiceProfile}
-                    extra={voiceCallout}
+                    extra={
+                      <div className={`grid gap-3 ${voiceCallout ? "md:grid-cols-2" : ""}`}>
+                        <VoicePaceMiniChart prosodyArc={result.fingerprint.prosodyArc} />
+                        {voiceCallout}
+                      </div>
+                    }
                   />
                 )}
                 {activeTab === "delivery" && domainProfiles?.languageProfile && (
@@ -838,11 +844,14 @@ function HomeContent() {
                     visual={<DomainRadar profile={domainProfiles.languageProfile} />}
                     insights={result.domainInsights?.languageProfile}
                     detailOverride={
-                      <DeliveryRelationalSection
-                        tone={deliveryTone}
-                        connection={deliveryConnection}
-                        axisDetails={result.fingerprint.supporting?.axisDetails}
-                      />
+                      <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
+                        <DeliveryRelationalSection
+                          tone={deliveryTone}
+                          connection={deliveryConnection}
+                          axisDetails={result.fingerprint.supporting?.axisDetails}
+                        />
+                        <LanguageTimingMiniChart languageTexture={result.fingerprint.languageTexture} />
+                      </div>
                     }
                   />
                 )}
@@ -859,6 +868,13 @@ function HomeContent() {
                         <DomainTimeline
                           beats={supporting?.beats}
                           transcriptSegments={supporting?.transcriptSegments}
+                          silenceSpans={result.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.spans?.map(
+                            (span) => ({
+                              startSeconds: span.startSeconds,
+                              endSeconds: span.endSeconds,
+                              label: span.label ?? (span.alignedBeat ? `Silence near ${span.alignedBeat}` : undefined),
+                            }),
+                          )}
                         />
                       </div>
                     }
@@ -871,7 +887,21 @@ function HomeContent() {
                     profile={domainProfiles.visualProfile}
                     visual={<DomainRadar profile={domainProfiles.visualProfile} />}
                     insights={result.domainInsights?.visualProfile}
-                    extra={visualCallout}
+                    extra={
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <DomainTimeline
+                          beats={supporting?.sceneSegments}
+                          silenceSpans={result.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.spans?.map(
+                            (span) => ({
+                              startSeconds: span.startSeconds,
+                              endSeconds: span.endSeconds,
+                              label: span.label ?? (span.alignedBeat ? `Silence near ${span.alignedBeat}` : undefined),
+                            }),
+                          )}
+                        />
+                        {visualCallout}
+                      </div>
+                    }
                   />
                 )}
                 {activeTab === "editing" && domainProfiles?.editingProfile && (
@@ -884,7 +914,16 @@ function HomeContent() {
                     extra={
                       <div className="grid gap-3 md:grid-cols-2">
                         {visualCallout}
-                        <DomainTimeline beats={supporting?.sceneSegments} />
+                        <DomainTimeline
+                          beats={supporting?.sceneSegments}
+                          silenceSpans={result.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.spans?.map(
+                            (span) => ({
+                              startSeconds: span.startSeconds,
+                              endSeconds: span.endSeconds,
+                              label: span.label ?? (span.alignedBeat ? `Silence near ${span.alignedBeat}` : undefined),
+                            }),
+                          )}
+                        />
                       </div>
                     }
                   />

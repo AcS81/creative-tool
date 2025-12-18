@@ -1,4 +1,4 @@
-import { Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { PerformanceProfile } from "../lib/types";
 
 type Props = {
@@ -38,17 +38,25 @@ export function PerformanceView({
       : "Connect YouTube via OAuth to pull retention, CTR, and engagement for owned videos.";
 
     return (
-      <div className="space-y-3 rounded-md border border-border bg-surface p-6 text-sm">
-        <p className="font-semibold text-foreground">Performance data unavailable</p>
-        <p className="text-muted">{fallbackText}</p>
-        {!youtubeConnected && (
-          <a
-            href="/api/auth/youtube/start"
-            className="cs-button inline-flex w-fit justify-center text-xs"
-          >
-            Connect YouTube
-          </a>
-        )}
+      <div className="cs-card space-y-3 p-6 text-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="cs-kicker text-[10px]">Performance</p>
+            <p className="text-base font-semibold text-foreground">No performance data yet</p>
+            <p className="text-muted">{fallbackText}</p>
+          </div>
+          <span className="cs-badge text-[12px]">
+            {youtubeConnected ? "YouTube connected" : "YouTube not connected"}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {!youtubeConnected ? (
+            <a href="/api/auth/youtube/start" className="cs-button inline-flex w-fit justify-center text-xs">
+              Connect YouTube
+            </a>
+          ) : null}
+          <span className="cs-pill text-[12px]">Retention • CTR • Engagement</span>
+        </div>
       </div>
     );
   }
@@ -70,7 +78,7 @@ export function PerformanceView({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-white/90 p-5 shadow-sm">
         <div>
           <p className="cs-kicker text-[10px]">Performance summary</p>
           <p className="text-base text-foreground">{performanceProfile.summaryText}</p>
@@ -86,8 +94,11 @@ export function PerformanceView({
       </div>
 
       {performanceInsights.length > 0 && (
-        <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
-          <p className="text-sm font-semibold text-muted">Performance coaching</p>
+        <div className="rounded-lg border border-border bg-white/90 p-4 shadow-sm">
+          <div className="flex items-start justify-between">
+            <p className="text-sm font-semibold text-muted">Performance coaching</p>
+            <span className="cs-pill bg-surface-strong/80 text-[11px] font-semibold">Auto-generated</span>
+          </div>
           <ul className="mt-2 list-disc space-y-1 pl-4 text-sm text-foreground/85">
             {performanceInsights.map((insight, idx) => (
               <li key={idx}>{insight}</li>
@@ -96,7 +107,7 @@ export function PerformanceView({
         </div>
       )}
 
-      <div className="rounded-md border border-border bg-surface p-4 shadow-sm">
+      <div className="rounded-lg border border-border bg-white/90 p-4 shadow-sm">
         <div className="mb-2 flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-muted">Retention over time</p>
@@ -114,6 +125,12 @@ export function PerformanceView({
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={series}>
+                <defs>
+                  <linearGradient id="retentionGradient" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="#ff2f45" stopOpacity={0.34} />
+                    <stop offset="100%" stopColor="#f6c344" stopOpacity={0.08} />
+                  </linearGradient>
+                </defs>
                 <XAxis
                   dataKey="timeRatio"
                   tickFormatter={(v) => `${Math.round(Number(v) * 100)}%`}
@@ -137,11 +154,19 @@ export function PerformanceView({
                   }}
                   labelFormatter={(label) => `${Math.round(Number(label) * 100)}% of video`}
                 />
+                <Area
+                  type="monotone"
+                  dataKey="audienceRetention"
+                  stroke="none"
+                  fill="url(#retentionGradient)"
+                  fillOpacity={0.6}
+                  isAnimationActive={false}
+                />
                 <Line
                   type="monotone"
                   dataKey="audienceRetention"
-                  stroke="#6366f1"
-                  strokeWidth={2}
+                  stroke="#ff2f45"
+                  strokeWidth={2.2}
                   dot={false}
                   isAnimationActive={false}
                 />

@@ -107,6 +107,8 @@ export function MiniArcBar({ beats, durationSeconds, transcriptSegments }: Props
       toColor: next.color,
       leftPct,
       widthPct,
+      centerSeconds,
+      gapSeconds,
     };
   });
 
@@ -142,6 +144,7 @@ export function MiniArcBar({ beats, durationSeconds, transcriptSegments }: Props
                 width: `${transition.widthPct}%`,
                 backgroundImage: `linear-gradient(90deg, ${transition.fromColor}, ${transition.toColor})`,
               }}
+              title={`Transition ~${formatSeconds(transition.gapSeconds)} gap`}
             />
           ))}
         </div>

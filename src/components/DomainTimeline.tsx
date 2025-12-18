@@ -11,9 +11,11 @@ type Beat = {
 export function DomainTimeline({
   beats,
   transcriptSegments,
+  silenceSpans,
 }: {
   beats?: Beat[];
   transcriptSegments?: TranscriptSegment[];
+  silenceSpans?: { startSeconds: number; endSeconds: number; label?: string }[];
 }) {
   if (!beats?.length && !transcriptSegments?.length) {
     return null;
@@ -57,20 +59,35 @@ export function DomainTimeline({
           const endPct = Math.max(0, Math.min(100, (item.endSeconds / maxTime) * 100));
           const width = Math.max(4, endPct - startPct);
           return (
-            <div key={`${item.label}-${idx}`} className="flex items-center gap-2 text-xs text-muted">
-              <span className="w-14 text-right text-[11px] tabular-nums">
-                {Math.round(item.startSeconds)}s
-              </span>
-              <div className="relative h-2 w-full rounded bg-slate-200">
-                <div
-                  className={`absolute left-0 top-0 h-2 rounded ${roleColor(item.label, item.role)}`}
-                  // Prefer normalized role for color and label if present.
-                  style={{ marginLeft: `${startPct}%`, width: `${width}%` }}
-                />
+            <div key={`${item.label}-${idx}`} className="flex flex-col gap-1 text-xs text-muted">
+              <div className="flex items-center gap-2">
+                <span className="w-14 text-right text-[11px] tabular-nums">
+                  {Math.round(item.startSeconds)}s
+                </span>
+                <div className="relative h-2 w-full rounded bg-slate-200">
+                  <div
+                    className={`absolute left-0 top-0 h-2 rounded ${roleColor(item.label, item.role)}`}
+                    // Prefer normalized role for color and label if present.
+                    style={{ marginLeft: `${startPct}%`, width: `${width}%` }}
+                  />
+                  {silenceSpans?.map((span, spanIdx) => {
+                    const spanStart = Math.max(0, Math.min(100, (span.startSeconds / maxTime) * 100));
+                    const spanEnd = Math.max(0, Math.min(100, (span.endSeconds / maxTime) * 100));
+                    const spanWidth = Math.max(1, spanEnd - spanStart);
+                    return (
+                      <div
+                        key={`silence-${spanIdx}`}
+                        className="absolute top-[-2px] h-[12px] rounded bg-amber-400/60"
+                        style={{ left: `${spanStart}%`, width: `${spanWidth}%` }}
+                        title={span.label ?? "Silence for emphasis"}
+                      />
+                    );
+                  })}
+                </div>
+                <span className="w-10 text-left text-[11px] tabular-nums">
+                  {Math.round(item.endSeconds)}s
+                </span>
               </div>
-              <span className="w-10 text-left text-[11px] tabular-nums">
-                {Math.round(item.endSeconds)}s
-              </span>
               <div className="flex flex-1 items-center gap-2">
                 <span className="line-clamp-1 w-32 text-foreground">{item.role ?? item.label}</span>
                 {item.devices?.slice(0, 3).map((device) => (
