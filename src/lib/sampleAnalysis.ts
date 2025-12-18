@@ -1,11 +1,12 @@
 import type { VideoFingerprintJson } from "./types";
 import type { AnalyzeVideoResult } from "./analysis/types";
 import { buildDefaultAdvancedMetrics } from "./analysis/fingerprint/defaults";
+import { buildMockAdvancedMetrics, hashStringToNumber } from "./analysis/fingerprint/mockAdvancedMetrics";
 
 const sampleFingerprint: VideoFingerprintJson = {
   version: "1.3.0",
   createdAt: new Date().toISOString(),
-  ...buildDefaultAdvancedMetrics(),
+  ...buildMockAdvancedMetrics(hashStringToNumber("sample-analysis")),
   metaAxes: {
     voiceIntensity: 72,
     conceptualDepth: 68,

@@ -580,8 +580,7 @@ export const callGeminiMultimodalJson = async (
 ): Promise<GeminiMultimodalResult> => {
   const config = request.config ?? getAppConfig();
   const logger = request.logger ?? console;
-  // The product only wants Gemini to ingest by URL; fallback uploads are now dev-only.
-  const fallbackEnabled = request.forceFallback === true;
+  const forceFallbackRequested = request.forceFallback === true;
 
   if (!request.forceEnable && !isMultimodalClientEnabled(config)) {
     return {
@@ -687,7 +686,7 @@ export const callGeminiMultimodalJson = async (
     }
   };
 
-  if (fallbackEnabled && request.forceFallback) {
+  if (forceFallbackRequested) {
     return attemptFallback();
   }
 
@@ -722,7 +721,7 @@ export const callGeminiMultimodalJson = async (
     primaryOutcome.errorMessage ||
     "Gemini returned an error before fallback could be attempted.";
 
-  if (fallbackEnabled && (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome))) {
+  if (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome) || forceFallbackRequested) {
     logger.warn(
       `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
     );

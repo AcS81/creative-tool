@@ -22,6 +22,8 @@ export interface AnalyzeVideoResult {
     unobservedCounts?: Record<string, number>;
     analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
     analysisErrorMessage?: string;
+    advancedMetricsDefaulted?: boolean;
+    advancedMetricsObserved?: boolean;
   };
 }
 

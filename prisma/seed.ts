@@ -1,6 +1,8 @@
 import { PrismaClient } from "@prisma/client";
 import { validateFingerprint } from "../src/lib/schemas/fingerprint";
 import { buildVideoFingerprint } from "../src/lib/analysis/fingerprint/videoFingerprint";
+import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
+import { buildMockAdvancedMetrics, hashStringToNumber } from "../src/lib/analysis/fingerprint/mockAdvancedMetrics";
 import { getAxesForDomain, resolveAxisMetadata } from "../src/lib/analysis/axisMetadata";
 
 const prisma = new PrismaClient();
@@ -225,6 +227,7 @@ const makeFingerprint = (seed: SeedCreator) => {
     metaAxes: seed.metaAxes,
     overallArchetype: seed.displayName,
     version: "1.3.0",
+    advancedMetrics: buildMockAdvancedMetrics(hashStringToNumber(seed.youtubeVideoId)),
   });
 
   return validateFingerprint(fingerprint);

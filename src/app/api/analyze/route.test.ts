@@ -158,6 +158,8 @@ describe("POST /api/analyze", () => {
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();
     expect((json.fingerprint as VideoFingerprintJson).metaAxes.voiceIntensity).toBeGreaterThanOrEqual(0);
+    expect((json.fingerprint as VideoFingerprintJson).cognitiveLoad.loadPerSecond.timeline?.length).toBeGreaterThan(0);
+    expect((json.fingerprint as VideoFingerprintJson).secondOrder.alignmentScore.score).toBeGreaterThanOrEqual(0);
     expect(json.metadata?.title).toBe("Sample Test Video");
     expect(json.metadata?.durationSeconds).toBe(120);
     expect(json.metadata?.thumbnailUrl).toBe("http://thumb");

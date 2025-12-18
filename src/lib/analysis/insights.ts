@@ -71,6 +71,33 @@ const isAxisObserved = (axis: keyof MetaAxes, fingerprint?: VideoFingerprintJson
   return hasNonZero || hasObservedDetail;
 };
 
+const advancedInsights = (fingerprint?: VideoFingerprintJson): string[] => {
+  if (!fingerprint) return [];
+  const bullets: string[] = [];
+
+  const loadHighlights = fingerprint.cognitiveLoad?.loadHighlights;
+  const topLoadSpan =
+    loadHighlights?.spans && loadHighlights.spans.length > 0
+      ? [...loadHighlights.spans].sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0]
+      : null;
+  if (topLoadSpan && (topLoadSpan.value ?? 0) > 60) {
+    const when = Math.round(topLoadSpan.startSeconds ?? 0);
+    const label = topLoadSpan.label ? ` (${topLoadSpan.label})` : "";
+    bullets.push(`Cognitive load spikes around ${when}s${label}; consider easing pacing there.`);
+  }
+
+  const alignmentScore = fingerprint.secondOrder?.alignmentScore?.score;
+  if (typeof alignmentScore === "number") {
+    if (alignmentScore < 35) {
+      bullets.push("Low cross-modal alignment: emphasis, edits, and beats often miss each other.");
+    } else if (alignmentScore > 70) {
+      bullets.push("Strong cross-modal alignment: audio, visuals, and beats reinforce each other.");
+    }
+  }
+
+  return bullets;
+};
+
 export function generateInsights(
   userMeta: MetaAxes,
   references: MetaAxes[],
@@ -117,7 +144,8 @@ export function generateInsights(
     .slice(0, 3)
     .map((i) => i.text);
 
-  const bullets = [...unusualnessInsights, ...strengthInsights, ...growthInsights].slice(0, 6);
+  const advanced = advancedInsights(options.fingerprint);
+  const bullets = [...advanced, ...unusualnessInsights, ...strengthInsights, ...growthInsights].slice(0, 8);
 
   return {
     unusualnessInsights,

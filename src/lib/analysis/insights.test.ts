@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateInsights } from "./insights";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
+import { buildMockAdvancedMetrics } from "./fingerprint/mockAdvancedMetrics";
 import type { VideoFingerprintJson } from "../types";
 
 const sampleMeta = {
@@ -43,7 +44,7 @@ describe("generateInsights", () => {
   it("produces ranked insights with readable text", () => {
     const result = generateInsights(sampleMeta, refs, { fingerprint: sampleFingerprint });
     expect(result.bullets.length).toBeGreaterThan(0);
-    expect(result.bullets[0]).toMatch(/reference videos/);
+    expect(result.bullets.some((b) => /reference videos/i.test(b) || /alignment/i.test(b))).toBe(true);
     expect(result.strengthInsights.length).toBeGreaterThan(0);
   });
 
@@ -59,5 +60,27 @@ describe("generateInsights", () => {
     };
     const result = generateInsights(sparseFingerprint.metaAxes, refs, { fingerprint: sparseFingerprint });
     expect(result.bullets.some((b) => b.toLowerCase().includes("visual"))).toBe(false);
+  });
+
+  it("includes advanced alignment/load bullets when present", () => {
+    const mockMetrics = buildMockAdvancedMetrics(42);
+    const enriched = {
+      ...sampleFingerprint,
+      ...mockMetrics,
+      cognitiveLoad: {
+        ...mockMetrics.cognitiveLoad,
+        loadHighlights: {
+          ...mockMetrics.cognitiveLoad.loadHighlights,
+          spans: [{ startSeconds: 10, endSeconds: 12, value: 85, label: "dense moment" }],
+        },
+      },
+      secondOrder: {
+        ...mockMetrics.secondOrder,
+        alignmentScore: { ...mockMetrics.secondOrder.alignmentScore, score: 20 },
+      },
+    };
+    const result = generateInsights(sampleMeta, refs, { fingerprint: enriched });
+    expect(result.bullets.some((b) => b.toLowerCase().includes("alignment"))).toBe(true);
+    expect(result.bullets.some((b) => b.toLowerCase().includes("cognitive load"))).toBe(true);
   });
 });

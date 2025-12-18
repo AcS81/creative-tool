@@ -4,16 +4,9 @@ import type { DomainScore, DomainProfile, VideoFingerprintJson } from "../types"
 import type { DomainKey } from "../archetypes/descriptions";
 import { getAxesForDomain } from "./axisMetadata";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
+import { buildMockAdvancedMetrics, hashStringToNumber } from "./fingerprint/mockAdvancedMetrics";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
-
-const hashStringToNumber = (input: string) => {
-  let hash = 0;
-  for (let i = 0; i < input.length; i += 1) {
-    hash = (hash * 31 + input.charCodeAt(i)) >>> 0;
-  }
-  return hash;
-};
 
 const deriveScore = (seed: number, salt: number) =>
   clamp(((seed + salt * 9973) % 101) + (salt % 7) - 3);
@@ -50,6 +43,7 @@ const archetypeForMeta = (meta: VideoFingerprintJson["metaAxes"]) => {
 
 export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   const seed = hashStringToNumber(input.videoId);
+  const advancedMetrics = buildMockAdvancedMetrics(seed);
 
   const fingerprint: VideoFingerprintJson = {
     version: "1.3.0",
@@ -83,6 +77,7 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
         { startSeconds: 5, endSeconds: 25, label: "Hook", devices: ["contrast"] },
       ],
     },
+    ...advancedMetrics,
   };
 
   const overallArchetype = archetypeForMeta(fingerprint.metaAxes);
@@ -100,6 +95,8 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
       analysisPath: "mock",
       analysisVersion: "v2",
       multimodalFallbackUsed: false,
+      advancedMetricsDefaulted: false,
+      advancedMetricsObserved: true,
     },
   };
 }
