@@ -309,7 +309,6 @@ function HomeContent() {
       videoAnalysisId: "sample-analysis",
       fingerprint: {
         ...sampleAnalysisResult.fingerprint,
-        hasPerformanceData: false,
       } as VideoFingerprintJson,
       overallArchetype: sampleAnalysisResult.overallArchetype,
       nearestReferences: [],
@@ -474,6 +473,44 @@ function HomeContent() {
       />
     ) : null;
 
+  const diagnostics = result?.diagnostics;
+  const showDiagnostics =
+    diagnostics &&
+    (diagnostics.source !== "mock" ||
+      diagnostics.multimodalFallbackUsed ||
+      diagnostics.advancedMetricsDefaulted ||
+      diagnostics.lowerConfidence ||
+      diagnostics.advancedMetricsObserved === false);
+  const diagnosticChips = showDiagnostics
+    ? [
+        diagnostics?.source ? { label: `Source: ${diagnostics.source}`, tone: "muted" as const } : null,
+        diagnostics?.advancedMetricsObserved === false
+          ? { label: "Advanced metrics missing", tone: "warn" as const }
+          : diagnostics?.advancedMetricsObserved === true
+            ? { label: "Advanced metrics observed", tone: "success" as const }
+            : null,
+        diagnostics?.advancedMetricsDefaulted
+          ? {
+              label: diagnostics.advancedMetricsDefaultReason
+                ? `Defaulted: ${diagnostics.advancedMetricsDefaultReason}`
+                : "Defaulted metrics",
+              tone: "warn" as const,
+            }
+          : null,
+        diagnostics?.multimodalFallbackUsed
+          ? { label: "Fallback ingest used", tone: "warn" as const }
+          : null,
+        diagnostics?.lowerConfidence
+          ? {
+              label: diagnostics.lowerConfidenceReason
+                ? `Lower confidence: ${diagnostics.lowerConfidenceReason}`
+                : "Lower confidence",
+              tone: "alert" as const,
+            }
+          : null,
+      ].filter(Boolean)
+    : [];
+
   return (
     <AppShell>
       <div className="flex w-full flex-col gap-8 py-2 sm:py-3">
@@ -500,23 +537,25 @@ function HomeContent() {
                   YouTube + amber UI
                 </span>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {youtubeStatusBadge}
-                {youtubeMessage ? (
-                  <span
-                    className={`text-xs ${
-                      youtubeMessage.tone === "error"
-                        ? "text-red-600"
-                        : youtubeMessage.tone === "success"
-                          ? "text-emerald-700"
-                          : "text-muted"
-                    }`}
-                  >
-                    {youtubeMessage.text}
-                  </span>
-                ) : null}
-              </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {youtubeStatusBadge}
+              {youtubeMessage ? (
+                <span
+                  role="status"
+                  aria-live="polite"
+                  className={`text-xs ${
+                    youtubeMessage.tone === "error"
+                      ? "text-red-600"
+                      : youtubeMessage.tone === "success"
+                        ? "text-emerald-700"
+                        : "text-muted"
+                  }`}
+                >
+                  {youtubeMessage.text}
+                </span>
+              ) : null}
             </div>
+          </div>
 
             <form
               id="analysis"
@@ -535,7 +574,11 @@ function HomeContent() {
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                 />
-                {error ? <p className="mt-2 text-sm text-red-600">{error}</p> : null}
+                {error ? (
+                  <p className="mt-2 text-sm text-red-600" role="alert" aria-live="assertive">
+                    {error}
+                  </p>
+                ) : null}
               </div>
               <button type="submit" className="cs-button justify-center" disabled={loading}>
                 {loading ? "Analyzing..." : "Analyze video"}
@@ -594,7 +637,7 @@ function HomeContent() {
       )}
 
       {loading && (
-        <div className="cs-card space-y-4 p-6">
+        <div className="cs-card space-y-4 p-6" role="status" aria-live="polite">
           <p className="text-sm font-semibold text-muted">Loading your analysis…</p>
           <div className="grid gap-3">
             <div className="h-4 w-1/2 animate-pulse rounded bg-surface-strong" />
@@ -608,7 +651,7 @@ function HomeContent() {
       )}
 
       {!loading && error && !result && (
-        <div className="cs-card space-y-2 p-6 border-red-200 bg-red-50">
+        <div className="cs-card space-y-2 p-6 border-red-200 bg-red-50" role="alert" aria-live="assertive">
           <p className="text-sm font-semibold text-red-700">Analysis failed</p>
           <p className="text-sm text-red-600">{error}</p>
           <p className="text-xs text-red-500">Double-check the URL and try again.</p>
@@ -697,7 +740,7 @@ function HomeContent() {
                         <p className="text-xs text-muted">Analysis ID: {result.videoAnalysisId}</p>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2" role="status" aria-live="polite">
                       <Chip label={`Voice: ${result.fingerprint.perDomain.voiceProfile.primaryArchetype}`} />
                       <Chip
                         label={`Delivery: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
@@ -714,6 +757,26 @@ function HomeContent() {
                       <Chip
                         label={`Sound: ${result.fingerprint.perDomain.soundProfile.primaryArchetype}`}
                       />
+                      {diagnosticChips.length ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {diagnosticChips.map((chip, idx) => (
+                            <span
+                              key={`${chip?.label}-${idx}`}
+                              className={`cs-pill text-[11px] ${
+                                chip?.tone === "warn"
+                                  ? "border-amber-300 bg-amber-100 text-amber-800"
+                                  : chip?.tone === "alert"
+                                    ? "border-red-300 bg-red-50 text-red-700"
+                                    : chip?.tone === "success"
+                                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                      : "bg-surface-strong text-muted"
+                              }`}
+                            >
+                              {chip?.label}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   {result.metadata ? (

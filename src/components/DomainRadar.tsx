@@ -40,10 +40,20 @@ export function DomainRadar({ profile }: Props) {
     );
   };
 
+  const axisSummary = data.map((item) => `${item.axis}: ${Math.round(item.value)}/100`).join("; ");
+
   return (
-    <div className="mt-4 space-y-3">
+    <div
+      className="mt-4 space-y-3"
+      role="img"
+      aria-label={`Radar scores for ${profile.primaryArchetype}`}
+      aria-describedby="domain-radar-summary"
+    >
+      <p id="domain-radar-summary" className="sr-only">
+        {axisSummary}
+      </p>
       <div className="h-64 w-full">
-        <ResponsiveContainer>
+        <ResponsiveContainer aria-hidden="true">
           <RadarChart cx="50%" cy="50%" outerRadius="65%" data={data}>
             <PolarGrid stroke="#CBD5E1" />
             <PolarAngleAxis dataKey="axis" tick={{ fontSize: 11, fill: "#475569" }} />

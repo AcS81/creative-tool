@@ -33,6 +33,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
 - `npm run test` (Vitest)
 - `npm run probe:ingestion` (dev probe for Gemini file_data vs fallback ingestion)
 - `npm run eval:golden` (run multimodal pipeline against the documented golden YouTube set)
+- `npm run visual:check` (optional Playwright screenshots of landing/sample/performance; requires `npm install` to fetch Playwright)
 
 ## Notes
 - `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, overview insights, and domain tabs (radars + score bars + micro-insights). A sample analysis button is available for instant demo.

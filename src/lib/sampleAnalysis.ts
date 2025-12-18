@@ -1,7 +1,39 @@
 import type { VideoFingerprintJson } from "./types";
 import type { AnalyzeVideoResult } from "./analysis/types";
-import { buildDefaultAdvancedMetrics } from "./analysis/fingerprint/defaults";
 import { buildMockAdvancedMetrics, hashStringToNumber } from "./analysis/fingerprint/mockAdvancedMetrics";
+
+const samplePerformance: VideoFingerprintJson["performanceProfile"] = {
+  summaryText: "Hook lands and retention holds steady; CTR is healthy for the topic.",
+  scores: {
+    hookRetention: 72,
+    midVideoRetentionStability: 68,
+    lateDropOffSeverity: 32,
+    clickThroughRateQuality: 64,
+  },
+  metrics: {
+    views: 126_500,
+    likes: 6_320,
+    comments: 420,
+    ctr: 6.8,
+    avgViewDurationSeconds: 310,
+    retentionSeries: [
+      { timeRatio: 0, audienceRetention: 100, beatRole: "hook" },
+      { timeRatio: 0.12, audienceRetention: 92, beatRole: "setup" },
+      { timeRatio: 0.24, audienceRetention: 87, beatRole: "escalation" },
+      { timeRatio: 0.36, audienceRetention: 83, beatRole: "payoff" },
+      { timeRatio: 0.5, audienceRetention: 79, beatRole: "escalation" },
+      { timeRatio: 0.64, audienceRetention: 74, beatRole: "payoff" },
+      { timeRatio: 0.78, audienceRetention: 70, beatRole: "cta" },
+      { timeRatio: 0.92, audienceRetention: 66, beatRole: "outro" },
+      { timeRatio: 1, audienceRetention: 64 },
+    ],
+  },
+  insights: [
+    "Retention stays above 70% through the mid-point; reinforce the payoff to keep late viewers.",
+    "CTR is solid—double down on strong thumbnails for similar topics.",
+    "Late drop-off is mild; consider a tighter CTA to keep viewers through outro.",
+  ],
+};
 
 const sampleFingerprint: VideoFingerprintJson = {
   version: "1.3.0",
@@ -98,6 +130,8 @@ const sampleFingerprint: VideoFingerprintJson = {
     ],
     beats: [{ startSeconds: 5, endSeconds: 25, label: "Hook", devices: ["contrast"] }],
   },
+  performanceProfile: samplePerformance,
+  hasPerformanceData: true,
 };
 
 export const sampleAnalysisResult: AnalyzeVideoResult = {

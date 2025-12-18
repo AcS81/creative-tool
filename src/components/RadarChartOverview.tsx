@@ -58,27 +58,43 @@ export function RadarChartOverview({ fingerprint, comparisonValues, comparisonLa
 
   const data = toChartData(fingerprint.metaAxes, comparisonValues);
 
+  const summary = data.map((item) => `${item.axis}: ${Math.round(item.value)}/100`).join("; ");
+  const comparisonSummary = comparisonValues
+    ? metaAxesMetadata
+        .map((axis) => `${axis.label} reference: ${Math.round(comparisonValues[axis.id as keyof typeof comparisonValues])}/100`)
+        .join("; ")
+    : undefined;
+
   return (
-    <div className="w-full space-y-3 rounded-md border border-border bg-white/80 p-4 shadow-sm">
+    <div
+      className="w-full space-y-3 rounded-md border border-border bg-white/80 p-4 shadow-sm"
+      role="img"
+      aria-label="Meta-axis radar overview"
+      aria-describedby="meta-radar-summary"
+    >
+      <p id="meta-radar-summary" className="sr-only">
+        {summary}
+        {comparisonSummary ? `; ${comparisonSummary}` : ""}
+      </p>
       <div className="flex flex-wrap items-center gap-3 text-xs font-semibold text-muted">
         <span className="inline-flex items-center gap-2">
           <span className="inline-block h-3 w-3 rounded-sm bg-[#2563eb]" />
           You
         </span>
-            {comparisonValues ? (
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-block h-3 w-3 rounded-sm border border-border bg-gray-200" />
-                {comparisonLabel ?? "Reference avg"}
-              </span>
-            ) : null}
-          </div>
+        {comparisonValues ? (
+          <span className="inline-flex items-center gap-2">
+            <span className="inline-block h-3 w-3 rounded-sm border border-border bg-gray-200" />
+            {comparisonLabel ?? "Reference avg"}
+          </span>
+        ) : null}
+      </div>
       <div className="grid gap-2 text-[12px] text-muted md:grid-cols-5">
         {metaAxesMetadata.map((axis) => (
           <span key={axis.id}>{axis.label}</span>
         ))}
       </div>
       <div className="h-[360px] w-full">
-        <ResponsiveContainer>
+        <ResponsiveContainer aria-hidden="true">
           <RadarChart data={data}>
             <PolarGrid stroke="#e2e8f0" />
             <PolarAngleAxis dataKey="axis" tick={{ fill: "#475569", fontSize: 12 }} />

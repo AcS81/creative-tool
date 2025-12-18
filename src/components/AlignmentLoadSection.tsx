@@ -164,7 +164,20 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
   const redundancyDetail = pickDetail(["balance.redundancy_vs_complementarity", "redundancyVsComplementarity"], axisDetails);
 
   if (!anyAlignment && !loadSpark?.path) {
-    return null;
+    return (
+      <div className="cs-panel space-y-2 border border-border/80 bg-surface p-4 text-sm text-muted shadow-sm">
+        <p className="font-semibold text-foreground">Alignment & Load</p>
+        <p>Alignment and load metrics were not observed for this analysis.</p>
+        <a
+          href="/docs/axes_and_domains.md"
+          target="_blank"
+          rel="noreferrer"
+          className="text-[12px] font-semibold text-accent underline"
+        >
+          What do these metrics mean?
+        </a>
+      </div>
+    );
   }
 
   return (
