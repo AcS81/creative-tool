@@ -7,6 +7,7 @@ export type AppConfig = {
   geminiApiKey?: string;
   youtubeApiKey?: string;
   performanceEnabled: boolean;
+  advancedMetricsEnabled: boolean;
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUrl?: string;
@@ -58,6 +59,9 @@ export const getAppConfig = (): AppConfig => {
   const rawMultimodalFlag = process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
   const analysisV2MultimodalFlag =
     typeof rawMultimodalFlag === "string" ? parseBoolean(rawMultimodalFlag) : undefined;
+  const rawAdvancedMetricsFlag = process.env.ENABLE_ADVANCED_METRICS;
+  const advancedMetricsFlag =
+    typeof rawAdvancedMetricsFlag === "string" ? parseBoolean(rawAdvancedMetricsFlag) : undefined;
 
   if (analysisMode === "gemini") {
     const missingKeys = [!geminiApiKey && "GEMINI_API_KEY", !youtubeApiKey && "YOUTUBE_API_KEY"].filter(
@@ -89,6 +93,7 @@ export const getAppConfig = (): AppConfig => {
 
   const geminiConfigured = analysisMode === "gemini" && Boolean(geminiApiKey) && Boolean(youtubeApiKey);
   const defaultMultimodalEnabled = geminiConfigured;
+  const defaultAdvancedMetricsEnabled = geminiConfigured;
 
   let analysisVersion: AnalysisVersion;
   let analysisV2MultimodalEnabled: boolean;
@@ -103,12 +108,16 @@ export const getAppConfig = (): AppConfig => {
     analysisVersion = analysisV2MultimodalEnabled ? "v2" : "v1";
   }
 
+  const advancedMetricsEnabled =
+    typeof advancedMetricsFlag === "boolean" ? advancedMetricsFlag : defaultAdvancedMetricsEnabled;
+
   return {
     analysisMode,
     analysisVersion,
     geminiApiKey,
     youtubeApiKey,
     performanceEnabled,
+    advancedMetricsEnabled,
     googleClientId,
     googleClientSecret,
     googleRedirectUrl,

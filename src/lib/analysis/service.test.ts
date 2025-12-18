@@ -30,6 +30,7 @@ const baseConfig: AppConfig = {
   geminiApiKey: "key",
   youtubeApiKey: "yt",
   performanceEnabled: false,
+  advancedMetricsEnabled: true,
 };
 
 describe("analyzeVideo service", () => {
@@ -70,6 +71,10 @@ describe("analyzeVideo service", () => {
     expect(result.fingerprint.supporting?.beats?.length).toBe(1);
     expect(result.diagnostics?.source).toBe("gemini-v2-multimodal");
     expect(result.diagnostics?.analysisVersion).toBe("v2");
+    expect(result.diagnostics?.advancedMetricsDefaulted).toBe(true);
+    expect(result.diagnostics?.advancedMetricsObserved).toBe(false);
+    expect(result.diagnostics?.advancedMetricsDefaultReason).toContain("unavailable");
+    expect(result.diagnostics?.lowerConfidence).toBe(false);
   });
 
   it("surfaces fallback diagnostics when fallback media path is used", async () => {
@@ -94,6 +99,21 @@ describe("analyzeVideo service", () => {
     expect(result.diagnostics?.multimodalFallbackUsed).toBe(true);
     expect(result.diagnostics?.unobservedCounts?.voice).toBe(1);
     expect(result.diagnostics?.source).toBe("gemini-v2-multimodal");
+    expect(result.diagnostics?.lowerConfidence).toBe(true);
+    expect(result.diagnostics?.lowerConfidenceReason).toContain("fallback");
+  });
+
+  it("surfaces rollback diagnostics when advanced metrics are disabled", async () => {
+    setupMultimodal();
+
+    const result = await analyzeVideo(
+      { videoId: "abc-disabled" },
+      { config: { ...baseConfig, advancedMetricsEnabled: false } },
+    );
+
+    expect(result.diagnostics?.advancedMetricsDefaulted).toBe(true);
+    expect(result.diagnostics?.advancedMetricsObserved).toBe(false);
+    expect(result.diagnostics?.advancedMetricsDefaultReason).toContain("disabled");
   });
 
   it("throws when v1 is requested after decommissioning", async () => {

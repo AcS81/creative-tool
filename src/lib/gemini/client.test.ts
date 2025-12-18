@@ -89,6 +89,7 @@ describe("callGeminiMultimodalJson", () => {
     youtubeApiKey: "yt",
     performanceEnabled: false,
     analysisV2MultimodalEnabled: true,
+    advancedMetricsEnabled: true,
   };
 
   const sampleCandidate = (data: unknown) =>

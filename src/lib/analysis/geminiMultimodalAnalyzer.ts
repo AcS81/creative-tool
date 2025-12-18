@@ -1,5 +1,11 @@
 import type { AppConfig } from "../config";
-import type { AxisDetail, BeatRole, BeatSegment, DomainProfile } from "../types";
+import type {
+  AdvancedFingerprintMetrics,
+  AxisDetail,
+  BeatRole,
+  BeatSegment,
+  DomainProfile,
+} from "../types";
 import {
   callGeminiMultimodalJson,
   GeminiApiError,
@@ -24,6 +30,7 @@ export type MultimodalAnalysisResult = {
   profiles: MultimodalProfiles;
   beats?: BeatSegment[];
   axisDetails: Record<string, AxisDetail>;
+  advancedMetrics?: AdvancedFingerprintMetrics;
   diagnostics: {
     fromFallback: boolean;
     unobservedCounts: Record<string, number>;

@@ -5,6 +5,8 @@ import type {
   MetaAxes,
   VideoFingerprintJson,
   FingerprintPerDomain,
+  AdvancedFingerprintMetrics,
+  ScoredMetric,
 } from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
 import { fetchVideoAnalytics } from "../youtube/analytics";
@@ -12,6 +14,7 @@ import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
 
 type AnalyzeOptions = {
@@ -28,6 +31,20 @@ const archetypeForMeta = (meta: MetaAxes) => {
 };
 
 const buildVideoUrl = (videoId: string) => `https://www.youtube.com/watch?v=${videoId}`;
+
+const extractScoredMetrics = (advanced: AdvancedFingerprintMetrics): ScoredMetric[] =>
+  Object.values(advanced).flatMap((section) => Object.values(section ?? {}));
+
+const hasObservedAdvancedMetrics = (advanced?: AdvancedFingerprintMetrics) => {
+  if (!advanced) return false;
+  return extractScoredMetrics(advanced).some((metric) => {
+    if (!metric) return false;
+    const value = typeof metric.value === "string" ? metric.value.trim().toLowerCase() : "";
+    const hasValue = value !== "" && value !== "unobserved";
+    const hasScore = typeof metric.score === "number" && metric.score > 0;
+    return metric.observed === true || hasValue || hasScore;
+  });
+};
 
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
@@ -73,6 +90,20 @@ export async function analyzeVideo(
 
   const metaAxes = computeMetaAxesFromProfiles(perDomain);
   const overallArchetype = archetypeForMeta(metaAxes);
+  const advancedMetricsEnabled = config.advancedMetricsEnabled !== false;
+  const advancedMetricsFromAnalysis = advancedMetricsEnabled ? multimodal.advancedMetrics : undefined;
+  const advancedMetricsObserved = advancedMetricsEnabled && hasObservedAdvancedMetrics(advancedMetricsFromAnalysis);
+  const advancedMetricsDefaulted = !advancedMetricsEnabled || !advancedMetricsFromAnalysis;
+  const advancedMetricsDefaultReason = !advancedMetricsDefaulted
+    ? undefined
+    : !advancedMetricsEnabled
+      ? "Advanced metrics disabled via ENABLE_ADVANCED_METRICS=false."
+      : "Advanced metrics unavailable from Gemini; using defaults.";
+  const advancedMetrics = advancedMetricsFromAnalysis ?? buildDefaultAdvancedMetrics();
+  const lowerConfidence = multimodalFallbackUsed;
+  const lowerConfidenceReason = multimodalFallbackUsed
+    ? "Gemini used inline fallback upload; measurements may be lower confidence."
+    : undefined;
 
   let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
@@ -82,6 +113,7 @@ export async function analyzeVideo(
       axisDetails,
     },
     hasPerformanceData: false,
+    advancedMetrics,
   });
 
   let performanceAttached = false;
@@ -135,7 +167,12 @@ export async function analyzeVideo(
       analysisErrorMessage: undefined,
       analysisVersion: "v2",
       multimodalFallbackUsed,
+      lowerConfidence,
+      lowerConfidenceReason,
       unobservedCounts,
+      advancedMetricsDefaulted,
+      advancedMetricsObserved,
+      advancedMetricsDefaultReason,
     },
   };
 }

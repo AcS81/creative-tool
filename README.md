@@ -54,6 +54,7 @@ The current app covers the PRD MVP features:
 - Performance tab overlays retention with multimodal beats (hook/setup/escalation/payoff/outro) when available; without Analytics, the creative view stays unchanged.
 - Multimodal regression helper: `npm run golden:multimodal` runs a small golden set (requires Gemini keys; see `docs/multimodal_golden_set.md`).
 - Alignment & Load preview: mock mode and seeds now surface alignment/drift/balance/timing and cognitive-load timelines (Overview “Alignment & Load” section).
+- Rollback: set `ENABLE_ADVANCED_METRICS=false` to force placeholder alignment/load metrics (schema stays v1.3.0) while keeping the rest of the analysis live.
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.

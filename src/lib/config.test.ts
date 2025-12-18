@@ -16,6 +16,7 @@ describe("getAppConfig", () => {
     delete process.env.GEMINI_API_KEY;
     delete process.env.YOUTUBE_API_KEY;
     delete process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
+    delete process.env.ENABLE_ADVANCED_METRICS;
   });
 
   it("defaults to mock mode and performance disabled", () => {
@@ -24,6 +25,7 @@ describe("getAppConfig", () => {
     expect(config.analysisVersion).toBe("v1");
     expect(config.performanceEnabled).toBe(false);
     expect(config.analysisV2MultimodalEnabled).toBe(false);
+    expect(config.advancedMetricsEnabled).toBe(false);
   });
 
   it("enables multimodal by default in gemini mode when keys are present", () => {
@@ -35,6 +37,7 @@ describe("getAppConfig", () => {
     expect(config.analysisMode).toBe("gemini");
     expect(config.analysisVersion).toBe("v2");
     expect(config.analysisV2MultimodalEnabled).toBe(true);
+    expect(config.advancedMetricsEnabled).toBe(true);
   });
 
   it("requires Gemini keys when ANALYSIS_MODE=gemini", () => {
@@ -79,5 +82,15 @@ describe("getAppConfig", () => {
     const config = getAppConfig();
     expect(config.analysisV2MultimodalEnabled).toBe(true);
     expect(config.analysisVersion).toBe("v2");
+  });
+
+  it("respects ENABLE_ADVANCED_METRICS override", () => {
+    process.env.ANALYSIS_MODE = "gemini";
+    process.env.GEMINI_API_KEY = "key";
+    process.env.YOUTUBE_API_KEY = "yt";
+    process.env.ENABLE_ADVANCED_METRICS = "false";
+
+    const config = getAppConfig();
+    expect(config.advancedMetricsEnabled).toBe(false);
   });
 });

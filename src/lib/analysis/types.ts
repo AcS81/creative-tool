@@ -19,11 +19,14 @@ export interface AnalyzeVideoResult {
     performanceErrorMessage?: string;
     analysisVersion?: "v1" | "v2";
     multimodalFallbackUsed?: boolean;
+    lowerConfidence?: boolean;
+    lowerConfidenceReason?: string;
     unobservedCounts?: Record<string, number>;
     analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
     analysisErrorMessage?: string;
     advancedMetricsDefaulted?: boolean;
     advancedMetricsObserved?: boolean;
+    advancedMetricsDefaultReason?: string;
   };
 }
 

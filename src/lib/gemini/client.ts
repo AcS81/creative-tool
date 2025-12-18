@@ -49,6 +49,11 @@ type GetTranscriptAndScenesOptions = {
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
 const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const parsePositiveInt = (raw: string | undefined, fallback: number) => {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+};
 
 const buildPrompt = (videoUrl: string) =>
   [
@@ -182,6 +187,33 @@ type Logger = Pick<typeof console, "warn" | "error" | "info">;
 
 const DEFAULT_VIDEO_MIME_TYPE = "video/mp4";
 const FALLBACK_MAX_BYTES = 5 * 1024 * 1024; // 5 MB sample to keep temp files small
+const FALLBACK_DOWNLOAD_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_FALLBACK_DOWNLOAD_TIMEOUT_MS, 20000);
+const MULTIMODAL_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS, 180000);
+
+const withTimeoutSignal = (parent: AbortSignal | undefined, timeoutMs: number) => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, timeoutMs);
+
+  const abortFromParent = () => controller.abort();
+  if (parent) {
+    if (parent.aborted) {
+      controller.abort();
+    } else {
+      parent.addEventListener("abort", abortFromParent, { once: true });
+    }
+  }
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    if (parent) {
+      parent.removeEventListener("abort", abortFromParent);
+    }
+  };
+
+  return { signal: controller.signal, cleanup };
+};
 export type GeminiMultimodalErrorCode =
   | "FEATURE_DISABLED"
   | "CONFIG_MISSING"
@@ -400,50 +432,78 @@ const callGeminiWithVideoPart = async (input: {
   };
 };
 
-const downloadVideoSample = async (youtubeUrl: string, signal?: AbortSignal): Promise<Buffer> => {
-  const response = await fetch(youtubeUrl, {
-    headers: { Range: `bytes=0-${FALLBACK_MAX_BYTES - 1}` },
-    signal,
-  });
+const downloadVideoSample = async (
+  youtubeUrl: string,
+  signal?: AbortSignal,
+  logger?: Logger,
+): Promise<Buffer> => {
+  const { signal: guardedSignal, cleanup } = withTimeoutSignal(signal, FALLBACK_DOWNLOAD_TIMEOUT_MS);
+  const started = Date.now();
+  try {
+    const response = await fetch(youtubeUrl, {
+      headers: { Range: `bytes=0-${FALLBACK_MAX_BYTES - 1}` },
+      signal: guardedSignal,
+    });
 
-  if (!response.ok) {
-    throw new Error(`Failed to fetch media sample, status ${response.status}`);
-  }
+    if (!response.ok) {
+      throw new Error(`Failed to fetch media sample, status ${response.status}`);
+    }
 
-  if (!response.body || typeof response.body.getReader !== "function") {
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const clamped = buffer.subarray(0, Math.min(buffer.length, FALLBACK_MAX_BYTES));
-    if (clamped.length === 0) {
+    const contentType = response.headers?.get?.("content-type")?.toLowerCase() ?? "";
+    if (contentType.includes("text/html")) {
+      throw new Error("Fallback download returned HTML, not media bytes.");
+    }
+
+    const readBuffer = async (): Promise<Buffer> => {
+      if (!response.body || typeof response.body.getReader !== "function") {
+        const buffer = Buffer.from(await response.arrayBuffer());
+        const clamped = buffer.subarray(0, Math.min(buffer.length, FALLBACK_MAX_BYTES));
+        return Buffer.from(clamped);
+      }
+
+      const reader = response.body.getReader();
+      const chunks: Buffer[] = [];
+      let received = 0;
+
+      while (received < FALLBACK_MAX_BYTES) {
+        const { done, value } = await reader.read();
+        if (done || !value) break;
+        const allowed = Math.min(value.length, FALLBACK_MAX_BYTES - received);
+        chunks.push(Buffer.from(value.subarray(0, allowed)));
+        received += allowed;
+        if (received >= FALLBACK_MAX_BYTES) {
+          try {
+            await reader.cancel();
+          } catch {
+            // ignore cancellation errors
+          }
+          break;
+        }
+      }
+
+      return Buffer.concat(chunks, received);
+    };
+
+    const buffer = await readBuffer();
+    if (buffer.length === 0) {
       throw new Error("Media fetch returned empty body.");
     }
-    return Buffer.from(clamped);
-  }
 
-  const reader = response.body.getReader();
-  const chunks: Buffer[] = [];
-  let received = 0;
-
-  while (received < FALLBACK_MAX_BYTES) {
-    const { done, value } = await reader.read();
-    if (done || !value) break;
-    const allowed = Math.min(value.length, FALLBACK_MAX_BYTES - received);
-    chunks.push(Buffer.from(value.subarray(0, allowed)));
-    received += allowed;
-    if (received >= FALLBACK_MAX_BYTES) {
-      try {
-        await reader.cancel();
-      } catch {
-        // ignore cancellation errors
-      }
-      break;
+    const sniff = buffer.subarray(0, 128).toString("utf8").toLowerCase();
+    if (sniff.includes("<!doctype html") || sniff.includes("<html")) {
+      throw new Error("Fallback download returned HTML content.");
     }
-  }
 
-  if (received === 0) {
-    throw new Error("No media bytes received from YouTube URL.");
-  }
+    const elapsed = Date.now() - started;
+    if (elapsed > FALLBACK_DOWNLOAD_TIMEOUT_MS) {
+      throw new Error(`Fallback media fetch exceeded ${FALLBACK_DOWNLOAD_TIMEOUT_MS}ms.`);
+    }
 
-  return Buffer.concat(chunks, received);
+    return buffer;
+  } finally {
+    cleanup();
+    logger?.info?.(`Fallback fetch elapsed ${Date.now() - started}ms`);
+  }
 };
 
 const prepareFallbackUpload = async (
@@ -451,7 +511,7 @@ const prepareFallbackUpload = async (
   signal?: AbortSignal,
   logger?: Logger,
 ): Promise<TempUploadHandle> => {
-  const mediaBuffer = await downloadVideoSample(youtubeUrl, signal);
+  const mediaBuffer = await downloadVideoSample(youtubeUrl, signal, logger);
   logger?.info?.(`Fallback media sample fetched: ${mediaBuffer.byteLength} bytes`);
 
   const cleanup = async () => {
@@ -533,12 +593,6 @@ const waitWithBackoff = async (attempt: number, signal?: AbortSignal) => {
   if (signal?.aborted) throw new Error("Aborted");
 };
 
-const parsePositiveInt = (raw: string | undefined, fallback: number) => {
-  if (!raw) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-};
-
 const MAX_CONCURRENT_GEMINI = parsePositiveInt(process.env.GEMINI_MAX_CONCURRENCY, 1);
 const geminiQueue: Array<() => void> = [];
 let geminiInFlight = 0;
@@ -581,155 +635,163 @@ export const callGeminiMultimodalJson = async (
   const config = request.config ?? getAppConfig();
   const logger = request.logger ?? console;
   const forceFallbackRequested = request.forceFallback === true;
-
-  if (!request.forceEnable && !isMultimodalClientEnabled(config)) {
-    return {
-      ok: false,
-      errorCode: "FEATURE_DISABLED",
-      errorMessage: "analysis_v2_multimodal flag is disabled.",
-    };
-  }
-
-  if (!request.forceEnable && config.analysisMode === "mock") {
-    return {
-      ok: false,
-      errorCode: "FEATURE_DISABLED",
-      errorMessage: "Gemini calls are disabled while ANALYSIS_MODE=mock.",
-    };
-  }
-
-  if (!isValidYoutubeUrl(request.youtubeUrl)) {
-    return toInvalidUrl(request.youtubeUrl);
-  }
-
-  const apiKey = config.geminiApiKey;
-  if (!apiKey) {
-    return toConfigMissing("GEMINI_API_KEY is not set.");
-  }
-
-  const callWithRetries = async (
-    label: string,
-    fn: () => Promise<GeminiCallOutcome>,
-  ): Promise<GeminiCallOutcome> => {
-    const maxAttempts = 3;
-    let attempt = 0;
-    let lastOutcome: GeminiCallOutcome | undefined;
-
-    while (attempt < maxAttempts) {
-      lastOutcome = await fn();
-      if (!shouldRetryOutcome(lastOutcome)) {
-        return lastOutcome;
-      }
-
-      attempt += 1;
-      if (attempt >= maxAttempts) {
-        const errorMessage = lastOutcome.errorMessage
-          ? `${lastOutcome.errorMessage} (after ${maxAttempts} attempts)`
-          : `Gemini unavailable after ${maxAttempts} attempts`;
-        return { ...lastOutcome, errorMessage };
-      }
-
-      logger.warn(
-        `Gemini ${label} attempt ${attempt} failed (status ${lastOutcome.status ?? "unknown"}); retrying...`,
-      );
-      await waitWithBackoff(attempt, request.signal);
-    }
-
-    return lastOutcome as GeminiCallOutcome;
-  };
-
-  const attemptFallback = async (): Promise<GeminiMultimodalResult> => {
-    logger.warn("Using inline_data fallback path for Gemini multimodal call.");
-
-    let upload: TempUploadHandle | undefined;
-    try {
-      upload = await prepareFallbackUpload(request.youtubeUrl, request.signal, logger);
-    } catch (error) {
-      logger.error("Failed to prepare fallback upload", error);
-      return toFallbackFailed(describeError(error));
-    }
-
-    try {
-      const fallbackOutcome = await callWithRetries("fallback inline_data", () =>
-        withGeminiSlot(() =>
-          callGeminiWithVideoPart({
-            apiKey,
-            videoPart: upload.part,
-            prompt: request.prompt,
-            jsonSchema: request.jsonSchema,
-            systemInstruction: request.systemInstruction,
-            signal: request.signal,
-          }),
-        ),
-      );
-
-      if (fallbackOutcome.ok) {
-        return {
-          ok: true,
-          fromFallback: true,
-          rawJson: fallbackOutcome.data,
-          status: fallbackOutcome.status,
-        };
-      }
-
-      const message =
-        fallbackOutcome.errorMessage ||
-        "Gemini returned an error while using the fallback inline upload.";
-      if (fallbackOutcome.status && fallbackOutcome.status >= 200 && fallbackOutcome.status < 300) {
-        return toInvalidResponse(message, fallbackOutcome.status);
-      }
-      return toUpstreamError(message, fallbackOutcome.status);
-    } finally {
-      if (upload) {
-        await upload.cleanup();
-      }
-    }
-  };
-
-  if (forceFallbackRequested) {
-    return attemptFallback();
-  }
-
-  const primaryOutcome = await callWithRetries("primary file_data", () =>
-    withGeminiSlot(() =>
-      callGeminiWithVideoPart({
-        apiKey,
-        videoPart: {
-          file_data: {
-            mime_type: DEFAULT_VIDEO_MIME_TYPE,
-            file_uri: request.youtubeUrl,
-          },
-        },
-        prompt: request.prompt,
-        jsonSchema: request.jsonSchema,
-        systemInstruction: request.systemInstruction,
-        signal: request.signal,
-      }),
-    ),
+  const { signal: requestSignal, cleanup: cleanupRequestTimeout } = withTimeoutSignal(
+    request.signal,
+    MULTIMODAL_TIMEOUT_MS,
   );
 
-  if (primaryOutcome.ok) {
-    return {
-      ok: true,
-      fromFallback: false,
-      rawJson: primaryOutcome.data,
-      status: primaryOutcome.status,
+  try {
+    if (!request.forceEnable && !isMultimodalClientEnabled(config)) {
+      return {
+        ok: false,
+        errorCode: "FEATURE_DISABLED",
+        errorMessage: "analysis_v2_multimodal flag is disabled.",
+      };
+    }
+
+    if (!request.forceEnable && config.analysisMode === "mock") {
+      return {
+        ok: false,
+        errorCode: "FEATURE_DISABLED",
+        errorMessage: "Gemini calls are disabled while ANALYSIS_MODE=mock.",
+      };
+    }
+
+    if (!isValidYoutubeUrl(request.youtubeUrl)) {
+      return toInvalidUrl(request.youtubeUrl);
+    }
+
+    const apiKey = config.geminiApiKey;
+    if (!apiKey) {
+      return toConfigMissing("GEMINI_API_KEY is not set.");
+    }
+
+    const callWithRetries = async (
+      label: string,
+      fn: () => Promise<GeminiCallOutcome>,
+    ): Promise<GeminiCallOutcome> => {
+      const maxAttempts = 3;
+      let attempt = 0;
+      let lastOutcome: GeminiCallOutcome | undefined;
+
+      while (attempt < maxAttempts) {
+        lastOutcome = await fn();
+        if (!shouldRetryOutcome(lastOutcome)) {
+          return lastOutcome;
+        }
+
+        attempt += 1;
+        if (attempt >= maxAttempts) {
+          const errorMessage = lastOutcome.errorMessage
+            ? `${lastOutcome.errorMessage} (after ${maxAttempts} attempts)`
+            : `Gemini unavailable after ${maxAttempts} attempts`;
+          return { ...lastOutcome, errorMessage };
+        }
+
+        logger.warn(
+          `Gemini ${label} attempt ${attempt} failed (status ${lastOutcome.status ?? "unknown"}); retrying...`,
+        );
+        await waitWithBackoff(attempt, requestSignal);
+      }
+
+      return lastOutcome as GeminiCallOutcome;
     };
-  }
 
-  const message =
-    primaryOutcome.errorMessage ||
-    "Gemini returned an error before fallback could be attempted.";
+    const attemptFallback = async (): Promise<GeminiMultimodalResult> => {
+      logger.warn("Using inline_data fallback path for Gemini multimodal call.");
 
-  if (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome) || forceFallbackRequested) {
-    logger.warn(
-      `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
+      let upload: TempUploadHandle | undefined;
+      try {
+        upload = await prepareFallbackUpload(request.youtubeUrl, requestSignal, logger);
+      } catch (error) {
+        logger.error("Failed to prepare fallback upload", error);
+        return toFallbackFailed(describeError(error));
+      }
+
+      try {
+        const fallbackOutcome = await callWithRetries("fallback inline_data", () =>
+          withGeminiSlot(() =>
+            callGeminiWithVideoPart({
+              apiKey,
+              videoPart: upload.part,
+              prompt: request.prompt,
+              jsonSchema: request.jsonSchema,
+              systemInstruction: request.systemInstruction,
+              signal: requestSignal,
+            }),
+          ),
+        );
+
+        if (fallbackOutcome.ok) {
+          return {
+            ok: true,
+            fromFallback: true,
+            rawJson: fallbackOutcome.data,
+            status: fallbackOutcome.status,
+          };
+        }
+
+        const message =
+          fallbackOutcome.errorMessage ||
+          "Gemini returned an error while using the fallback inline upload.";
+        if (fallbackOutcome.status && fallbackOutcome.status >= 200 && fallbackOutcome.status < 300) {
+          return toInvalidResponse(message, fallbackOutcome.status);
+        }
+        return toUpstreamError(message, fallbackOutcome.status);
+      } finally {
+        if (upload) {
+          await upload.cleanup();
+        }
+      }
+    };
+
+    if (forceFallbackRequested) {
+      return attemptFallback();
+    }
+
+    const primaryOutcome = await callWithRetries("primary file_data", () =>
+      withGeminiSlot(() =>
+        callGeminiWithVideoPart({
+          apiKey,
+          videoPart: {
+            file_data: {
+              mime_type: DEFAULT_VIDEO_MIME_TYPE,
+              file_uri: request.youtubeUrl,
+            },
+          },
+          prompt: request.prompt,
+          jsonSchema: request.jsonSchema,
+          systemInstruction: request.systemInstruction,
+          signal: requestSignal,
+        }),
+      ),
     );
-    return attemptFallback();
-  }
 
-  if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
-    return toInvalidResponse(message, primaryOutcome.status);
+    if (primaryOutcome.ok) {
+      return {
+        ok: true,
+        fromFallback: false,
+        rawJson: primaryOutcome.data,
+        status: primaryOutcome.status,
+      };
+    }
+
+    const message =
+      primaryOutcome.errorMessage ||
+      "Gemini returned an error before fallback could be attempted.";
+
+    if (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome) || forceFallbackRequested) {
+      logger.warn(
+        `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
+      );
+      return attemptFallback();
+    }
+
+    if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
+      return toInvalidResponse(message, primaryOutcome.status);
+    }
+    return toUpstreamError(message, primaryOutcome.status);
+  } finally {
+    cleanupRequestTimeout();
   }
-  return toUpstreamError(message, primaryOutcome.status);
 };
