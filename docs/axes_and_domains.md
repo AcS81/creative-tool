@@ -57,3 +57,11 @@ This is a quick, human-readable glossary for the axes shown in the Overview rada
 - Scores are directional, not clinical measurements.
 - “Unobserved” indicates low confidence (e.g., silent mic track or missing visuals).
 - Domain tabs show raw values and short explanations per axis; hover tooltips on radars provide quick context.
+
+## Alignment & Cognitive Load Glossary
+- **Alignment** – Audio, visuals, and narrative beats land together (emphasis, cuts, beats point at the same idea).
+- **Drift** – Pace, energy, or topic coherence slowly wander; lower drift = steadier trajectory.
+- **Decay** – Delivery or clarity fades over time (late-stage energy drops, rushed pace, rising load).
+- **Balance** – Modalities share the load without conflict; low balance = one mode dominates or conflicts.
+- **Timing** – Hooks, punchlines, cuts, and silences arrive when they’re most effective.
+- **Cognitive load** – Momentary effort required to follow along; spikes often come from dense language, rapid cuts, or chaotic visuals.

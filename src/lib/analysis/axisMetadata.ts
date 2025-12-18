@@ -8,7 +8,7 @@ export type MetaAxisId =
   | "productionPolish";
 
 export type DomainMetricId = `${DomainKey}.${string}`;
-export type AxisId = MetaAxisId | DomainMetricId;
+export type AxisId = MetaAxisId | DomainMetricId | string;
 
 export type AxisMetadata = {
   id: AxisId;
@@ -403,6 +403,297 @@ const soundAxes: AxisMetadata[] = [
   },
 ];
 
+const prosodyArcAxes: AxisMetadata[] = [
+  {
+    id: "voice.pace_mean_wpm",
+    domain: "voice",
+    label: "Speaking pace (mean)",
+    shortDescription: "Average speaking pace in words per minute.",
+    howMeasured: "Mean WPM measured over 10s windows and averaged.",
+    scaleDirection: "low=slow/deliberate, high=fast/pressured",
+    aliases: ["pace_mean_wpm"],
+  },
+  {
+    id: "voice.pace_variability_pct",
+    domain: "voice",
+    label: "Pace variability",
+    shortDescription: "How much pace swings versus the mean.",
+    howMeasured: "Coefficient of variation of pace across 10s windows.",
+    scaleDirection: "low=flat, high=erratic",
+    aliases: ["pace_variability_pct"],
+  },
+  {
+    id: "voice.within_segment_pace_change_pct",
+    domain: "voice",
+    label: "Within-segment pace drift",
+    shortDescription: "Speed-ups or slowdowns inside segments.",
+    howMeasured: "Start→end pace deltas per segment, normalized as % change.",
+    scaleDirection: "low=stable, high=drifting",
+    aliases: ["within_segment_pace_change_pct"],
+  },
+  {
+    id: "voice.emphasis_alignment_score",
+    domain: "voice",
+    label: "Emphasis vs key phrases",
+    shortDescription: "How well vocal stress lands on important phrases.",
+    howMeasured: "Precision/recall of stressed syllables against detected key phrases.",
+    scaleDirection: "low=misplaced, high=aligned",
+    aliases: ["emphasis_alignment_score"],
+  },
+  {
+    id: "voice.energy_drift_db_per_min",
+    domain: "voice",
+    label: "Energy drift",
+    shortDescription: "Trend of vocal energy over time.",
+    howMeasured: "Slope of loudness (dB) per minute plus 15s window timeline.",
+    scaleDirection: "low=fade, mid=steady, high=building",
+    aliases: ["energy_drift_db_per_min"],
+  },
+];
+
+const languageTextureAxes: AxisMetadata[] = [
+  {
+    id: "language.analogy_example_definition_ratio",
+    domain: "language",
+    label: "Analogy/example/definition mix",
+    shortDescription: "Balance of analogies, examples, and definitions.",
+    howMeasured: "Counts per 1k words across analogies, examples, and definitions.",
+    scaleDirection: "low=skewed, high=balanced",
+    aliases: ["analogy_example_definition_ratio"],
+  },
+  {
+    id: "language.sentence_compression_ratio",
+    domain: "language",
+    label: "Sentence compression",
+    shortDescription: "Words per idea/clause as a tightness proxy.",
+    howMeasured: "Distribution of words per atomic idea to gauge compression.",
+    scaleDirection: "low=telegraphic, mid=crisp, high=rambling",
+    aliases: ["sentence_compression_ratio"],
+  },
+  {
+    id: "language.humor_timing_score",
+    domain: "language",
+    label: "Humor timing",
+    shortDescription: "Setup-to-punch spacing and landed punchlines.",
+    howMeasured: "Setup/punch deltas and landed rates across jokes.",
+    scaleDirection: "low=buried/late, high=timely",
+    aliases: ["humor_timing_score"],
+  },
+  {
+    id: "language.reference_density_per_min",
+    domain: "language",
+    label: "Reference density",
+    shortDescription: "How often topical/cultural references appear.",
+    howMeasured: "References per minute with type annotations.",
+    scaleDirection: "low=sparse, high=rich/varied",
+    aliases: ["reference_density_per_min"],
+  },
+  {
+    id: "language.question_rate",
+    domain: "language",
+    label: "Question rate",
+    shortDescription: "Frequency and mix of rhetorical vs genuine questions.",
+    howMeasured: "Questions per minute plus rhetorical vs genuine share.",
+    scaleDirection: "low=none, mid=engaging, high=interrogative barrage",
+    aliases: ["question_rate"],
+  },
+];
+
+const narrativeArcAxes: AxisMetadata[] = [
+  {
+    id: "narrative.time_to_hook_seconds",
+    domain: "narrative",
+    label: "Time to hook",
+    shortDescription: "Seconds until the first hook lands.",
+    howMeasured: "Elapsed time from start to first detected hook beat.",
+    scaleDirection: "low=fast hook, high=delayed",
+    aliases: ["time_to_hook_seconds"],
+  },
+  {
+    id: "narrative.hook_strength_score",
+    domain: "narrative",
+    label: "Hook strength",
+    shortDescription: "Clarity and potency of opening promise/tension.",
+    howMeasured: "Hook device strength and promise clarity at first hook beat.",
+    scaleDirection: "low=vague, high=compelling",
+    aliases: ["hook_strength_score"],
+  },
+  {
+    id: "narrative.segment_cohesion_drift",
+    domain: "narrative",
+    label: "Segment cohesion",
+    shortDescription: "How smoothly segments relate versus drift.",
+    howMeasured: "Semantic similarity deltas between adjacent segments.",
+    scaleDirection: "low=drifty, high=cohesive",
+    aliases: ["segment_cohesion_drift"],
+  },
+  {
+    id: "narrative.open_loops_unresolved_ratio",
+    domain: "narrative",
+    label: "Open loops resolved",
+    shortDescription: "Share of open loops that get closed.",
+    howMeasured: "Unresolved loops divided by total detected loops.",
+    scaleDirection: "low=lots unresolved, high=closed loops",
+    aliases: ["open_loops_unresolved_ratio"],
+  },
+  {
+    id: "narrative.ending_resolution_score",
+    domain: "narrative",
+    label: "Ending resolution",
+    shortDescription: "How fully the ending pays off promises.",
+    howMeasured: "Presence of payoff, callbacks, and CTA clarity.",
+    scaleDirection: "low=abrupt, high=resolved",
+    aliases: ["ending_resolution_score"],
+  },
+];
+
+const visualAlignmentAxes: AxisMetadata[] = [
+  {
+    id: "visual.visual_entropy",
+    domain: "visual",
+    label: "Visual entropy",
+    shortDescription: "Overall visual change rate/entropy.",
+    howMeasured: "Normalized entropy of visual changes over 1s windows.",
+    scaleDirection: "low=static, mid=purposeful spikes, high=chaotic",
+    aliases: ["visual_entropy"],
+  },
+  {
+    id: "editing.cut_rate_refinement",
+    domain: "editing",
+    label: "Cut rate refinement",
+    shortDescription: "Consistency of cut pacing with intentional peaks.",
+    howMeasured: "Median shot length, variance, and beat-coupling deltas.",
+    scaleDirection: "low=erratic/flat, high=deliberate",
+    aliases: ["cut_rate_refinement"],
+  },
+  {
+    id: "sound.silence_for_emphasis_fidelity",
+    domain: "sound",
+    label: "Silence for emphasis fidelity",
+    shortDescription: "Whether silences line up with hooks/payoffs.",
+    howMeasured: "Count/duration of >0.6s silences and alignment to beats or punchlines.",
+    scaleDirection: "low=absent/mistimed, high=well-placed",
+    aliases: ["silence_for_emphasis_fidelity"],
+  },
+];
+
+const crossModalAxes: AxisMetadata[] = [
+  {
+    id: "alignment.audio_visual_emphasis_alignment",
+    domain: "meta",
+    label: "Audio-visual emphasis alignment",
+    shortDescription: "Do vocal emphasis moments coincide with visual emphasis?",
+    howMeasured: "Offset between loudness/pitch/pauses and cuts/zooms/graphics.",
+    scaleDirection: "low=misaligned, high=locked",
+    aliases: ["audio_visual_emphasis_alignment"],
+  },
+  {
+    id: "alignment.beats_vs_edits_alignment",
+    domain: "meta",
+    label: "Beats vs edits alignment",
+    shortDescription: "Whether edits support narrative beat transitions.",
+    howMeasured: "Distance between beat changes and nearest cut/transition.",
+    scaleDirection: "low=unsupported, high=reinforced",
+    aliases: ["beats_vs_edits_alignment"],
+  },
+  {
+    id: "alignment.prosody_vs_semantic_importance_alignment",
+    domain: "meta",
+    label: "Prosody vs semantic importance",
+    shortDescription: "Vocal stress on important phrases.",
+    howMeasured: "Alignment of stressed phrases to semantic importance scores.",
+    scaleDirection: "low=misplaced, high=aligned",
+    aliases: ["prosody_vs_semantic_importance_alignment"],
+  },
+  {
+    id: "balance.redundancy_vs_complementarity",
+    domain: "meta",
+    label: "Redundant vs complementary",
+    shortDescription: "Whether modes add new info or repeat/conflict.",
+    howMeasured: "Share of redundant, complementary, and conflicting moments.",
+    scaleDirection: "low=conflicting/redundant, high=complementary",
+    aliases: ["redundancy_vs_complementarity"],
+  },
+  {
+    id: "balance.modality_over_reliance",
+    domain: "meta",
+    label: "Modality over-reliance",
+    shortDescription: "One modality carrying most meaning.",
+    howMeasured: "Dominant modality share of meaning vs supporting modes.",
+    scaleDirection: "low=balanced, high=over-reliant",
+    aliases: ["modality_over_reliance"],
+  },
+];
+
+const cognitiveLoadAxes: AxisMetadata[] = [
+  {
+    id: "cognitive_load.load_per_second",
+    domain: "meta",
+    label: "Cognitive load timeline",
+    shortDescription: "Moment-by-moment cognitive load estimate.",
+    howMeasured: "1 Hz smoothed load from pace density, visual entropy, jargon, and cut pace.",
+    scaleDirection: "low=light, high=dense/taxing",
+    aliases: ["load_per_second"],
+  },
+  {
+    id: "cognitive_load.load_highlights",
+    domain: "meta",
+    label: "Cognitive load spikes",
+    shortDescription: "Where cognitive load peaks occur.",
+    howMeasured: "Top load spikes with drivers and durations.",
+    scaleDirection: "low=overloaded, high=rare/brief peaks",
+    aliases: ["load_highlights"],
+  },
+];
+
+const secondOrderAxes: AxisMetadata[] = [
+  {
+    id: "summary.alignment_score",
+    domain: "meta",
+    label: "Alignment score",
+    shortDescription: "Overall cross-modal alignment of emphasis and beats.",
+    howMeasured: "Blend of emphasis alignment, audio-visual alignment, beats vs edits, and prosody vs importance.",
+    scaleDirection: "low=disjoint, high=aligned",
+    aliases: ["alignment_score"],
+  },
+  {
+    id: "summary.drift_score",
+    domain: "meta",
+    label: "Drift score",
+    shortDescription: "Stability of pace, energy, and cohesion over time.",
+    howMeasured: "Energy drift, pace variability, and segment cohesion changes.",
+    scaleDirection: "low=wandering/fading, high=steady/intentional",
+    aliases: ["drift_score"],
+  },
+  {
+    id: "summary.decay_score",
+    domain: "meta",
+    label: "Decay score",
+    shortDescription: "Resistance to fatigue or clarity loss across the video.",
+    howMeasured: "Within-segment pace change, energy drift, and late-stage load trend.",
+    scaleDirection: "low=clear decay, high=holds up",
+    aliases: ["decay_score"],
+  },
+  {
+    id: "summary.balance_score",
+    domain: "meta",
+    label: "Balance score",
+    shortDescription: "Complementarity across modalities without over-reliance.",
+    howMeasured: "Redundancy vs complementarity and modality reliance mix.",
+    scaleDirection: "low=conflict/overload, high=balanced blend",
+    aliases: ["balance_score"],
+  },
+  {
+    id: "summary.timing_score",
+    domain: "meta",
+    label: "Timing score",
+    shortDescription: "Effectiveness of hooks, cuts, silences, and punch timing.",
+    howMeasured: "Time to hook, hook strength, beats vs edits, silence fidelity, and punch deltas.",
+    scaleDirection: "low=late/misaligned, high=well-timed",
+    aliases: ["timing_score"],
+  },
+];
+
 export const metaAxesMetadata = metaAxes;
 export const domainAxesMetadata: AxisMetadata[] = [
   ...voiceAxes,
@@ -411,6 +702,13 @@ export const domainAxesMetadata: AxisMetadata[] = [
   ...visualAxes,
   ...editingAxes,
   ...soundAxes,
+  ...prosodyArcAxes,
+  ...languageTextureAxes,
+  ...narrativeArcAxes,
+  ...visualAlignmentAxes,
+  ...crossModalAxes,
+  ...cognitiveLoadAxes,
+  ...secondOrderAxes,
 ];
 export const allAxesMetadata: AxisMetadata[] = [...metaAxesMetadata, ...domainAxesMetadata];
 
