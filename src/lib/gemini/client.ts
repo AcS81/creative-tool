@@ -539,7 +539,7 @@ const parsePositiveInt = (raw: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
-const MAX_CONCURRENT_GEMINI = parsePositiveInt(process.env.GEMINI_MAX_CONCURRENCY, 2);
+const MAX_CONCURRENT_GEMINI = parsePositiveInt(process.env.GEMINI_MAX_CONCURRENCY, 1);
 const geminiQueue: Array<() => void> = [];
 let geminiInFlight = 0;
 
@@ -580,6 +580,8 @@ export const callGeminiMultimodalJson = async (
 ): Promise<GeminiMultimodalResult> => {
   const config = request.config ?? getAppConfig();
   const logger = request.logger ?? console;
+  // The product only wants Gemini to ingest by URL; fallback uploads are now dev-only.
+  const fallbackEnabled = request.forceFallback === true;
 
   if (!request.forceEnable && !isMultimodalClientEnabled(config)) {
     return {
@@ -685,7 +687,7 @@ export const callGeminiMultimodalJson = async (
     }
   };
 
-  if (request.forceFallback) {
+  if (fallbackEnabled && request.forceFallback) {
     return attemptFallback();
   }
 
@@ -716,23 +718,19 @@ export const callGeminiMultimodalJson = async (
     };
   }
 
-  if (!primaryOutcome.shouldFallback) {
-    if (shouldForceFallbackOnOverload(primaryOutcome)) {
-      logger.warn(
-        `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
-      );
-      return attemptFallback();
-    }
+  const message =
+    primaryOutcome.errorMessage ||
+    "Gemini returned an error before fallback could be attempted.";
 
-    const message =
-      primaryOutcome.errorMessage ||
-      "Gemini returned an error before fallback could be attempted.";
-    if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
-      return toInvalidResponse(message, primaryOutcome.status);
-    }
-    return toUpstreamError(message, primaryOutcome.status);
+  if (fallbackEnabled && (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome))) {
+    logger.warn(
+      `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
+    );
+    return attemptFallback();
   }
 
-  logger.warn("Gemini file_data path rejected; attempting temp upload fallback.");
-  return attemptFallback();
+  if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
+    return toInvalidResponse(message, primaryOutcome.status);
+  }
+  return toUpstreamError(message, primaryOutcome.status);
 };
