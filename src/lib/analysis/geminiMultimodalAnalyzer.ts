@@ -5,6 +5,7 @@ import type {
   BeatRole,
   BeatSegment,
   DomainProfile,
+  ScoredMetric,
 } from "../types";
 import {
   callGeminiMultimodalJson,
@@ -12,10 +13,16 @@ import {
   type GeminiMultimodalErrorCode,
   type GeminiMultimodalResult,
 } from "../gemini/client";
-import type { GeminiMultimodalResponse, GeminiObservedMetric } from "./types/multimodal";
+import type {
+  GeminiAdvancedMetrics,
+  GeminiMultimodalResponse,
+  GeminiObservedMetric,
+  GeminiRichMetric,
+} from "./types/multimodal";
 import { parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
 import type { DomainKey } from "../archetypes/descriptions";
 import { resolveAxisMetadata } from "./axisMetadata";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 type MultimodalProfiles = {
   voice: DomainProfile;
@@ -38,12 +45,76 @@ export type MultimodalAnalysisResult = {
   };
 };
 
+const timelinePointSchema = {
+  type: "object",
+  properties: {
+    timeSeconds: { type: "number" },
+    value: { type: "number" },
+    label: { type: "string" },
+  },
+  required: ["timeSeconds", "value"],
+};
+
+const spanSchema = {
+  type: "object",
+  properties: {
+    startSeconds: { type: "number" },
+    endSeconds: { type: "number" },
+    value: { type: "number" },
+    label: { type: "string" },
+    alignedBeat: { type: "string" },
+    alignedPunchline: { type: "boolean" },
+  },
+  required: ["startSeconds", "endSeconds"],
+};
+
+const segmentDeltaSchema = {
+  type: "object",
+  properties: {
+    startSeconds: { type: "number" },
+    endSeconds: { type: "number" },
+    deltaPct: { type: "number" },
+    label: { type: "string" },
+  },
+  required: ["startSeconds", "endSeconds"],
+};
+
 const metricSchema = {
   type: "object",
   properties: {
     score: { type: "number" },
     value: { type: "string" },
     explanation: { type: "string" },
+    timeline: {
+      type: "array",
+      items: timelinePointSchema,
+      minItems: 1,
+    },
+    spans: {
+      type: "array",
+      items: spanSchema,
+      minItems: 1,
+    },
+    segments: {
+      type: "array",
+      items: segmentDeltaSchema,
+      minItems: 1,
+    },
+    items: {
+      type: "array",
+      items: { type: "object" },
+      minItems: 1,
+    },
+    proportions: {
+      type: "object",
+      additionalProperties: { type: "number" },
+    },
+    counts: {
+      type: "object",
+      additionalProperties: { type: "number" },
+    },
+    trend: { type: "number" },
+    observed: { type: "boolean" },
   },
   required: ["score", "value", "explanation"],
 };
@@ -133,8 +204,119 @@ const responseJsonSchema = {
         "silence_for_emphasis",
       ],
     },
+    advanced_metrics: {
+      type: "object",
+      properties: {
+        prosodyArc: {
+          type: "object",
+          properties: {
+            paceMeanWpm: metricSchema,
+            paceVariabilityPct: metricSchema,
+            withinSegmentPaceChangePct: metricSchema,
+            emphasisAlignmentScore: metricSchema,
+            energyDriftDbPerMin: metricSchema,
+          },
+          required: [
+            "paceMeanWpm",
+            "paceVariabilityPct",
+            "withinSegmentPaceChangePct",
+            "emphasisAlignmentScore",
+            "energyDriftDbPerMin",
+          ],
+        },
+        languageTexture: {
+          type: "object",
+          properties: {
+            analogyExampleDefinitionRatio: metricSchema,
+            sentenceCompressionRatio: metricSchema,
+            humorTimingScore: metricSchema,
+            referenceDensityPerMin: metricSchema,
+            questionRate: metricSchema,
+          },
+          required: [
+            "analogyExampleDefinitionRatio",
+            "sentenceCompressionRatio",
+            "humorTimingScore",
+            "referenceDensityPerMin",
+            "questionRate",
+          ],
+        },
+        narrativeArc: {
+          type: "object",
+          properties: {
+            timeToHookSeconds: metricSchema,
+            hookStrengthScore: metricSchema,
+            segmentCohesionDrift: metricSchema,
+            openLoopsUnresolvedRatio: metricSchema,
+            endingResolutionScore: metricSchema,
+          },
+          required: [
+            "timeToHookSeconds",
+            "hookStrengthScore",
+            "segmentCohesionDrift",
+            "openLoopsUnresolvedRatio",
+            "endingResolutionScore",
+          ],
+        },
+        visualEditAlignment: {
+          type: "object",
+          properties: {
+            visualEntropy: metricSchema,
+            cutRateRefinement: metricSchema,
+            silenceForEmphasisFidelity: metricSchema,
+            audioVisualEmphasisAlignment: metricSchema,
+            beatsVsEditsAlignment: metricSchema,
+            prosodyVsSemanticImportanceAlignment: metricSchema,
+          },
+          required: [
+            "visualEntropy",
+            "cutRateRefinement",
+            "silenceForEmphasisFidelity",
+            "audioVisualEmphasisAlignment",
+            "beatsVsEditsAlignment",
+            "prosodyVsSemanticImportanceAlignment",
+          ],
+        },
+        modalityBalance: {
+          type: "object",
+          properties: {
+            redundancyVsComplementarity: metricSchema,
+            modalityOverReliance: metricSchema,
+          },
+          required: ["redundancyVsComplementarity", "modalityOverReliance"],
+        },
+        cognitiveLoad: {
+          type: "object",
+          properties: {
+            loadPerSecond: metricSchema,
+            loadHighlights: metricSchema,
+          },
+          required: ["loadPerSecond", "loadHighlights"],
+        },
+        secondOrder: {
+          type: "object",
+          properties: {
+            alignmentScore: metricSchema,
+            driftScore: metricSchema,
+            decayScore: metricSchema,
+            balanceScore: metricSchema,
+            timingScore: metricSchema,
+          },
+          required: ["alignmentScore", "driftScore", "decayScore", "balanceScore", "timingScore"],
+        },
+      },
+      required: [
+        "prosodyArc",
+        "languageTexture",
+        "narrativeArc",
+        "visualEditAlignment",
+        "modalityBalance",
+        "cognitiveLoad",
+        "secondOrder",
+      ],
+    },
   },
-  required: ["voice", "language", "narrative", "visual_edit_sound"],
+  required: ["voice", "language", "narrative", "visual_edit_sound", "advanced_metrics"],
 };
 
 const systemInstruction = [
@@ -142,23 +324,31 @@ const systemInstruction = [
   "You watch the attached YouTube video via file_data.",
   "Measure the requested metrics directly from audio + visuals.",
   "If a metric cannot be observed, set value: \"unobserved\" and score: 0.",
+  "Always include timelines/spans/items where requested; do not leave required arrays empty.",
   "Respond with strict JSON only.",
 ].join("\n");
 
 const userPrompt = [
-  "Return JSON for these domains:",
+  "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
+  "Base domains:",
   "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation.",
   "- language: concreteness, metaphor_density, references, humor, teaching_vs_riffing.",
   "- narrative: beats [{label,start,end}], mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence, devices [{type,timestamp}].",
   "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
+  "Advanced metrics (alignment/arc/load): include an `advanced_metrics` object with these sections:",
+  "- prosodyArc: paceMeanWpm (timeline 10s windows), paceVariabilityPct (timeline), withinSegmentPaceChangePct (segments with deltaPct), emphasisAlignmentScore (items for stressed phrases + time), energyDriftDbPerMin (trend + timeline).",
+  "- languageTexture: analogyExampleDefinitionRatio (counts proportions), sentenceCompressionRatio (words per idea), humorTimingScore (items with setupStart/punchStart/deltaSeconds/landed), referenceDensityPerMin (counts), questionRate (counts for rhetorical vs genuine).",
+  "- narrativeArc: timeToHookSeconds, hookStrengthScore (items with beatTime, devices, promiseClarity), segmentCohesionDrift (timeline), openLoopsUnresolvedRatio (items openedAt/resolvedAt/label), endingResolutionScore (items payoffDelivered/ctaClarity/callbackCount).",
+  "- visualEditAlignment: visualEntropy (timeline), cutRateRefinement (items medianShotSeconds/variance/beatCouplingDelta), silenceForEmphasisFidelity (spans start/end with alignedBeat/punchline), audioVisualEmphasisAlignment (timeline with offsets), beatsVsEditsAlignment (timeline per beat), prosodyVsSemanticImportanceAlignment (items phrase/importanceScore/stressed).",
+  "- modalityBalance: redundancyVsComplementarity (proportions redundantPct/complementaryPct/conflictingPct), modalityOverReliance (proportions with dominant mode).",
+  "- cognitiveLoad: loadPerSecond (timeline 1 Hz), loadHighlights (spans with driver/label/value).",
+  "- secondOrder: alignmentScore, driftScore, decayScore, balanceScore, timingScore (summaries).",
   "Rules:",
-  "- scores are 0-100 reflecting the observed strength/level.",
-  "- value is a short raw measurement string.",
-  "- explanation is a short justification.",
+  "- Provide timelines/spans/items for the metrics noted above; keep arrays non-empty when observable.",
   "- Provide beats using seconds and include hook/setup/escalation/payoff/outro labels when present.",
   "- For narrative.devices, use types: contrast, foreshadow, callback, analogy, reversal, pattern_interrupt, stakes_change.",
   "- JSON only; no prose.",
-  "- If safety filters block content, return an empty object that matches the schema shape with \"unobserved\" values and score: 0 so the client can handle it.",
+  "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ].join("\n");
 
 export const multimodalResponseJsonSchema = responseJsonSchema;
@@ -368,6 +558,134 @@ const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<str
   ).length,
 });
 
+const mapMetric = (metric: GeminiRichMetric | undefined, fallback: ScoredMetric): ScoredMetric => {
+  if (!metric) return fallback;
+  const observed =
+    metric.observed !== undefined
+      ? metric.observed
+      : metric.value?.toLowerCase() !== "unobserved" && metric.score !== 0;
+  return {
+    score: Number.isFinite(metric.score) ? metric.score : fallback.score,
+    value: metric.value ?? fallback.value,
+    observed,
+    timeline: metric.timeline ?? fallback.timeline,
+    spans: metric.spans ?? fallback.spans,
+    segments: metric.segments ?? fallback.segments,
+    items: metric.items ?? fallback.items,
+    proportions: metric.proportions ?? fallback.proportions,
+    counts: metric.counts ?? fallback.counts,
+    trend: metric.trend ?? fallback.trend,
+  };
+};
+
+const mapAdvancedMetrics = (
+  advanced?: GeminiAdvancedMetrics,
+  defaults?: AdvancedFingerprintMetrics,
+): AdvancedFingerprintMetrics | undefined => {
+  if (!advanced) return undefined;
+  const base = defaults ?? buildDefaultAdvancedMetrics();
+  return {
+    prosodyArc: {
+      paceMeanWpm: mapMetric(advanced.prosodyArc?.paceMeanWpm, base.prosodyArc.paceMeanWpm),
+      paceVariabilityPct: mapMetric(advanced.prosodyArc?.paceVariabilityPct, base.prosodyArc.paceVariabilityPct),
+      withinSegmentPaceChangePct: mapMetric(
+        advanced.prosodyArc?.withinSegmentPaceChangePct,
+        base.prosodyArc.withinSegmentPaceChangePct,
+      ),
+      emphasisAlignmentScore: mapMetric(
+        advanced.prosodyArc?.emphasisAlignmentScore,
+        base.prosodyArc.emphasisAlignmentScore,
+      ),
+      energyDriftDbPerMin: mapMetric(
+        advanced.prosodyArc?.energyDriftDbPerMin,
+        base.prosodyArc.energyDriftDbPerMin,
+      ),
+    },
+    languageTexture: {
+      analogyExampleDefinitionRatio: mapMetric(
+        advanced.languageTexture?.analogyExampleDefinitionRatio,
+        base.languageTexture.analogyExampleDefinitionRatio,
+      ),
+      sentenceCompressionRatio: mapMetric(
+        advanced.languageTexture?.sentenceCompressionRatio,
+        base.languageTexture.sentenceCompressionRatio,
+      ),
+      humorTimingScore: mapMetric(
+        advanced.languageTexture?.humorTimingScore,
+        base.languageTexture.humorTimingScore,
+      ),
+      referenceDensityPerMin: mapMetric(
+        advanced.languageTexture?.referenceDensityPerMin,
+        base.languageTexture.referenceDensityPerMin,
+      ),
+      questionRate: mapMetric(advanced.languageTexture?.questionRate, base.languageTexture.questionRate),
+    },
+    narrativeArc: {
+      timeToHookSeconds: mapMetric(
+        advanced.narrativeArc?.timeToHookSeconds,
+        base.narrativeArc.timeToHookSeconds,
+      ),
+      hookStrengthScore: mapMetric(advanced.narrativeArc?.hookStrengthScore, base.narrativeArc.hookStrengthScore),
+      segmentCohesionDrift: mapMetric(
+        advanced.narrativeArc?.segmentCohesionDrift,
+        base.narrativeArc.segmentCohesionDrift,
+      ),
+      openLoopsUnresolvedRatio: mapMetric(
+        advanced.narrativeArc?.openLoopsUnresolvedRatio,
+        base.narrativeArc.openLoopsUnresolvedRatio,
+      ),
+      endingResolutionScore: mapMetric(
+        advanced.narrativeArc?.endingResolutionScore,
+        base.narrativeArc.endingResolutionScore,
+      ),
+    },
+    visualEditAlignment: {
+      visualEntropy: mapMetric(advanced.visualEditAlignment?.visualEntropy, base.visualEditAlignment.visualEntropy),
+      cutRateRefinement: mapMetric(
+        advanced.visualEditAlignment?.cutRateRefinement,
+        base.visualEditAlignment.cutRateRefinement,
+      ),
+      silenceForEmphasisFidelity: mapMetric(
+        advanced.visualEditAlignment?.silenceForEmphasisFidelity,
+        base.visualEditAlignment.silenceForEmphasisFidelity,
+      ),
+      audioVisualEmphasisAlignment: mapMetric(
+        advanced.visualEditAlignment?.audioVisualEmphasisAlignment,
+        base.visualEditAlignment.audioVisualEmphasisAlignment,
+      ),
+      beatsVsEditsAlignment: mapMetric(
+        advanced.visualEditAlignment?.beatsVsEditsAlignment,
+        base.visualEditAlignment.beatsVsEditsAlignment,
+      ),
+      prosodyVsSemanticImportanceAlignment: mapMetric(
+        advanced.visualEditAlignment?.prosodyVsSemanticImportanceAlignment,
+        base.visualEditAlignment.prosodyVsSemanticImportanceAlignment,
+      ),
+    },
+    modalityBalance: {
+      redundancyVsComplementarity: mapMetric(
+        advanced.modalityBalance?.redundancyVsComplementarity,
+        base.modalityBalance.redundancyVsComplementarity,
+      ),
+      modalityOverReliance: mapMetric(
+        advanced.modalityBalance?.modalityOverReliance,
+        base.modalityBalance.modalityOverReliance,
+      ),
+    },
+    cognitiveLoad: {
+      loadPerSecond: mapMetric(advanced.cognitiveLoad?.loadPerSecond, base.cognitiveLoad.loadPerSecond),
+      loadHighlights: mapMetric(advanced.cognitiveLoad?.loadHighlights, base.cognitiveLoad.loadHighlights),
+    },
+    secondOrder: {
+      alignmentScore: mapMetric(advanced.secondOrder?.alignmentScore, base.secondOrder.alignmentScore),
+      driftScore: mapMetric(advanced.secondOrder?.driftScore, base.secondOrder.driftScore),
+      decayScore: mapMetric(advanced.secondOrder?.decayScore, base.secondOrder.decayScore),
+      balanceScore: mapMetric(advanced.secondOrder?.balanceScore, base.secondOrder.balanceScore),
+      timingScore: mapMetric(advanced.secondOrder?.timingScore, base.secondOrder.timingScore),
+    },
+  };
+};
+
 const toError = (result: GeminiMultimodalResult): GeminiApiError & { code?: GeminiMultimodalErrorCode } => {
   const isError = result.ok === false;
   const message = isError ? result.errorMessage : "Unknown Gemini multimodal error";
@@ -401,6 +719,7 @@ export const analyzeVideoMultimodal = async (input: {
   const parsed = parseGeminiMultimodalJson(result.rawJson);
   const axisDetails: Record<string, AxisDetail> = {};
   const profiles = buildProfiles(parsed, result.fromFallback, axisDetails);
+  const advancedMetrics = mapAdvancedMetrics(parsed.advanced_metrics);
 
   return {
     profiles,
@@ -411,5 +730,6 @@ export const analyzeVideoMultimodal = async (input: {
       unobservedCounts: collectUnobservedCounts(parsed),
       rawStatus: result.status,
     },
+    advancedMetrics,
   };
 };
