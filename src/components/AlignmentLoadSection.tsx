@@ -36,6 +36,32 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
   const loadTimeline = load?.timeline?.map((t) => t.value).slice(0, 24) ?? [];
   const loadPath = loadTimeline.length > 1 ? sparklinePath(loadTimeline) : "";
 
+  const dominantModality = modality?.proportions
+    ? Object.entries(modality.proportions)
+        .sort((a, b) => (b[1] ?? 0) - (a[1] ?? 0))
+        .map(([k, v]) => `${k.replace("Pct", "")} ${Math.round((v ?? 0) * 100)}%`)[0]
+    : undefined;
+  const worstEditAlignment =
+    beatsEdits?.timeline && beatsEdits.timeline.length
+      ? beatsEdits.timeline
+          .filter((p) => typeof p.value === "number" && typeof p.timeSeconds === "number")
+          .reduce(
+            (acc, point) =>
+              !acc || (point.value as number) < acc.value
+                ? { value: point.value as number, time: point.timeSeconds as number }
+                : acc,
+            null as { value: number; time: number } | null,
+          )
+      : null;
+  const alignmentNote =
+    dominantModality && worstEditAlignment
+      ? `Dominant modality: ${dominantModality}. Lowest beat/edit alignment near ${Math.round(worstEditAlignment.time)}s.`
+      : dominantModality
+        ? `Dominant modality: ${dominantModality}.`
+        : worstEditAlignment
+          ? `Lowest beat/edit alignment near ${Math.round(worstEditAlignment.time)}s.`
+          : undefined;
+
   const anyAlignment =
     audioVisual?.observed !== false ||
     beatsEdits?.observed !== false ||
@@ -104,6 +130,11 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
           </p>
         </div>
       </div>
+      {alignmentNote ? (
+        <p className="text-[12px] text-muted" title={alignmentNote}>
+          {alignmentNote}
+        </p>
+      ) : null}
     </div>
   );
 }

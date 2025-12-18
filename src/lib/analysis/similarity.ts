@@ -1,8 +1,11 @@
 import type { VideoFingerprintJson } from "../types";
 
+const SECOND_ORDER_WEIGHT = 0.12; // small influence from alignment/balance/timing to avoid overpowering meta axes
+
 export const distanceOnMetaAxes = (
   target: VideoFingerprintJson["metaAxes"],
   candidate: VideoFingerprintJson["metaAxes"],
+  options?: { targetFingerprint?: VideoFingerprintJson; candidateFingerprint?: VideoFingerprintJson },
 ) => {
   const deltas = [
     target.voiceIntensity - candidate.voiceIntensity,
@@ -12,7 +15,31 @@ export const distanceOnMetaAxes = (
     target.productionPolish - candidate.productionPolish,
   ];
   const sumSq = deltas.reduce((sum, value) => sum + value * value, 0);
-  return Math.sqrt(sumSq);
+  const base = Math.sqrt(sumSq);
+
+  const secondOrderVector = (fp?: VideoFingerprintJson) => {
+    if (!fp?.secondOrder) return [] as number[];
+    const { alignmentScore, balanceScore, timingScore, driftScore } = fp.secondOrder;
+    return [alignmentScore, balanceScore, timingScore, driftScore]
+      .map((metric) => (typeof metric?.score === "number" ? metric.score : null))
+      .filter((v): v is number => v !== null);
+  };
+
+  const targetSecond = secondOrderVector(options?.targetFingerprint);
+  const candidateSecond = secondOrderVector(options?.candidateFingerprint);
+
+  const secondPairs = targetSecond
+    .map((value, idx) => {
+      const candidateValue = candidateSecond[idx];
+      if (typeof candidateValue !== "number") return null;
+      return value - candidateValue;
+    })
+    .filter((v): v is number => v !== null);
+
+  if (!secondPairs.length) return base;
+
+  const secondMagnitude = Math.sqrt(secondPairs.reduce((sum, v) => sum + v * v, 0));
+  return base + SECOND_ORDER_WEIGHT * secondMagnitude;
 };
 
 export const computeAverageMetaAxes = (
@@ -54,7 +81,10 @@ export const findNearestReferences = (
   const distances = references.map((ref) => ({
     creatorId: ref.creatorId,
     displayName: ref.displayName,
-    distance: distanceOnMetaAxes(target.metaAxes, ref.fingerprint.metaAxes),
+    distance: distanceOnMetaAxes(target.metaAxes, ref.fingerprint.metaAxes, {
+      targetFingerprint: target,
+      candidateFingerprint: ref.fingerprint,
+    }),
   }));
   return distances.sort((a, b) => a.distance - b.distance).slice(0, limit);
 };

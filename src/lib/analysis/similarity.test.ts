@@ -46,4 +46,20 @@ describe("similarity helpers", () => {
     const nearest = findNearestReferences(target, refs, 1);
     expect(nearest[0]?.creatorId).toBe("1");
   });
+
+  it("lightly weights second-order alignment when available", () => {
+    const base = fp(60, "base");
+    base.secondOrder.alignmentScore.score = 80;
+    const aligned = fp(60, "aligned");
+    aligned.secondOrder.alignmentScore.score = 90;
+    const misaligned = fp(60, "misaligned");
+    misaligned.secondOrder.alignmentScore.score = 10;
+
+    const nearest = findNearestReferences(base, [
+      { creatorId: "aligned", displayName: "Aligned Ref", fingerprint: aligned },
+      { creatorId: "misaligned", displayName: "Misaligned Ref", fingerprint: misaligned },
+    ]);
+
+    expect(nearest[0]?.creatorId).toBe("aligned");
+  });
 });

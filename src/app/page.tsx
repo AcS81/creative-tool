@@ -87,6 +87,21 @@ const tabKeys = [
 
 type TabKey = (typeof tabKeys)[number];
 
+const Callout = ({ label, value, description }: { label: string; value: string; description: string }) => (
+  <div className="rounded-md border border-border/70 bg-surface-strong p-3 shadow-sm">
+    <p className="text-xs font-semibold text-muted">{label}</p>
+    <p className="text-lg font-semibold text-foreground">{value}</p>
+    <p className="text-[12px] text-muted">{description}</p>
+  </div>
+);
+
+const metricValue = (value?: string | number | null) => {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "number") return `${Math.round(value)}`;
+  const trimmed = String(value).trim();
+  return trimmed.toLowerCase() === "unobserved" || trimmed === "" ? null : trimmed;
+};
+
 const clampScore = (value?: number | null, fallback = 50) => Math.max(0, Math.min(100, value ?? fallback));
 
 const findScore = (profile: DomainProfile | undefined, keys: string[]) => {
@@ -396,6 +411,43 @@ function HomeContent() {
     <span className="cs-pill bg-surface-strong text-[11px] text-muted">YouTube not connected</span>
   );
   const youtubeCtaLabel = youtubeConnected ? "Reconnect YouTube" : "Connect YouTube";
+
+  const voiceCallout =
+    metricValue(result?.fingerprint.prosodyArc?.paceVariabilityPct?.value) &&
+    result?.fingerprint.prosodyArc?.paceVariabilityPct?.observed !== false ? (
+      <Callout
+        label="Pace variance"
+        value={metricValue(result?.fingerprint.prosodyArc?.paceVariabilityPct?.value) as string}
+        description="How much your pace swings from average."
+      />
+    ) : null;
+  const narrativeCallout =
+    metricValue(result?.fingerprint.narrativeArc?.timeToHookSeconds?.value) &&
+    result?.fingerprint.narrativeArc?.timeToHookSeconds?.observed !== false ? (
+      <Callout
+        label="Time to hook"
+        value={metricValue(result?.fingerprint.narrativeArc?.timeToHookSeconds?.value) as string}
+        description="Seconds until the first clear hook lands."
+      />
+    ) : null;
+  const visualCallout =
+    metricValue(result?.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.value) &&
+    result?.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.observed !== false ? (
+      <Callout
+        label="Silence fidelity"
+        value={metricValue(result?.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.value) as string}
+        description="Silences align with beats or emphasis."
+      />
+    ) : null;
+  const soundCallout =
+    metricValue(result?.fingerprint.visualEditAlignment?.audioVisualEmphasisAlignment?.value) &&
+    result?.fingerprint.visualEditAlignment?.audioVisualEmphasisAlignment?.observed !== false ? (
+      <Callout
+        label="Alignment note"
+        value={metricValue(result?.fingerprint.visualEditAlignment?.audioVisualEmphasisAlignment?.value) as string}
+        description="Audio emphasis lining up with visual peaks."
+      />
+    ) : null;
 
   return (
     <AppShell>
@@ -730,6 +782,7 @@ function HomeContent() {
                     profile={domainProfiles.voiceProfile}
                     visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
                     insights={result.domainInsights?.voiceProfile}
+                    extra={voiceCallout}
                   />
                 )}
                 {activeTab === "delivery" && domainProfiles?.languageProfile && (
@@ -756,10 +809,13 @@ function HomeContent() {
                     visual={<DomainRadar profile={domainProfiles.narrativeProfile} />}
                     insights={result.domainInsights?.narrativeProfile}
                     extra={
-                      <DomainTimeline
-                        beats={supporting?.beats}
-                        transcriptSegments={supporting?.transcriptSegments}
-                      />
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {narrativeCallout}
+                        <DomainTimeline
+                          beats={supporting?.beats}
+                          transcriptSegments={supporting?.transcriptSegments}
+                        />
+                      </div>
                     }
                   />
                 )}
@@ -770,6 +826,7 @@ function HomeContent() {
                     profile={domainProfiles.visualProfile}
                     visual={<DomainRadar profile={domainProfiles.visualProfile} />}
                     insights={result.domainInsights?.visualProfile}
+                    extra={visualCallout}
                   />
                 )}
                 {activeTab === "editing" && domainProfiles?.editingProfile && (
@@ -779,7 +836,12 @@ function HomeContent() {
                     profile={domainProfiles.editingProfile}
                     visual={<DomainRadar profile={domainProfiles.editingProfile} />}
                     insights={result.domainInsights?.editingProfile}
-                    extra={<DomainTimeline beats={supporting?.sceneSegments} />}
+                    extra={
+                      <div className="grid gap-3 md:grid-cols-2">
+                        {visualCallout}
+                        <DomainTimeline beats={supporting?.sceneSegments} />
+                      </div>
+                    }
                   />
                 )}
                 {activeTab === "sound" && domainProfiles?.soundProfile && (
@@ -789,6 +851,7 @@ function HomeContent() {
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
                     insights={result.domainInsights?.soundProfile}
+                    extra={soundCallout}
                   />
                 )}
                 {activeTab === "performance" && (

@@ -80,7 +80,7 @@ const advancedInsights = (fingerprint?: VideoFingerprintJson): string[] => {
     loadHighlights?.spans && loadHighlights.spans.length > 0
       ? [...loadHighlights.spans].sort((a, b) => (b.value ?? 0) - (a.value ?? 0))[0]
       : null;
-  if (topLoadSpan && (topLoadSpan.value ?? 0) > 60) {
+  if (topLoadSpan && (topLoadSpan.value ?? 0) > 60 && topLoadSpan.value !== 0) {
     const when = Math.round(topLoadSpan.startSeconds ?? 0);
     const label = topLoadSpan.label ? ` (${topLoadSpan.label})` : "";
     bullets.push(`Cognitive load spikes around ${when}s${label}; consider easing pacing there.`);
@@ -92,6 +92,25 @@ const advancedInsights = (fingerprint?: VideoFingerprintJson): string[] => {
       bullets.push("Low cross-modal alignment: emphasis, edits, and beats often miss each other.");
     } else if (alignmentScore > 70) {
       bullets.push("Strong cross-modal alignment: audio, visuals, and beats reinforce each other.");
+    }
+  }
+
+  const balanceScore = fingerprint.secondOrder?.balanceScore?.score;
+  if (typeof balanceScore === "number") {
+    if (balanceScore < 40) {
+      bullets.push("Modalities lean on one channel; tighten complementarity to reduce over-reliance.");
+    } else if (balanceScore > 70) {
+      bullets.push("Strong modality balance: audio, visuals, and text share the load well.");
+    }
+  }
+
+  const paceVariance = fingerprint.prosodyArc?.paceVariabilityPct?.score;
+  const editAlignment = fingerprint.visualEditAlignment?.beatsVsEditsAlignment?.score;
+  if (typeof paceVariance === "number" && typeof editAlignment === "number") {
+    if (editAlignment > 65 && paceVariance > 55) {
+      bullets.push("Audio cadence and edits sync tightly; pacing + cuts reinforce your beats.");
+    } else if (editAlignment < 40 && paceVariance > 55) {
+      bullets.push("Rapid pacing with loose edit alignment—consider anchoring cuts to key beats.");
     }
   }
 
