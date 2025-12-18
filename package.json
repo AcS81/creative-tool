@@ -15,7 +15,7 @@
     "test": "vitest run",
     "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts",
     "eval:golden": "tsx scripts/run-multimodal-golden.ts",
-    "golden:multimodal": "node scripts/run-multimodal-golden.ts"
+    "golden:multimodal": "tsx scripts/run-multimodal-golden.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

@@ -2,6 +2,7 @@ import { analyzeVideoMultimodal } from "../src/lib/analysis/geminiMultimodalAnal
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "../src/lib/analysis/fingerprint/videoFingerprint";
 import type { AppConfig } from "../src/lib/config";
 import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
+import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
 
 type GoldenVideo = {
   id: string;
@@ -57,11 +58,17 @@ const summarize = (video: GoldenVideo, axisDetails?: Record<string, { rawValue?:
   const musicChanges = getScore("sound", "music_changes", axisDetails)?.rawValue || "n/a";
   const cutRate = getScore("editing", "cut_rate", axisDetails)?.rawValue || "n/a";
   const story = getScore("narrative", "story_presence", axisDetails)?.rawValue || "n/a";
+  const alignmentScore = getScore("secondOrder", "alignmentScore", axisDetails)?.rawValue || "n/a";
+  const loadHighlight = getScore("cognitiveLoad", "loadHighlights", axisDetails)?.rawValue || "n/a";
+  const modalityBalance = getScore("modalityBalance", "redundancyVsComplementarity", axisDetails)?.rawValue || "n/a";
   return {
     musicCoverage: music,
     musicChanges,
     cutRate,
     storyPresence: story,
+    alignmentScore,
+    loadHighlight,
+    modalityBalance,
     expected: video.expected,
   };
 };
@@ -99,8 +106,9 @@ const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMu
     const perDomain = toFingerprintDomains(analysis.profiles);
     const fingerprint = buildVideoFingerprint(perDomain, {
       metaAxes: computeMetaAxesFromProfiles(perDomain),
-        supporting: { beats: analysis.beats, axisDetails: analysis.axisDetails },
-      });
+      supporting: { beats: analysis.beats, axisDetails: analysis.axisDetails },
+      advancedMetrics: analysis.advancedMetrics ?? buildDefaultAdvancedMetrics(),
+    });
       const summary = summarize(video, fingerprint.supporting?.axisDetails);
       console.log(
         `Status: ok (fallback=${analysis.diagnostics.fromFallback ? "yes" : "no"}) ` +
@@ -109,6 +117,9 @@ const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMu
       console.log(
         `Sound -> musicCoverage: ${summary.musicCoverage}, musicChanges: ${summary.musicChanges}; ` +
           `Editing -> cutRate: ${summary.cutRate}; Narrative -> storyPresence: ${summary.storyPresence}`,
+      );
+      console.log(
+        `Alignment/load -> alignmentScore: ${summary.alignmentScore}; loadHighlights: ${summary.loadHighlight}; modalityBalance: ${summary.modalityBalance}`,
       );
       console.log(
         `Expected -> story: ${video.expected.story}, music: ${video.expected.music}, pacing: ${video.expected.pacing}`,

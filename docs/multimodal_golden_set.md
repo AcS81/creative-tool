@@ -15,9 +15,15 @@ npm run golden:multimodal [-- --dry-run]
 - If you don’t have keys handy, add `--dry-run` and it will exit early after checking envs.
 
 ## What to look for
-- Logs include fallback usage, unobserved metric counts, and key metrics: music coverage/changes, cut rate, and story presence.
+- Logs include fallback usage, unobserved metric counts, and key metrics: music coverage/changes, cut rate, story presence, and now alignment/load snapshots (alignmentScore, loadHighlights).
 - Compare the printed metrics to the expected notes in the script (story/music/pacing). Large mismatches are a signal to revisit prompts or parsers.
 - `fallback=yes` means the inline upload path was used; rerun when possible to confirm primary `file_data` entitlement.
 
 ## CI guidance
 - Do not enable real golden runs in CI. If you add a CI-friendly variant, mock Gemini responses and gate it behind an env (not provided here).
+
+## Alignment/load coverage
+The golden set now includes a vlog, a fast-cut commentary, a music-heavy video, and a tutorial to exercise:
+- Cross-modal alignment (audioVisualEmphasisAlignment, beatsVsEditsAlignment, alignmentScore)
+- Cognitive load spikes (cognitiveLoad.loadHighlights)
+- Modality balance (redundancyVsComplementarity, modalityOverReliance)
