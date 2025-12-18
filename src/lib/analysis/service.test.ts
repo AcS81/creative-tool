@@ -3,6 +3,7 @@ import { analyzeVideo } from "./service";
 import type { DomainProfile } from "../types";
 import type { AppConfig } from "../config";
 import { ConfigError } from "../config";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 const mockAnalyzeVideoMultimodal = vi.fn();
 
@@ -114,6 +115,41 @@ describe("analyzeVideo service", () => {
     expect(result.diagnostics?.advancedMetricsDefaulted).toBe(true);
     expect(result.diagnostics?.advancedMetricsObserved).toBe(false);
     expect(result.diagnostics?.advancedMetricsDefaultReason).toContain("disabled");
+  });
+
+  it("propagates advanced metrics when Gemini returns them", async () => {
+    const advancedMetrics = buildDefaultAdvancedMetrics();
+    advancedMetrics.prosodyArc.paceMeanWpm = {
+      ...advancedMetrics.prosodyArc.paceMeanWpm,
+      score: 12,
+      value: "180 wpm",
+      observed: true,
+      timeline: [{ timeSeconds: 0, value: 12 }],
+    };
+
+    mockAnalyzeVideoMultimodal.mockResolvedValue({
+      profiles: {
+        voice: mockDomain("Voice", 60),
+        language: mockDomain("Language", 65),
+        narrative: mockDomain("Narrative", 70),
+        visual: mockDomain("Visual", 55),
+        editing: mockDomain("Editing", 62),
+        sound: mockDomain("Sound", 58),
+      },
+      beats: [{ startSeconds: 0, endSeconds: 10, label: "hook", devices: [] }],
+      axisDetails: {},
+      diagnostics: {
+        fromFallback: false,
+        unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
+      },
+      advancedMetrics,
+    });
+
+    const result = await analyzeVideo({ videoId: "abc-advanced" }, { config: baseConfig });
+    expect(result.diagnostics?.advancedMetricsObserved).toBe(true);
+    expect(result.diagnostics?.advancedMetricsDefaulted).toBe(false);
+    expect(result.fingerprint.prosodyArc.paceMeanWpm.value).toBe("180 wpm");
+    expect(result.fingerprint.prosodyArc.paceMeanWpm.observed).toBe(true);
   });
 
   it("throws when v1 is requested after decommissioning", async () => {

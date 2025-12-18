@@ -29,6 +29,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
 - `npm run prisma:migrate -- --name <label>` (SQLite)
 - `npm run prisma:studio` (opens Prisma Studio)
 - `npm run seed` (populate reference creators + fingerprints)
+- Seed note: Option B chosen—refresh seeds with a one-time Gemini run. Until you run the refresh (see `docs/reference_seed_refresh.md`), seeds stay mock-generated for determinism.
 - `npm run test` (Vitest)
 - `npm run probe:ingestion` (dev probe for Gemini file_data vs fallback ingestion)
 - `npm run eval:golden` (run multimodal pipeline against the documented golden YouTube set)

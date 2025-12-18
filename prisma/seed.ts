@@ -1,11 +1,11 @@
 import { PrismaClient } from "@prisma/client";
 import { validateFingerprint } from "../src/lib/schemas/fingerprint";
 import { buildVideoFingerprint } from "../src/lib/analysis/fingerprint/videoFingerprint";
-import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
 import { buildMockAdvancedMetrics, hashStringToNumber } from "../src/lib/analysis/fingerprint/mockAdvancedMetrics";
 import { getAxesForDomain, resolveAxisMetadata } from "../src/lib/analysis/axisMetadata";
 
 const prisma = new PrismaClient();
+// Seeds default to deterministic mocks; run the refresh script with Gemini keys (see docs/reference_seed_refresh.md) to replace them with observed metrics.
 
 type DomainConfig = {
   base: number;
