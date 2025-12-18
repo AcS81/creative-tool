@@ -5,6 +5,7 @@ import { validateFingerprint } from "../../../lib/schemas/fingerprint";
 import type { VideoFingerprintJson } from "../../../lib/types";
 import { encryptString } from "../../../lib/auth/crypto";
 import { YoutubeAnalyticsError } from "../../../lib/youtube/analytics";
+import { buildDefaultAdvancedMetrics } from "../../../lib/analysis/fingerprint/defaults";
 
 const originalEnv = { ...process.env };
 const mockAnalyzeVideoMultimodal = vi.fn();
@@ -98,8 +99,9 @@ describe("POST /api/analyze in performance mode", () => {
     process.env.GOOGLE_REDIRECT_URL = "http://localhost/api/auth/youtube/callback";
     process.env.TOKEN_ENCRYPTION_KEY = "a-secure-key-32-bytes-long-------";
     const referenceFingerprint = validateFingerprint({
-      version: "1.2.0",
+      version: "1.3.0",
       createdAt: new Date().toISOString(),
+      ...buildDefaultAdvancedMetrics(),
       metaAxes: {
         voiceIntensity: 60,
         conceptualDepth: 60,

@@ -8,7 +8,9 @@ import type {
   SceneSegment,
   TranscriptSegment,
   VideoFingerprintJson,
+  AdvancedFingerprintMetrics,
 } from "../../types";
+import { buildDefaultAdvancedMetrics } from "./defaults";
 
 type BuildFingerprintOptions = {
   version?: VideoFingerprintJson["version"];
@@ -23,6 +25,7 @@ type BuildFingerprintOptions = {
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
+  advancedMetrics?: AdvancedFingerprintMetrics;
 };
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -47,14 +50,16 @@ export const buildVideoFingerprint = (
   options: BuildFingerprintOptions = {},
 ): VideoFingerprintJson => {
   const createdAt = options.createdAt ?? new Date().toISOString();
-  const version = options.version ?? "1.2.0";
+  const version = options.version ?? "1.3.0";
   const metaAxes = options.metaAxes ?? computeMetaAxesFromProfiles(perDomain);
+  const advancedMetrics = options.advancedMetrics ?? buildDefaultAdvancedMetrics();
 
   return {
     version,
     createdAt,
     metaAxes,
     perDomain,
+    ...advancedMetrics,
     overallArchetype: options.overallArchetype,
     supporting: options.supporting,
     performanceProfile: options.performanceProfile,

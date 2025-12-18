@@ -224,7 +224,7 @@ const makeFingerprint = (seed: SeedCreator) => {
   const fingerprint = buildVideoFingerprint(perDomain, {
     metaAxes: seed.metaAxes,
     overallArchetype: seed.displayName,
-    version: "1.2.0",
+    version: "1.3.0",
   });
 
   return validateFingerprint(fingerprint);

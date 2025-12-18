@@ -65,7 +65,7 @@ describe("analyzeVideo service", () => {
     setupMultimodal();
 
     const result = await analyzeVideo({ videoId: "abc123" }, { config: baseConfig });
-    expect(result.fingerprint.version).toBe("1.2.0");
+    expect(result.fingerprint.version).toBe("1.3.0");
     expect(result.fingerprint.perDomain.voiceProfile.scores.length).toBeGreaterThan(0);
     expect(result.fingerprint.supporting?.beats?.length).toBe(1);
     expect(result.diagnostics?.source).toBe("gemini-v2-multimodal");
@@ -107,6 +107,6 @@ describe("analyzeVideo service", () => {
       { config: { ...baseConfig, analysisMode: "mock" } },
     );
     expect(result.diagnostics?.source).toBe("mock");
-    expect(result.fingerprint.version).toBe("1.2.0");
+    expect(result.fingerprint.version).toBe("1.3.0");
   });
 });

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { computeAverageMetaAxes, distanceOnMetaAxes, findNearestReferences } from "./similarity";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import type { VideoFingerprintJson } from "../types";
 
 const fp = (voice: number, key: string): VideoFingerprintJson => ({
-  version: "1.2.0",
+  version: "1.3.0",
   createdAt: new Date().toISOString(),
+  ...buildDefaultAdvancedMetrics(),
   metaAxes: {
     voiceIntensity: voice,
     conceptualDepth: 60,

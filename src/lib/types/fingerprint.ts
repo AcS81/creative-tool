@@ -35,6 +35,41 @@ export interface AxisDetail {
   observed?: boolean;
 }
 
+export type TimelinePoint = {
+  timeSeconds: number;
+  value: number;
+  label?: string;
+};
+
+export type SpanHighlight = {
+  startSeconds: number;
+  endSeconds: number;
+  value?: number;
+  label?: string;
+  alignedBeat?: string;
+  alignedPunchline?: boolean;
+};
+
+export type SegmentDelta = {
+  startSeconds: number;
+  endSeconds: number;
+  deltaPct?: number;
+  label?: string;
+};
+
+export type ScoredMetric = {
+  score: number;
+  value?: string;
+  observed?: boolean;
+  timeline?: TimelinePoint[];
+  spans?: SpanHighlight[];
+  segments?: SegmentDelta[];
+  items?: Record<string, unknown>[];
+  proportions?: Record<string, number>;
+  counts?: Record<string, number>;
+  trend?: number;
+};
+
 export type DomainScore = AxisScore;
 
 export interface DomainProfile {
@@ -117,8 +152,69 @@ export interface PerformanceProfile {
   insights?: string[];
 }
 
-export type VideoFingerprintVersion = "1.2.0";
-export type LegacyVideoFingerprintVersion = "1.1.0";
+export interface ProsodyArc {
+  paceMeanWpm: ScoredMetric;
+  paceVariabilityPct: ScoredMetric;
+  withinSegmentPaceChangePct: ScoredMetric;
+  emphasisAlignmentScore: ScoredMetric;
+  energyDriftDbPerMin: ScoredMetric;
+}
+
+export interface LanguageTexture {
+  analogyExampleDefinitionRatio: ScoredMetric;
+  sentenceCompressionRatio: ScoredMetric;
+  humorTimingScore: ScoredMetric;
+  referenceDensityPerMin: ScoredMetric;
+  questionRate: ScoredMetric;
+}
+
+export interface NarrativeArc {
+  timeToHookSeconds: ScoredMetric;
+  hookStrengthScore: ScoredMetric;
+  segmentCohesionDrift: ScoredMetric;
+  openLoopsUnresolvedRatio: ScoredMetric;
+  endingResolutionScore: ScoredMetric;
+}
+
+export interface VisualEditAlignment {
+  visualEntropy: ScoredMetric;
+  cutRateRefinement: ScoredMetric;
+  silenceForEmphasisFidelity: ScoredMetric;
+  audioVisualEmphasisAlignment: ScoredMetric;
+  beatsVsEditsAlignment: ScoredMetric;
+  prosodyVsSemanticImportanceAlignment: ScoredMetric;
+}
+
+export interface ModalityBalance {
+  redundancyVsComplementarity: ScoredMetric;
+  modalityOverReliance: ScoredMetric;
+}
+
+export interface CognitiveLoad {
+  loadPerSecond: ScoredMetric;
+  loadHighlights: ScoredMetric;
+}
+
+export interface SecondOrderSummary {
+  alignmentScore: ScoredMetric;
+  driftScore: ScoredMetric;
+  decayScore: ScoredMetric;
+  balanceScore: ScoredMetric;
+  timingScore: ScoredMetric;
+}
+
+export interface AdvancedFingerprintMetrics {
+  prosodyArc: ProsodyArc;
+  languageTexture: LanguageTexture;
+  narrativeArc: NarrativeArc;
+  visualEditAlignment: VisualEditAlignment;
+  modalityBalance: ModalityBalance;
+  cognitiveLoad: CognitiveLoad;
+  secondOrder: SecondOrderSummary;
+}
+
+export type VideoFingerprintVersion = "1.3.0";
+export type LegacyVideoFingerprintVersion = "1.1.0" | "1.2.0";
 
 interface VideoFingerprintBase {
   createdAt: string;
@@ -135,7 +231,7 @@ interface VideoFingerprintBase {
   hasPerformanceData?: boolean;
 }
 
-export interface VideoFingerprintJson extends VideoFingerprintBase {
+export interface VideoFingerprintJson extends VideoFingerprintBase, AdvancedFingerprintMetrics {
   version: VideoFingerprintVersion;
 }
 

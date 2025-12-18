@@ -1,6 +1,7 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
 import type { VideoFingerprintJson } from "../../../lib/types";
+import { buildDefaultAdvancedMetrics } from "../../../lib/analysis/fingerprint/defaults";
 
 const mockPrisma = vi.hoisted(() => ({
   creatorProfile: {
@@ -49,8 +50,9 @@ const sampleDomain = (label: string, value: number) => ({
 
 const buildFingerprint = (offset: number) =>
   validateFingerprint({
-    version: "1.2.0",
+    version: "1.3.0",
     createdAt: new Date().toISOString(),
+    ...buildDefaultAdvancedMetrics(),
     metaAxes: {
       voiceIntensity: 50 + offset,
       conceptualDepth: 55 + offset,
@@ -151,7 +153,7 @@ describe("POST /api/analyze", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.videoAnalysisId).toBeTruthy();
-    expect(json.fingerprint?.version).toBe("1.2.0");
+    expect(json.fingerprint?.version).toBe("1.3.0");
     expect(Array.isArray(json.nearestReferences)).toBe(true);
     expect(json.nearestReferences.length).toBeGreaterThan(0);
     expect(json.nicheAverageMetaAxes).toBeDefined();

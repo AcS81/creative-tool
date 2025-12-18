@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { fingerprintSchema, isValidFingerprint, validateFingerprint } from "./fingerprint";
+import { buildDefaultAdvancedMetrics } from "../analysis/fingerprint/defaults";
 
 const sampleDomain = (label: string) => ({
   primaryArchetype: `${label} Archetype`,
@@ -10,8 +11,9 @@ const sampleDomain = (label: string) => ({
 });
 
 const baseFingerprint = {
-  version: "1.2.0",
+  version: "1.3.0",
   createdAt: new Date().toISOString(),
+  ...buildDefaultAdvancedMetrics(),
   metaAxes: {
     voiceIntensity: 65,
     conceptualDepth: 58,
@@ -40,7 +42,7 @@ const baseFingerprint = {
 describe("fingerprint schema", () => {
   it("accepts a valid fingerprint", () => {
     const validated = validateFingerprint(baseFingerprint);
-    expect(validated.version).toBe("1.2.0");
+    expect(validated.version).toBe("1.3.0");
     expect(validated.perDomain.voiceProfile.primaryArchetype).toContain("Voice");
     expect(validated.hasPerformanceData).toBe(false);
   });
@@ -50,9 +52,16 @@ describe("fingerprint schema", () => {
     expect(() => validateFingerprint(invalid)).toThrow(/metaAxes/);
   });
 
+  it("requires advanced metrics sections", () => {
+    const invalid = { ...baseFingerprint };
+    // @ts-expect-error intentional removal
+    delete invalid.prosodyArc;
+    expect(() => validateFingerprint(invalid)).toThrow(/prosodyArc/);
+  });
+
   it("flags invalid objects via isValidFingerprint", () => {
     const withBadVersion = { ...baseFingerprint, version: "1.0.0" };
-    const legacy = { ...baseFingerprint, version: "1.1.0" };
+    const legacy = { ...baseFingerprint, version: "1.2.0" };
     expect(isValidFingerprint(withBadVersion)).toBe(false);
     expect(isValidFingerprint(legacy)).toBe(true);
     expect(isValidFingerprint(baseFingerprint)).toBe(true);
@@ -66,8 +75,17 @@ describe("fingerprint schema", () => {
   it("upgrades legacy v1.1 fingerprints to v2", () => {
     const legacy = { ...baseFingerprint, version: "1.1.0" };
     const upgraded = validateFingerprint(legacy);
-    expect(upgraded.version).toBe("1.2.0");
+    expect(upgraded.version).toBe("1.3.0");
     expect(upgraded.hasPerformanceData).toBe(false);
+    expect(upgraded.cognitiveLoad.loadPerSecond.observed).toBe(false);
+  });
+
+  it("upgrades legacy v1.2 fingerprints and fills advanced metrics", () => {
+    const legacyV12 = { ...baseFingerprint, version: "1.2.0" };
+    const upgraded = validateFingerprint(legacyV12);
+    expect(upgraded.version).toBe("1.3.0");
+    expect(upgraded.secondOrder.alignmentScore.score).toBe(0);
+    expect(upgraded.modalityBalance.modalityOverReliance.value).toBe("unobserved");
   });
 
   it("throws descriptive error for unsupported version", () => {

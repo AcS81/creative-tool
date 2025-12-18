@@ -3,6 +3,7 @@ import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
 import type { DomainScore, DomainProfile, VideoFingerprintJson } from "../types";
 import type { DomainKey } from "../archetypes/descriptions";
 import { getAxesForDomain } from "./axisMetadata";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -51,23 +52,24 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   const seed = hashStringToNumber(input.videoId);
 
   const fingerprint: VideoFingerprintJson = {
-    version: "1.2.0",
+    version: "1.3.0",
     createdAt: new Date().toISOString(),
+    ...buildDefaultAdvancedMetrics(),
     metaAxes: {
       voiceIntensity: deriveScore(seed, 1),
       conceptualDepth: deriveScore(seed, 2),
       narrativeStructureStrength: deriveScore(seed, 3),
-    visualDynamism: deriveScore(seed, 4),
-    productionPolish: deriveScore(seed, 5),
-  },
-  perDomain: {
-    voiceProfile: buildDomain("voice", deriveScore(seed, 6)),
-    languageProfile: buildDomain("language", deriveScore(seed, 7)),
-    narrativeProfile: buildDomain("narrative", deriveScore(seed, 8)),
-    visualProfile: buildDomain("visual", deriveScore(seed, 9)),
-    editingProfile: buildDomain("editing", deriveScore(seed, 10)),
-    soundProfile: buildDomain("sound", deriveScore(seed, 11)),
-  },
+      visualDynamism: deriveScore(seed, 4),
+      productionPolish: deriveScore(seed, 5),
+    },
+    perDomain: {
+      voiceProfile: buildDomain("voice", deriveScore(seed, 6)),
+      languageProfile: buildDomain("language", deriveScore(seed, 7)),
+      narrativeProfile: buildDomain("narrative", deriveScore(seed, 8)),
+      visualProfile: buildDomain("visual", deriveScore(seed, 9)),
+      editingProfile: buildDomain("editing", deriveScore(seed, 10)),
+      soundProfile: buildDomain("sound", deriveScore(seed, 11)),
+    },
     overallArchetype: "",
     supporting: {
       transcriptSegments: [

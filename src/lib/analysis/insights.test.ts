@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateInsights } from "./insights";
+import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import type { VideoFingerprintJson } from "../types";
 
 const sampleMeta = {
@@ -18,8 +19,9 @@ const refs = [
 ];
 
 const sampleFingerprint: VideoFingerprintJson = {
-  version: "1.2.0",
+  version: "1.3.0",
   createdAt: new Date().toISOString(),
+  ...buildDefaultAdvancedMetrics(),
   metaAxes: sampleMeta,
   perDomain: {
     voiceProfile: { primaryArchetype: "Voice", summaryText: "Voice", scores: [{ key: "voice.speaking_rate", label: "Speech pace", value: 60 }] },
