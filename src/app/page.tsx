@@ -14,6 +14,7 @@ import { DomainRadar } from "../components/DomainRadar";
 import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
 import { DeliveryRelationalSection } from "../components/DeliveryRelationalSection";
 import { MiniArcBar } from "../components/MiniArcBar";
+import { AlignmentLoadSection } from "../components/AlignmentLoadSection";
 import { sampleAnalysisResult, sampleMetadata } from "../lib/sampleAnalysis";
 import { PerformanceView } from "../components/PerformanceView";
 import { performanceCoaching } from "../lib/analysis/performanceCoaching";
@@ -651,6 +652,8 @@ function HomeContent() {
                   comparisonValues={result.nicheAverageMetaAxes || undefined}
                   comparisonLabel="Reference avg"
                 />
+
+                <AlignmentLoadSection fingerprint={result.fingerprint} />
 
                 <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
                   <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">

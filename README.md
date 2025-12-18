@@ -1,4 +1,4 @@
-# CreatorSight – PRD MVP (Iterations 1–5)
+# CreatorSight – PRD MVP (Iterations 1–6)
 
 CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterations 1–5 it has reached the PRD MVP: URL input, creative fingerprint, reference similarity, Performance domain, and lightweight sessions/history.
 
@@ -53,6 +53,7 @@ The current app covers the PRD MVP features:
 - **Gemini + Analytics** (`ANALYSIS_MODE=gemini` + performance envs): adds YouTube Analytics (retention, CTR, engagement) and computes a performance domain + coaching on top of the creative fingerprint.
 - Performance tab overlays retention with multimodal beats (hook/setup/escalation/payoff/outro) when available; without Analytics, the creative view stays unchanged.
 - Multimodal regression helper: `npm run golden:multimodal` runs a small golden set (requires Gemini keys; see `docs/multimodal_golden_set.md`).
+- Alignment & Load preview: mock mode and seeds now surface alignment/drift/balance/timing and cognitive-load timelines (Overview “Alignment & Load” section).
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.
@@ -90,4 +91,5 @@ The current app covers the PRD MVP features:
 - **Iteration 3**: `docs/iteration_3_e2e.md` – UX/coaching polish, sample/demo flow.
 - **Iteration 4**: `docs/iteration_4_e2e.md` – Performance mode (YouTube OAuth + Analytics) end-to-end.
 - **Iteration 5**: `docs/iteration_5_e2e.md` – quick checklist that combines running an analysis, revisiting it via “Recent analyses”, and (optionally) seeing the Performance tab with live data.
+- **Iteration 6**: `docs/iteration_6_e2e.md` – alignment/load scaffold (schema v1.3.0, mock alignment/load metrics, UI Alignment & Load section).
 - **Axes glossary**: `docs/axes_and_domains.md` – human-readable meanings for meta/domain axes and how to interpret scores/unobserved states.
