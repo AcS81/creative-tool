@@ -63,9 +63,9 @@
 ---
 
 ## Phase 3: Coaching & Copy
-- [ ] Generate actionable insights that map second-order scores to guidance (e.g., “Low balance: redundancy high—add complementary visuals”).
-- [ ] Add microcopy beside each new chart explaining what “good” looks like (pull from metric semantics docs).
-- [ ] Guardrails: never show advice when metrics are unobserved; display a friendly “Not observed” chip instead.
+- [x] Generate actionable insights that map second-order scores to guidance (e.g., “Low balance: redundancy high—add complementary visuals”).
+- [x] Add microcopy beside each new chart explaining what “good” looks like (pull from metric semantics docs).
+- [x] Guardrails: never show advice when metrics are unobserved; display a friendly “Not observed” chip instead.
 
 ---
 

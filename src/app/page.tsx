@@ -21,6 +21,7 @@ import { performanceCoaching } from "../lib/analysis/performanceCoaching";
 import { LanguageTimingMiniChart, VoicePaceMiniChart } from "../components/VoiceLanguageMiniCharts";
 import { AdvancedSignalsStrip } from "../components/AdvancedSignalsStrip";
 import { DomainBadges } from "../components/DomainBadges";
+import { AdvancedCoaching } from "../components/AdvancedCoaching";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -824,6 +825,8 @@ function HomeContent() {
                 <AlignmentLoadSection fingerprint={result.fingerprint} />
 
                 <AdvancedSignalsStrip fingerprint={result.fingerprint} />
+
+                <AdvancedCoaching fingerprint={result.fingerprint} />
 
                 <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
                   <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
