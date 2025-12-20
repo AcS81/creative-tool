@@ -69,4 +69,5 @@ Status legend: **existing** = already in schema, needs quality/tolerance improve
 ## Rollback flag behaviour
 - Environment flag: `ENABLE_ADVANCED_METRICS=false` forces defaults via `getAppConfig` (`advancedMetricsEnabled=false`).
 - Service path: `analysis/service.ts` skips Gemini advanced metrics when the flag is false and uses `buildDefaultAdvancedMetrics()` while surfacing `Advanced metrics disabled via ENABLE_ADVANCED_METRICS=false.` in diagnostics.
+- Diagnostics: `advancedMetricsObservedBySection` flags which advanced metric groups were populated vs defaulted.
 - Schema stability: fingerprint still emits v1.3.0 shape with advanced blocks present but marked unobserved; downstream UI should remain stable.

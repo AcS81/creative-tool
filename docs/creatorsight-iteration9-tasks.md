@@ -59,10 +59,10 @@
 ---
 
 ## Phase 2: Pipeline Integration & Fallbacks
-- [ ] Update Gemini prompt snippets to describe the new/changed metrics (silence gaps, audience address, arc labeling); enforce JSON array population where required.
-- [ ] Extend parsers/validators to capture new fields and stricter timelines/spans; provide clear errors for missing blocks.
-- [ ] Ensure `mapAdvancedMetrics` respects observed flags and keeps defaults only when data is absent; add diagnostics flags per metric group.
-- [ ] Keep mock mode deterministic with upgraded mock generators for new fields and richer spans.
+- [x] Update Gemini prompt snippets to describe the new/changed metrics (silence gaps, audience address, arc labeling); enforce JSON array population where required.
+- [x] Extend parsers/validators to capture new fields and stricter timelines/spans; provide clear errors for missing blocks.
+- [x] Ensure `mapAdvancedMetrics` respects observed flags and keeps defaults only when data is absent; add diagnostics flags per metric group.
+- [x] Keep mock mode deterministic with upgraded mock generators for new fields and richer spans.
 
 ---
 

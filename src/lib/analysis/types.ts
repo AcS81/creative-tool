@@ -27,6 +27,15 @@ export interface AnalyzeVideoResult {
     advancedMetricsDefaulted?: boolean;
     advancedMetricsObserved?: boolean;
     advancedMetricsDefaultReason?: string;
+    advancedMetricsObservedBySection?: {
+      prosodyArc?: boolean;
+      languageTexture?: boolean;
+      narrativeArc?: boolean;
+      visualEditAlignment?: boolean;
+      modalityBalance?: boolean;
+      cognitiveLoad?: boolean;
+      secondOrder?: boolean;
+    };
   };
 }
 

@@ -46,6 +46,30 @@ const hasObservedAdvancedMetrics = (advanced?: AdvancedFingerprintMetrics) => {
   });
 };
 
+const hasObservedSection = (section: Record<string, ScoredMetric> | undefined) => {
+  if (!section) return false;
+  return Object.values(section).some((metric) => {
+    if (!metric) return false;
+    const value = typeof metric.value === "string" ? metric.value.trim().toLowerCase() : "";
+    const hasValue = value !== "" && value !== "unobserved";
+    const hasScore = typeof metric.score === "number" && metric.score > 0;
+    return metric.observed === true || hasValue || hasScore;
+  });
+};
+
+const observedAdvancedSections = (advanced?: AdvancedFingerprintMetrics) =>
+  !advanced
+    ? undefined
+    : {
+        prosodyArc: hasObservedSection(advanced.prosodyArc),
+        languageTexture: hasObservedSection(advanced.languageTexture),
+        narrativeArc: hasObservedSection(advanced.narrativeArc),
+        visualEditAlignment: hasObservedSection(advanced.visualEditAlignment),
+        modalityBalance: hasObservedSection(advanced.modalityBalance),
+        cognitiveLoad: hasObservedSection(advanced.cognitiveLoad),
+        secondOrder: hasObservedSection(advanced.secondOrder),
+      };
+
 export async function analyzeVideo(
   input: AnalyzeVideoInput,
   options: AnalyzeOptions = {},
@@ -93,6 +117,8 @@ export async function analyzeVideo(
   const advancedMetricsEnabled = config.advancedMetricsEnabled !== false;
   const advancedMetricsFromAnalysis = advancedMetricsEnabled ? multimodal.advancedMetrics : undefined;
   const advancedMetricsObserved = advancedMetricsEnabled && hasObservedAdvancedMetrics(advancedMetricsFromAnalysis);
+  const advancedMetricsObservedBySection =
+    advancedMetricsEnabled && advancedMetricsFromAnalysis ? observedAdvancedSections(advancedMetricsFromAnalysis) : undefined;
   const advancedMetricsDefaulted = !advancedMetricsEnabled || !advancedMetricsFromAnalysis;
   const advancedMetricsDefaultReason = !advancedMetricsDefaulted
     ? undefined
@@ -173,6 +199,7 @@ export async function analyzeVideo(
       advancedMetricsDefaulted,
       advancedMetricsObserved,
       advancedMetricsDefaultReason,
+      advancedMetricsObservedBySection,
     },
   };
 }
