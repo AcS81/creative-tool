@@ -70,16 +70,16 @@
 ---
 
 ## Phase 4: Responsiveness, States, and Accessibility
-- [ ] Collapsible sections for dense timelines on mobile; preserve hover data via tap-to-focus.
-- [ ] Empty/fallback states per new widget (entropy timeline missing, cut refinement missing, etc.) with reasons from diagnostics.
-- [ ] ARIA/keyboard: ensure new charts and badges are keyboard-focusable with text alternatives; verify contrast.
+- [x] Collapsible sections for dense timelines on mobile; preserve hover data via tap-to-focus.
+- [x] Empty/fallback states per new widget (entropy timeline missing, cut refinement missing, etc.) with reasons from diagnostics.
+- [x] ARIA/keyboard: ensure new charts and badges are keyboard-focusable with text alternatives; verify contrast.
 
 ---
 
 ## Phase 5: E2E & Regression
-- [ ] Add `docs/iteration_10_e2e.md` with a checklist that walks through every new advanced surface on desktop and mobile (including mock mode).
+- [x] Add `docs/iteration_10_e2e.md` with a checklist that walks through every new advanced surface on desktop and mobile (including mock mode).
 - [ ] Update visual regression/screenshot set to cover the new advanced strips, entropy/cut refinement, language texture charts, and second-order summary row.
-- [ ] Quick smoke script to assert UI renders when any advanced metric is unobserved (no crashes, clear messaging).
+- [x] Quick smoke script to assert UI renders when any advanced metric is unobserved (no crashes, clear messaging).
 
 ---
 

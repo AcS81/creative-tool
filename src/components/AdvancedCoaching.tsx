@@ -107,7 +107,7 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
   }
 
   return (
-    <div className="rounded-md border border-border bg-surface p-4 shadow-sm" id="advanced-coaching">
+    <div className="rounded-md border border-border bg-surface p-4 shadow-sm" id="advanced-coaching" role="region" aria-label="Advanced coaching">
       <div className="flex items-center justify-between">
         <p className="text-sm font-semibold text-muted">Advanced coaching</p>
       </div>

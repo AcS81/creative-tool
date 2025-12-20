@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { VideoFingerprintJson } from "../lib/types";
 
 type MetricCardProps = {
@@ -44,6 +45,7 @@ const formatCutRefinement = (items?: Record<string, unknown>[] | undefined, fall
 const metricObserved = (value?: string | number | null) => safeValue(value) !== undefined;
 
 export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFingerprintJson | null }) => {
+  const [collapsedMobile, setCollapsedMobile] = useState(false);
   const adv = fingerprint ?? undefined;
   const prosody = adv?.prosodyArc;
   const language = adv?.languageTexture;
@@ -65,19 +67,8 @@ export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFinge
     { key: "timingScore", label: "Timing", value: secondOrder?.timingScore.value, observed: secondOrder?.timingScore.observed },
   ];
 
-  return (
-    <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm" id="advanced-signals">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-muted">Advanced signals</p>
-        <a
-          className="text-xs font-semibold text-foreground underline"
-          href="/docs/axes_and_domains.md"
-          target="_blank"
-          rel="noreferrer"
-        >
-          Glossary
-        </a>
-      </div>
+  const content = (
+    <>
       <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-5">
         <MetricCard
           title="Energy drift"
@@ -87,18 +78,20 @@ export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFinge
               ? `Timeline points: ${energyDrift.timeline.length}`
               : energyDrift?.trend !== undefined
                 ? `Trend: ${energyDrift.trend.toFixed(2)}`
-                : undefined
+                : "Timeline missing"
           }
         />
         <MetricCard
           title="Visual entropy"
           value={safeValue(visualEntropy?.value)}
-          detail={visualEntropy?.timeline?.length ? `Timeline points: ${visualEntropy.timeline.length}` : undefined}
+          detail={
+            visualEntropy?.timeline?.length ? `Timeline points: ${visualEntropy.timeline.length}` : "Timeline missing"
+          }
         />
         <MetricCard
           title="Cut-rate refinement"
           value={safeValue(cutRefinement?.value)}
-          detail={formatCutRefinement(cutRefinement?.items, cutRefinement?.timeline ? undefined : "—")}
+          detail={formatCutRefinement(cutRefinement?.items, cutRefinement?.timeline ? undefined : "Timeline missing")}
         />
         <MetricCard
           title="Redundancy vs complementarity"
@@ -111,7 +104,7 @@ export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFinge
           detail={
             audienceAddress?.counts
               ? `Direct ${audienceAddress.counts.direct ?? 0} / Rhetorical ${audienceAddress.counts.rhetorical ?? 0}`
-              : undefined
+              : "Counts missing"
           }
         />
       </div>
@@ -125,6 +118,8 @@ export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFinge
               className={`rounded-md border p-2 ${
                 entry.observed === false ? "border-dashed border-border text-muted" : "border-border bg-white/60"
               }`}
+              role="group"
+              aria-label={`${entry.label} summary`}
             >
               <p className="text-[11px] font-semibold text-muted">{entry.label}</p>
               <p className="text-base font-semibold text-foreground">
@@ -134,6 +129,38 @@ export const AdvancedSignalsStrip = ({ fingerprint }: { fingerprint?: VideoFinge
           ))}
         </div>
       </div>
+    </>
+  );
+
+  return (
+    <div
+      className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm"
+      id="advanced-signals"
+      role="region"
+      aria-label="Advanced signals"
+    >
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-semibold text-muted">Advanced signals</p>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            className="rounded border border-border bg-surface-strong px-3 py-1 text-[12px] font-semibold text-muted md:hidden"
+            aria-expanded={!collapsedMobile}
+            onClick={() => setCollapsedMobile((prev) => !prev)}
+          >
+            {collapsedMobile ? "Show" : "Hide"}
+          </button>
+          <a
+            className="text-xs font-semibold text-foreground underline"
+            href="/docs/axes_and_domains.md"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Glossary
+          </a>
+        </div>
+      </div>
+      <div className={collapsedMobile ? "hidden md:block" : ""}>{content}</div>
     </div>
   );
 };
