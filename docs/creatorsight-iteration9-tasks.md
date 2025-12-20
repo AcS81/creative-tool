@@ -67,9 +67,9 @@
 ---
 
 ## Phase 3: Quality, Golden Set, and Regression
-- [ ] Add golden clips: (a) sports highlight with crowd shush, (b) essay with long pauses, (c) high-cut vlog, (d) Q&A heavy talk for audience-address.
-- [ ] Extend `npm run eval:golden` (or similar) to assert: silence spans count >0 where expected, audience address > threshold, hook < target time, entropy timeline populated.
-- [ ] Unit tests for parser/validator covering partial missing advanced metrics and “unobserved” paths.
+- [x] Add golden clips: (a) sports highlight with crowd shush, (b) essay with long pauses, (c) high-cut vlog, (d) Q&A heavy talk for audience-address.
+- [x] Extend `npm run eval:golden` (or similar) to assert: silence spans count >0 where expected, audience address > threshold, hook < target time, entropy timeline populated.
+- [x] Unit tests for parser/validator covering partial missing advanced metrics and “unobserved” paths.
 - [ ] Benchmarks: measure latency/cost impact of the richer prompt; document acceptable ceilings.
 
 ---
