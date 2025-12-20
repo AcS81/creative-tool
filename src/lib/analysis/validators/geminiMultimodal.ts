@@ -51,6 +51,7 @@ const beatSchema: z.ZodType<GeminiBeat> = z
     label: z.string().min(1),
     start: z.number().min(0),
     end: z.number().min(0),
+    role: z.string().min(1).optional(),
   })
   .refine((val) => val.end >= val.start, {
     message: "end must be greater than or equal to start",

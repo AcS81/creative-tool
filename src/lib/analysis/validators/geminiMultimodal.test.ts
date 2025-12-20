@@ -79,7 +79,10 @@ const buildResponse = (): GeminiMultimodalResponse => ({
     teaching_vs_riffing: metric("70% instructional"),
   },
   narrative: {
-    beats: [{ label: "hook", start: 0, end: 15 }],
+    beats: [
+      { label: "hook", role: "hook", start: 0, end: 15 },
+      { label: "setup", role: "setup", start: 15, end: 45 },
+    ],
     mini_arc_density: metric("3"),
     foreshadow_callbacks: metric("2 callbacks"),
     transition_clarity: metric("guided"),

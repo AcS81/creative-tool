@@ -47,7 +47,10 @@ const sampleRaw = {
     teaching_vs_riffing: { score: 70, value: "70% instructional", explanation: "more teaching" },
   },
   narrative: {
-    beats: [{ label: "hook", start: 0, end: 12 }],
+    beats: [
+      { label: "hook", role: "hook", start: 0, end: 12 },
+      { label: "escalation", role: "escalation", start: 12, end: 40 },
+    ],
     mini_arc_density: { score: 50, value: "3", explanation: "some arcs" },
     foreshadow_callbacks: { score: 40, value: "2 callbacks", explanation: "few callbacks" },
     transition_clarity: { score: 60, value: "clear", explanation: "clear transitions" },
@@ -129,6 +132,7 @@ describe("analyzeVideoMultimodal", () => {
     const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
     expect(result.profiles.voice.scores.length).toBeGreaterThan(0);
     expect(result.beats?.[0]?.label).toBe("hook");
+    expect(result.beats?.[0]?.role).toBe("hook");
     expect(result.beats?.[0]?.devices).toContain("callback");
     expect(result.diagnostics.fromFallback).toBe(false);
     expect(result.axisDetails["voice.speaking_rate"]?.rawValue).toBe("155 wpm");

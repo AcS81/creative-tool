@@ -35,9 +35,9 @@
 - [x] Tests: clips with ambient noise, commentator “shush” moments, and quiet B-roll; expect spans to register.
 
 ### Task 1.2: Arc/Act Understanding
-- [ ] Improve beat detection to classify hook/setup/escalation/payoff/outro with cohesion scores and “drift” diagnostics per segment.
-- [ ] Track open-loop creation/closure and ending resolution strength; populate `openLoopsUnresolvedRatio` and `endingResolutionScore` items.
-- [ ] Calibrate `timeToHookSeconds` and `hookStrengthScore` against a small labeled set; add fixtures.
+- [x] Improve beat detection to classify hook/setup/escalation/payoff/outro with cohesion scores and “drift” diagnostics per segment.
+- [x] Track open-loop creation/closure and ending resolution strength; populate `openLoopsUnresolvedRatio` and `endingResolutionScore` items.
+- [x] Calibrate `timeToHookSeconds` and `hookStrengthScore` against a small labeled set; add fixtures.
 
 ### Task 1.3: Audience Address Frequency
 - [ ] Add `audience_address_frequency` (you/we addressing) as a language/voice metric with counts per minute + rhetorical vs direct.

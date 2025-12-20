@@ -41,6 +41,7 @@ export type GeminiBeat = {
   label: string;
   start: number;
   end: number;
+  role?: string;
 };
 
 export interface GeminiVoiceMetrics {
