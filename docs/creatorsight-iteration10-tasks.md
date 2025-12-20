@@ -39,27 +39,26 @@
 ---
 
 ## Phase 2: Domain Tabs – Deep Exposure
-
 ### Voice/Delivery
-- [ ] Add energy-drift and emphasis-alignment badges; keep existing pace mini-chart.
-- [ ] Audience-address frequency badge (you/we per minute, rhetorical vs direct) with short interpretation.
-- [ ] Keep humor timing/question mix widget; add prosody vs semantic importance note if observed.
+- [x] Add energy-drift and emphasis-alignment badges; keep existing pace mini-chart.
+- [x] Audience-address frequency badge (you/we per minute, rhetorical vs direct) with short interpretation.
+- [x] Keep humor timing/question mix widget; add prosody vs semantic importance note if observed.
 
 ### Language
-- [ ] Visualize analogy/example/definition ratios (stacked bar) and sentence compression distribution.
-- [ ] Reference density per minute with type legend; keep metaphor density/concreteness tooltips.
+- [x] Visualize analogy/example/definition ratios (stacked bar) and sentence compression distribution.
+- [x] Reference density per minute with type legend; keep metaphor density/concreteness tooltips.
 
 ### Narrative
-- [ ] Open-loop resolution list and segment cohesion drift mini-chart; keep time-to-hook/hook strength callout.
-- [ ] Mini-arc bar remains; add drift flag when high.
+- [x] Open-loop resolution list and segment cohesion drift mini-chart; keep time-to-hook/hook strength callout.
+- [x] Mini-arc bar remains; add drift flag when high.
 
 ### Visual/Edit
-- [ ] Visual entropy strip with spike annotations; cut-rate refinement card (median/variance/beat coupling).
-- [ ] Keep silence spans overlay; add beat-aligned labels if present.
+- [x] Visual entropy strip with spike annotations; cut-rate refinement card (median/variance/beat coupling).
+- [x] Keep silence spans overlay; add beat-aligned labels if present.
 
 ### Sound/Performance
-- [ ] Add redundancy/complementarity badge to show mix of audio/visual/text signals.
-- [ ] Keep alignment note and silence fidelity badge; performance tab stays as refreshed in Iteration 8.
+- [x] Add redundancy/complementarity badge to show mix of audio/visual/text signals.
+- [x] Keep alignment note and silence fidelity badge; performance tab stays as refreshed in Iteration 8.
 
 ---
 

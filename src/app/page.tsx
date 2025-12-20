@@ -20,6 +20,7 @@ import { PerformanceView } from "../components/PerformanceView";
 import { performanceCoaching } from "../lib/analysis/performanceCoaching";
 import { LanguageTimingMiniChart, VoicePaceMiniChart } from "../components/VoiceLanguageMiniCharts";
 import { AdvancedSignalsStrip } from "../components/AdvancedSignalsStrip";
+import { DomainBadges } from "../components/DomainBadges";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -102,6 +103,11 @@ const metricValue = (value?: string | number | null) => {
   if (typeof value === "number") return `${Math.round(value)}`;
   const trimmed = String(value).trim();
   return trimmed.toLowerCase() === "unobserved" || trimmed === "" ? null : trimmed;
+};
+
+const badgeValue = (value?: string | number | null) => {
+  const normalized = metricValue(value);
+  return normalized ?? "Not observed";
 };
 
 const clampScore = (value?: number | null, fallback = 50) => Math.max(0, Math.min(100, value ?? fallback));
@@ -897,7 +903,28 @@ function HomeContent() {
                     extra={
                       <div className={`grid gap-3 ${voiceCallout ? "md:grid-cols-2" : ""}`}>
                         <VoicePaceMiniChart prosodyArc={result.fingerprint.prosodyArc} />
-                        {voiceCallout}
+                        <div className="space-y-2">
+                          {voiceCallout}
+                          <DomainBadges
+                            items={[
+                              {
+                                label: "Energy drift",
+                                value: result.fingerprint.prosodyArc.energyDriftDbPerMin.value,
+                                detail: result.fingerprint.prosodyArc.energyDriftDbPerMin.timeline?.length
+                                  ? `${result.fingerprint.prosodyArc.energyDriftDbPerMin.timeline?.length ?? 0} points`
+                                  : undefined,
+                              },
+                              {
+                                label: "Emphasis alignment",
+                                value: result.fingerprint.prosodyArc.emphasisAlignmentScore.value,
+                              },
+                              {
+                                label: "Audience address",
+                                value: result.fingerprint.languageTexture.audienceAddressFrequency.value,
+                              },
+                            ]}
+                          />
+                        </div>
                       </div>
                     }
                   />
@@ -917,6 +944,44 @@ function HomeContent() {
                           axisDetails={result.fingerprint.supporting?.axisDetails}
                         />
                         <LanguageTimingMiniChart languageTexture={result.fingerprint.languageTexture} />
+                        <DomainBadges
+                          items={[
+                            {
+                              label: "Analogy/example/definition",
+                              value: result.fingerprint.languageTexture.analogyExampleDefinitionRatio.value,
+                              detail: result.fingerprint.languageTexture.analogyExampleDefinitionRatio.counts
+                                ? Object.entries(result.fingerprint.languageTexture.analogyExampleDefinitionRatio.counts)
+                                    .map(([k, v]) => `${k}: ${v}`)
+                                    .join(" • ")
+                                : undefined,
+                            },
+                            {
+                              label: "Sentence compression",
+                              value: result.fingerprint.languageTexture.sentenceCompressionRatio.value,
+                              detail: result.fingerprint.languageTexture.sentenceCompressionRatio.timeline?.length
+                                ? `${result.fingerprint.languageTexture.sentenceCompressionRatio.timeline?.length ?? 0} samples`
+                                : undefined,
+                            },
+                            {
+                              label: "References/min",
+                              value: result.fingerprint.languageTexture.referenceDensityPerMin.value,
+                              detail: result.fingerprint.languageTexture.referenceDensityPerMin.counts
+                                ? Object.entries(result.fingerprint.languageTexture.referenceDensityPerMin.counts)
+                                    .map(([k, v]) => `${k}: ${v}`)
+                                    .join(" • ")
+                                : undefined,
+                            },
+                            {
+                              label: "Questions/min",
+                              value: result.fingerprint.languageTexture.questionRate.value,
+                              detail: result.fingerprint.languageTexture.questionRate.counts
+                                ? Object.entries(result.fingerprint.languageTexture.questionRate.counts)
+                                    .map(([k, v]) => `${k}: ${v}`)
+                                    .join(" • ")
+                                : undefined,
+                            },
+                          ]}
+                        />
                       </div>
                     }
                   />
@@ -942,6 +1007,26 @@ function HomeContent() {
                             }),
                           )}
                         />
+                        <DomainBadges
+                          items={[
+                            {
+                              label: "Open loops",
+                              value: result.fingerprint.narrativeArc.openLoopsUnresolvedRatio.value,
+                              detail: `${result.fingerprint.narrativeArc.openLoopsUnresolvedRatio.items?.length ?? 0} tracked`,
+                            },
+                            {
+                              label: "Cohesion drift",
+                              value: result.fingerprint.narrativeArc.segmentCohesionDrift.value,
+                              detail: result.fingerprint.narrativeArc.segmentCohesionDrift.timeline?.length
+                                ? `${result.fingerprint.narrativeArc.segmentCohesionDrift.timeline?.length ?? 0} segments`
+                                : undefined,
+                            },
+                            {
+                              label: "Ending resolution",
+                              value: result.fingerprint.narrativeArc.endingResolutionScore.value,
+                            },
+                          ]}
+                        />
                       </div>
                     }
                   />
@@ -965,7 +1050,36 @@ function HomeContent() {
                             }),
                           )}
                         />
-                        {visualCallout}
+                        <div className="space-y-2">
+                          {visualCallout}
+                          <DomainBadges
+                            items={[
+                              {
+                                label: "Visual entropy",
+                                value: result.fingerprint.visualEditAlignment.visualEntropy.value,
+                                detail: result.fingerprint.visualEditAlignment.visualEntropy.timeline?.length
+                                  ? `${result.fingerprint.visualEditAlignment.visualEntropy.timeline?.length ?? 0} points`
+                                  : undefined,
+                              },
+                              {
+                                label: "Cut refinement",
+                                value: result.fingerprint.visualEditAlignment.cutRateRefinement.value,
+                                detail: (() => {
+                                  const item = result.fingerprint.visualEditAlignment.cutRateRefinement.items?.[0] as
+                                    | { medianShotSeconds?: number; variance?: number; beatCouplingDelta?: number }
+                                    | undefined;
+                                  if (!item) return undefined;
+                                  const parts = [
+                                    item.medianShotSeconds ? `median ${item.medianShotSeconds.toFixed(1)}s` : null,
+                                    item.variance ? `var ${item.variance.toFixed(1)}` : null,
+                                    item.beatCouplingDelta ? `beat Δ ${item.beatCouplingDelta.toFixed(1)}s` : null,
+                                  ].filter(Boolean);
+                                  return parts.join(" • ");
+                                })(),
+                              },
+                            ]}
+                          />
+                        </div>
                       </div>
                     }
                   />
@@ -979,7 +1093,21 @@ function HomeContent() {
                     insights={result.domainInsights?.editingProfile}
                     extra={
                       <div className="grid gap-3 md:grid-cols-2">
-                        {visualCallout}
+                        <div className="space-y-2">
+                          {visualCallout}
+                          <DomainBadges
+                            items={[
+                              {
+                                label: "Silence fidelity",
+                                value: result.fingerprint.visualEditAlignment.silenceForEmphasisFidelity.value,
+                              },
+                              {
+                                label: "Cut refinement",
+                                value: result.fingerprint.visualEditAlignment.cutRateRefinement.value,
+                              },
+                            ]}
+                          />
+                        </div>
                         <DomainTimeline
                           beats={supporting?.sceneSegments}
                           silenceSpans={result.fingerprint.visualEditAlignment?.silenceForEmphasisFidelity?.spans?.map(
@@ -1001,7 +1129,23 @@ function HomeContent() {
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
                     insights={result.domainInsights?.soundProfile}
-                    extra={soundCallout}
+                    extra={
+                      <div className="space-y-2">
+                        {soundCallout}
+                        <DomainBadges
+                          items={[
+                            {
+                              label: "Redundancy vs complementarity",
+                              value: result.fingerprint.modalityBalance.redundancyVsComplementarity.value,
+                            },
+                            {
+                              label: "Silence fidelity",
+                              value: result.fingerprint.visualEditAlignment.silenceForEmphasisFidelity.value,
+                            },
+                          ]}
+                        />
+                      </div>
+                    }
                   />
                 )}
                 {activeTab === "performance" && (
