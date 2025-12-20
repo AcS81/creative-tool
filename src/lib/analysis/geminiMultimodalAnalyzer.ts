@@ -100,19 +100,6 @@ const metricSchema = {
       items: segmentDeltaSchema,
       minItems: 1,
     },
-    items: {
-      type: "array",
-      items: { type: "object" },
-      minItems: 1,
-    },
-    proportions: {
-      type: "object",
-      additionalProperties: { type: "number" },
-    },
-    counts: {
-      type: "object",
-      additionalProperties: { type: "number" },
-    },
     trend: { type: "number" },
     observed: { type: "boolean" },
   },
