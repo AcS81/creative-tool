@@ -20,21 +20,21 @@
 ---
 
 ## Phase 0: UX Narrative & IA
-- [ ] Design a concise “Advanced signals” narrative for the remaining hidden data: language texture, prosody/energy, visual entropy/cut refinement, modality balance, second-order summaries, audience-address.
-- [ ] IA update: anchors/sections to jump directly to these widgets; keep existing pace/humor/silence/alignment UI unchanged.
-- [ ] Glossary/tooltips plan that reuses `docs/axes_and_domains.md` entries; avoid duplicating copy.
+- [x] Design a concise “Advanced signals” narrative for the remaining hidden data: language texture, prosody/energy, visual entropy/cut refinement, modality balance, second-order summaries, audience-address.
+- [x] IA update: anchors/sections to jump directly to these widgets; keep existing pace/humor/silence/alignment UI unchanged.
+- [x] Glossary/tooltips plan that reuses `docs/axes_and_domains.md` entries; avoid duplicating copy.
 
 ---
 
 ## Phase 1: Overview Surfaces
-- [ ] Add a multi-lane strip for the still-hidden metrics:
+- [x] Add a multi-lane strip for the still-hidden metrics:
   - Energy drift trend (prosody).
   - Visual entropy strip with spikes.
   - Cut-rate refinement summary (median/variance/beat coupling).
   - Redundancy/complementarity proportions badge.
   - Audience-address frequency badge (you/we per minute; rhetorical vs direct).
-- [ ] Second-order summary row: Alignment/Drift/Decay/Balance/Timing with short labels, hover hints, and “not observed” states.
-- [ ] Keep existing Alignment & Load panel; add glossary tooltips and links where missing.
+- [x] Second-order summary row: Alignment/Drift/Decay/Balance/Timing with short labels, hover hints, and “not observed” states.
+- [x] Keep existing Alignment & Load panel; add glossary tooltips and links where missing.
 
 ---
 
