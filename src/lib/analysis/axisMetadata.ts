@@ -397,7 +397,7 @@ const soundAxes: AxisMetadata[] = [
     domain: "sound",
     label: "Silence for emphasis",
     shortDescription: "Intentional use of quiet moments.",
-    howMeasured: "Distinct spans of silence used to punctuate ideas.",
+    howMeasured: "Relative-energy speech gaps that drop below the local floor for >0.6s, ignoring bed/crowd noise.",
     scaleDirection: "low=none, high=frequent",
     aliases: ["silence_for_emphasis"],
   },
@@ -571,7 +571,8 @@ const visualAlignmentAxes: AxisMetadata[] = [
     domain: "sound",
     label: "Silence for emphasis fidelity",
     shortDescription: "Whether silences line up with hooks/payoffs.",
-    howMeasured: "Count/duration of >0.6s silences and alignment to beats or punchlines.",
+    howMeasured:
+      "Relative-energy speech gaps >0.6s with strength scores, labeled intent (reset/punch/transition), and alignment to beats or punchlines.",
     scaleDirection: "low=absent/mistimed, high=well-placed",
     aliases: ["silence_for_emphasis_fidelity"],
   },

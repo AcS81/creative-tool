@@ -20,8 +20,15 @@ const makeTimeline = (base: number): ScoredMetric["timeline"] => [
 ];
 
 const makeSpans = (base: number): NonNullable<ScoredMetric["spans"]> => [
-  { startSeconds: 12, endSeconds: 13.2, value: clamp(base - 4), alignedBeat: "hook" },
-  { startSeconds: 48, endSeconds: 49.4, value: clamp(base + 3), alignedBeat: "payoff", alignedPunchline: true },
+  { startSeconds: 12, endSeconds: 13.2, value: clamp(base - 4), label: "reset", alignedBeat: "hook" },
+  {
+    startSeconds: 48,
+    endSeconds: 49.4,
+    value: clamp(base + 3),
+    label: "punch",
+    alignedBeat: "payoff",
+    alignedPunchline: true,
+  },
 ];
 
 const makeSegments = (base: number): NonNullable<ScoredMetric["segments"]> => [

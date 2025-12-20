@@ -30,9 +30,9 @@
 ## Phase 1: Metric Additions & Improvements
 
 ### Task 1.1: Silence-for-Emphasis Fidelity Upgrade
-- [ ] Implement relative-energy + speech-activity gap detection that tolerates crowd/bed noise; require min duration + drop vs local floor.
-- [ ] Annotate spans with placement intent (reset, punch, transition) and beat/punchline alignment; include duration and strength.
-- [ ] Tests: clips with ambient noise, commentator “shush” moments, and quiet B-roll; expect spans to register.
+- [x] Implement relative-energy + speech-activity gap detection that tolerates crowd/bed noise; require min duration + drop vs local floor.
+- [x] Annotate spans with placement intent (reset, punch, transition) and beat/punchline alignment; include duration and strength.
+- [x] Tests: clips with ambient noise, commentator “shush” moments, and quiet B-roll; expect spans to register.
 
 ### Task 1.2: Arc/Act Understanding
 - [ ] Improve beat detection to classify hook/setup/escalation/payoff/outro with cohesion scores and “drift” diagnostics per segment.

@@ -19,6 +19,18 @@ vi.mock("../gemini/client", () => {
 import { callGeminiMultimodalJson } from "../gemini/client";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
 
+const rich = (value: string, extra: Record<string, unknown> = {}) => ({
+  score: 70,
+  value,
+  explanation: "ok",
+  ...extra,
+});
+
+const silenceSpans = [
+  { startSeconds: 6, endSeconds: 6.9, value: 78, label: "reset", alignedBeat: "hook" },
+  { startSeconds: 42, endSeconds: 43.2, value: 88, label: "punch", alignedBeat: "payoff", alignedPunchline: true },
+];
+
 const sampleRaw = {
   voice: {
     speaking_rate: { score: 60, value: "155 wpm", explanation: "moderate pace" },
@@ -53,6 +65,54 @@ const sampleRaw = {
     sfx_density: { score: 30, value: "2 sfx", explanation: "light sfx" },
     silence_for_emphasis: { score: 20, value: "1 pause", explanation: "rare silence" },
   },
+  advanced_metrics: {
+    prosodyArc: {
+      paceMeanWpm: rich("150 wpm", { timeline: [{ timeSeconds: 0, value: 150 }] }),
+      paceVariabilityPct: rich("8% swing", { timeline: [{ timeSeconds: 0, value: 8 }] }),
+      withinSegmentPaceChangePct: rich("3% drift", { segments: [{ startSeconds: 0, endSeconds: 30, deltaPct: 3 }] }),
+      emphasisAlignmentScore: rich("key phrases stressed", { items: [{ phrase: "key idea", stressed: true }] }),
+      energyDriftDbPerMin: rich("1.2 dB/min", { trend: 0.2 }),
+    },
+    languageTexture: {
+      analogyExampleDefinitionRatio: rich("2/5/1", { counts: { analogies: 2, examples: 5, definitions: 1 } }),
+      sentenceCompressionRatio: rich("14 words/idea"),
+      humorTimingScore: rich("setup/punch spacing", { items: [{ setupStart: 10, punchStart: 12.5, deltaSeconds: 2.5, landed: true }] }),
+      referenceDensityPerMin: rich("3 refs/min", { counts: { cultural: 2, topical: 1 } }),
+      questionRate: rich("2 q/min", { counts: { rhetorical: 1, genuine: 1 } }),
+    },
+    narrativeArc: {
+      timeToHookSeconds: rich("7s"),
+      hookStrengthScore: rich("clear promise", { items: [{ beatTime: 7, devices: ["contrast"], promiseClarity: "high" }] }),
+      segmentCohesionDrift: rich("cohesion drift", { timeline: [{ timeSeconds: 15, value: 0.8 }] }),
+      openLoopsUnresolvedRatio: rich("1/3 unresolved", { items: [{ openedAt: 12, resolvedAt: 70, label: "mystery" }] }),
+      endingResolutionScore: rich("resolved", { items: [{ payoffDelivered: true, ctaClarity: "explicit", callbackCount: 2 }] }),
+    },
+    visualEditAlignment: {
+      visualEntropy: rich("entropy", { timeline: [{ timeSeconds: 1, value: 0.6 }] }),
+      cutRateRefinement: rich("2.0s median", { items: [{ medianShotSeconds: 2, variance: 0.5, beatCouplingDelta: 0.2 }] }),
+      silenceForEmphasisFidelity: rich("2 spans", { spans: silenceSpans }),
+      audioVisualEmphasisAlignment: rich("peaks aligned", { timeline: [{ timeSeconds: 10, value: 0.8 }] }),
+      beatsVsEditsAlignment: rich("edits support beats", { timeline: [{ timeSeconds: 5, value: 0.6 }] }),
+      prosodyVsSemanticImportanceAlignment: rich("prosody on key ideas", {
+        items: [{ phrase: "core insight", importanceScore: 0.9, stressed: true }],
+      }),
+    },
+    modalityBalance: {
+      redundancyVsComplementarity: rich("balanced", { proportions: { redundantPct: 0.2, complementaryPct: 0.7, conflictingPct: 0.1 } }),
+      modalityOverReliance: rich("voice-led", { proportions: { voicePct: 0.6, visualPct: 0.3, textPct: 0.1 } }),
+    },
+    cognitiveLoad: {
+      loadPerSecond: rich("load timeline", { timeline: [{ timeSeconds: 0, value: 40 }] }),
+      loadHighlights: rich("load spikes", { spans: [{ startSeconds: 20, endSeconds: 22, value: 75, label: "dense" }] }),
+    },
+    secondOrder: {
+      alignmentScore: rich("aligned"),
+      driftScore: rich("steady"),
+      decayScore: rich("no decay"),
+      balanceScore: rich("balanced"),
+      timingScore: rich("on time"),
+    },
+  },
 };
 
 describe("analyzeVideoMultimodal", () => {
@@ -85,5 +145,15 @@ describe("analyzeVideoMultimodal", () => {
     expect(result.profiles.voice.highlights?.some((h) => h.includes("fallback"))).toBe(true);
     expect(result.diagnostics.fromFallback).toBe(true);
     expect(result.axisDetails["voice.speaking_rate"]?.observed).toBe(true);
+  });
+
+  it("maps silence spans with intent, strength, and alignment", async () => {
+    const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
+    const spans = result.advancedMetrics?.visualEditAlignment.silenceForEmphasisFidelity.spans ?? [];
+    expect(spans.length).toBeGreaterThan(0);
+    expect(spans[0]?.label).toBe("reset");
+    expect(spans[0]?.alignedBeat).toBe("hook");
+    expect(spans.some((span) => span?.alignedPunchline === true)).toBe(true);
+    expect(typeof spans[0]?.value).toBe("number");
   });
 });
