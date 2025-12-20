@@ -233,6 +233,7 @@ const responseJsonSchema = {
             humorTimingScore: metricSchema,
             referenceDensityPerMin: metricSchema,
             questionRate: metricSchema,
+            audienceAddressFrequency: metricSchema,
           },
           required: [
             "analogyExampleDefinitionRatio",
@@ -240,6 +241,7 @@ const responseJsonSchema = {
             "humorTimingScore",
             "referenceDensityPerMin",
             "questionRate",
+            "audienceAddressFrequency",
           ],
         },
         narrativeArc: {
@@ -338,7 +340,7 @@ const userPrompt = [
   "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
   "Advanced metrics (alignment/arc/load): include an `advanced_metrics` object with these sections:",
   "- prosodyArc: paceMeanWpm (timeline 10s windows), paceVariabilityPct (timeline), withinSegmentPaceChangePct (segments with deltaPct), emphasisAlignmentScore (items for stressed phrases + time), energyDriftDbPerMin (trend + timeline).",
-  "- languageTexture: analogyExampleDefinitionRatio (counts proportions), sentenceCompressionRatio (words per idea), humorTimingScore (items with setupStart/punchStart/deltaSeconds/landed), referenceDensityPerMin (counts), questionRate (counts for rhetorical vs genuine).",
+  "- languageTexture: analogyExampleDefinitionRatio (counts proportions), sentenceCompressionRatio (words per idea), humorTimingScore (items with setupStart/punchStart/deltaSeconds/landed), referenceDensityPerMin (counts), questionRate (counts for rhetorical vs genuine), audienceAddressFrequency (counts per minute with direct vs rhetorical breakdown and optional timeline).",
   "- narrativeArc: timeToHookSeconds (derive from first hook beat if present), hookStrengthScore (items with beatTime, devices, promiseClarity), segmentCohesionDrift (timeline per segment), openLoopsUnresolvedRatio (items openedAt/resolvedAt/label), endingResolutionScore (items payoffDelivered/ctaClarity/callbackCount).",
   "- visualEditAlignment: visualEntropy (timeline), cutRateRefinement (items medianShotSeconds/variance/beatCouplingDelta), silenceForEmphasisFidelity (relative-energy speech gaps >0.6s; spans include start/end/durationSec, value=strength 0-100, label=placement intent reset|punch|transition, alignedBeat/punchline), audioVisualEmphasisAlignment (timeline with offsets), beatsVsEditsAlignment (timeline per beat), prosodyVsSemanticImportanceAlignment (items phrase/importanceScore/stressed).",
   "- modalityBalance: redundancyVsComplementarity (proportions redundantPct/complementaryPct/conflictingPct), modalityOverReliance (proportions with dominant mode).",
@@ -621,6 +623,10 @@ const mapAdvancedMetrics = (
         base.languageTexture.referenceDensityPerMin,
       ),
       questionRate: mapMetric(advanced.languageTexture?.questionRate, base.languageTexture.questionRate),
+      audienceAddressFrequency: mapMetric(
+        advanced.languageTexture?.audienceAddressFrequency,
+        base.languageTexture.audienceAddressFrequency,
+      ),
     },
     narrativeArc: {
       timeToHookSeconds: mapMetric(

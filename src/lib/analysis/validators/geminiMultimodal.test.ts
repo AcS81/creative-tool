@@ -30,6 +30,7 @@ const advancedMetric = (): GeminiMultimodalResponse["advanced_metrics"] =>
       humorTimingScore: { ...metric("jokes"), items: [{ setupStart: 1, punchStart: 3, deltaSeconds: 2, landed: true }] },
       referenceDensityPerMin: { ...metric("2/min"), counts: { cultural: 1 } },
       questionRate: { ...metric("3/min"), counts: { rhetorical: 1, genuine: 2 } },
+      audienceAddressFrequency: { ...metric("3 addr/min"), counts: { direct: 2, rhetorical: 1 } },
     },
     narrativeArc: {
       timeToHookSeconds: metric("8s"),
@@ -77,6 +78,7 @@ const buildResponse = (): GeminiMultimodalResponse => ({
     references: metric("cultural 3 / historical 0"),
     humor: metric("2 jokes"),
     teaching_vs_riffing: metric("70% instructional"),
+    audienceAddressFrequency: metric("3 addr/min"),
   },
   narrative: {
     beats: [

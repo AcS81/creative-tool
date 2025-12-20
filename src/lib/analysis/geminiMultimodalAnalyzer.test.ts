@@ -82,6 +82,13 @@ const sampleRaw = {
       humorTimingScore: rich("setup/punch spacing", { items: [{ setupStart: 10, punchStart: 12.5, deltaSeconds: 2.5, landed: true }] }),
       referenceDensityPerMin: rich("3 refs/min", { counts: { cultural: 2, topical: 1 } }),
       questionRate: rich("2 q/min", { counts: { rhetorical: 1, genuine: 1 } }),
+      audienceAddressFrequency: rich("3 addr/min", {
+        counts: { direct: 2, rhetorical: 1 },
+        timeline: [
+          { timeSeconds: 5, value: 60 },
+          { timeSeconds: 25, value: 75 },
+        ],
+      }),
     },
     narrativeArc: {
       timeToHookSeconds: rich("7s"),

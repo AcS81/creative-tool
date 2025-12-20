@@ -40,8 +40,8 @@
 - [x] Calibrate `timeToHookSeconds` and `hookStrengthScore` against a small labeled set; add fixtures.
 
 ### Task 1.3: Audience Address Frequency
-- [ ] Add `audience_address_frequency` (you/we addressing) as a language/voice metric with counts per minute + rhetorical vs direct.
-- [ ] Wire through prompt, validator, schema/types, mocks, and defaults; ensure axis metadata + glossary entries exist.
+- [x] Add `audience_address_frequency` (you/we addressing) as a language/voice metric with counts per minute + rhetorical vs direct.
+- [x] Wire through prompt, validator, schema/types, mocks, and defaults; ensure axis metadata + glossary entries exist.
 
 ### Task 1.4: Language Texture Completeness
 - [ ] Ensure analogy/example/definition ratio, sentence compression, humor timing, question rate, and reference density all carry counts/timelines/items.

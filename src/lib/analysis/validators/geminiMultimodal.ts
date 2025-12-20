@@ -115,6 +115,7 @@ const advancedLanguageTextureSchema = z.object({
   humorTimingScore: richMetricSchema,
   referenceDensityPerMin: richMetricSchema,
   questionRate: richMetricSchema,
+  audienceAddressFrequency: richMetricSchema,
 });
 
 const advancedNarrativeArcSchema = z.object({

@@ -497,6 +497,15 @@ const languageTextureAxes: AxisMetadata[] = [
     scaleDirection: "low=none, mid=engaging, high=interrogative barrage",
     aliases: ["question_rate"],
   },
+  {
+    id: "language.audience_address_frequency",
+    domain: "language",
+    label: "Audience address frequency",
+    shortDescription: "How often the speaker addresses the audience (you/we).",
+    howMeasured: "Counts per minute split by direct vs rhetorical; ignores quoted speech.",
+    scaleDirection: "low=detached, high=engaging",
+    aliases: ["audience_address_frequency"],
+  },
 ];
 
 const narrativeArcAxes: AxisMetadata[] = [

@@ -166,6 +166,7 @@ export interface LanguageTexture {
   humorTimingScore: ScoredMetric;
   referenceDensityPerMin: ScoredMetric;
   questionRate: ScoredMetric;
+  audienceAddressFrequency: ScoredMetric;
 }
 
 export interface NarrativeArc {

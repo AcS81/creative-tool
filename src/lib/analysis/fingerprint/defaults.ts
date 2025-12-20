@@ -27,6 +27,7 @@ export const buildDefaultAdvancedMetrics = (): AdvancedFingerprintMetrics => ({
     humorTimingScore: defaultMetric(),
     referenceDensityPerMin: defaultMetric(),
     questionRate: defaultMetric(),
+    audienceAddressFrequency: defaultMetric(),
   },
   narrativeArc: {
     timeToHookSeconds: defaultMetric(),

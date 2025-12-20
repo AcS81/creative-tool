@@ -79,6 +79,13 @@ export const buildMockAdvancedMetrics = (seed: number): AdvancedFingerprintMetri
     questionRate: metric(deriveScore(seed, 33), `${(deriveScore(seed, 33) % 6) + 1} q/min`, {
       counts: { rhetorical: (seed % 3) + 1, genuine: (seed % 2) + 1 },
     }),
+    audienceAddressFrequency: metric(deriveScore(seed, 46), `${(seed % 5) + 1} addr/min`, {
+      counts: { direct: (seed % 3) + 1, rhetorical: (seed % 2) + 1 },
+      timeline: [
+        { timeSeconds: 8, value: clamp(deriveScore(seed, 46) - 5) },
+        { timeSeconds: 32, value: clamp(deriveScore(seed, 46)) },
+      ],
+    }),
   };
 
   const narrativeArc: AdvancedFingerprintMetrics["narrativeArc"] = {
