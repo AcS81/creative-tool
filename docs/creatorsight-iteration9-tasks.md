@@ -48,13 +48,13 @@
 - [x] Add tests for partial/missing data; enforce non-empty diagnostics when observed.
 
 ### Task 1.5: Pace/Energy/Visual Dynamics
-- [ ] Tighten speaking pace mean/variance and within-segment drift timelines; validate WPM ranges and % swings.
-- [ ] Improve energy drift slope (dB/min) smoothing to avoid false negatives; keep timelines populated.
-- [ ] Upgrade visual entropy and cut-rate refinement (median/variance/beat coupling) to reduce “unobserved” on noisy videos.
+- [x] Tighten speaking pace mean/variance and within-segment drift timelines; validate WPM ranges and % swings.
+- [x] Improve energy drift slope (dB/min) smoothing to avoid false negatives; keep timelines populated.
+- [x] Upgrade visual entropy and cut-rate refinement (median/variance/beat coupling) to reduce “unobserved” on noisy videos.
 
 ### Task 1.6: Second-order Rebalance
-- [ ] Recompute Alignment/Drift/Decay/Balance/Timing formulas with the upgraded metrics; document weighting and any clamping.
-- [ ] Add sanity tests (high alignment clip vs drifty clip) to confirm score spread.
+- [x] Recompute Alignment/Drift/Decay/Balance/Timing formulas with the upgraded metrics; document weighting and any clamping.
+- [x] Add sanity tests (high alignment clip vs drifty clip) to confirm score spread.
 
 ---
 
