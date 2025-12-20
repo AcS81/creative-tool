@@ -75,9 +75,9 @@
 ---
 
 ## Phase 4: Documentation & Glossary
-- [ ] Update `docs/axes_and_domains.md` and `docs/iteration_6_metric_semantics.md` with new/changed metrics (audience address, silence rules, arc labeling).
-- [ ] Add `docs/iteration_9_e2e.md` checklist: run Gemini mode, verify silence spans, audience-address metric, arc beats, and second-order scores are populated; confirm diagnostics callouts.
-- [ ] Note default/fallback behaviour and how to interpret “unobserved” for the new metrics.
+- [x] Update `docs/axes_and_domains.md` and `docs/iteration_6_metric_semantics.md` with new/changed metrics (audience address, silence rules, arc labeling).
+- [x] Add `docs/iteration_9_e2e.md` checklist: run Gemini mode, verify silence spans, audience-address metric, arc beats, and second-order scores are populated; confirm diagnostics callouts.
+- [x] Note default/fallback behaviour and how to interpret “unobserved” for the new metrics.
 
 ---
 

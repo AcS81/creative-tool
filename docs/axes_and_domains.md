@@ -26,6 +26,7 @@ This is a quick, human-readable glossary for the axes shown in the Overview rada
 - **Teaching vs riffing** – structured instruction vs loose commentary; low=riffing, high=instructional.
 - **Story presence** – anecdotal/story phrasing vs straight exposition; low=explanatory, high=story-led.
 - **Visualizability** – ease of picturing what’s said; low=abstract, high=imagery-rich.
+- **Audience address frequency** – how often the speaker addresses the audience (you/we), split by direct vs rhetorical; low=detached, high=engaging. Unobserved when no addresses are detected.
 
 ## Narrative
 - **Story presence** – proportion of beats that are hook/setup/escalation/payoff vs pure explanation.
@@ -51,7 +52,7 @@ This is a quick, human-readable glossary for the axes shown in the Overview rada
 - **Music changes** – count of distinct music shifts.
 - **Music vs voice** – balance of music loudness to narration; low=understated, high=overpowering.
 - **SFX density** – notable sound effects; low=rare, high=frequent.
-- **Silence for emphasis** – intentional quiet spans; low=none, high=frequent.
+- **Silence for emphasis** – intentional quiet spans found via relative-energy gaps that drop below the local floor for >0.6s (ignoring bed/crowd noise); low=none, high=frequent and well-placed.
 
 ## Interpreting scores
 - Scores are directional, not clinical measurements.
