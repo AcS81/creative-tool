@@ -1,92 +1,91 @@
 # CreatorSight – Iteration 10 Implementation Tasks (User Presentation & Coaching of Advanced Signals)
 
 ## Document Information
-- **Product**: CreatorSight  
-- **Iteration**: 10 – Advanced Signal Presentation & Actionable Coaching  
-- **Version**: 1.0  
-- **Status**: Draft – starts after Iteration 9 signal coverage lands  
-- **Target Outcome**: Every factor from `todo.md` is visible, legible, and actionable in the UI. Users can see pacing, silence, arc, alignment, and language texture at a glance, with clear coaching and no hidden data.
+- **Product**: CreatorSight
+- **Iteration**: 10 – Advanced Signal Presentation & Actionable Coaching (post-Iteration 8 UI uplift)
+- **Version**: 1.0
+- **Status**: Draft – starts after Iteration 9 signal coverage lands
+- **Target Outcome**: Surface the remaining hidden factors from `todo.md` with clear visuals and coaching. Focus on data-only signals (language texture ratios/compression/reference density, prosody/energy details, visual entropy/cut refinement, redundancy/complementarity, second-order summaries, audience-address) while keeping the Iteration 8 wins (pace/humor/silence timelines, alignment/load panel) intact.
 
-> Scope: Turn the upgraded metrics into a polished, comprehensible experience. Add timelines, badges, and microcopy so users understand what the signals mean and how to act on them. Keep schema intact; focus on presentation, navigation, and clarity.
+> Scope: Turn the upgraded metrics into a polished, comprehensible experience without redoing the Iteration 8 surfaces. Keep schema intact; focus on presentation, navigation, and clarity for the signals that are still invisible to users.
 
 ---
 
 ## High-level Outcomes
-- Overview and domain tabs surface all advanced signals (pace mean/variance/drift, emphasis alignment, energy drift, audience address, analogies/examples/definitions, humor timing, question mix, reference density, time-to-hook/arc health, silence fidelity, visual entropy/cut pace, alignment/balance/timing scores).
-- Cross-modal alignment and cognitive load are visualized with timelines/spans and linked glossary tooltips.
+- Overview and domain tabs surface the still-hidden advanced signals: language texture ratios/compression/reference density, prosody/energy timelines (emphasis alignment, energy drift), visual entropy + cut refinement, redundancy/complementarity, second-order summary row, and the audience-address metric.
+- Cross-modal alignment and cognitive load visuals from Iteration 8 remain; add glossary tooltips and badges for the new surfaces.
 - Coaching bullets tie second-order scores (Alignment/Drift/Decay/Balance/Timing) to actionable guidance; no references to missing data.
 - Mobile/desktop layouts handle dense data with collapsible sections and clear empty/fallback states.
 
 ---
 
 ## Phase 0: UX Narrative & IA
-- [ ] Design a single “Advanced signals” narrative: what the user should learn first, second, third (pace → arc → alignment → load → balance).
-- [ ] IA update: ensure navigation or anchors let users jump to pace, arc, alignment, load, language texture, and silence visuals quickly.
+- [ ] Design a concise “Advanced signals” narrative for the remaining hidden data: language texture, prosody/energy, visual entropy/cut refinement, modality balance, second-order summaries, audience-address.
+- [ ] IA update: anchors/sections to jump directly to these widgets; keep existing pace/humor/silence/alignment UI unchanged.
 - [ ] Glossary/tooltips plan that reuses `docs/axes_and_domains.md` entries; avoid duplicating copy.
 
 ---
 
 ## Phase 1: Overview Surfaces
-- [ ] Add a multi-lane strip under the radar showing:  
-  - Speaking pace mean + variance timeline (10s bins).  
-  - Energy drift trend.  
-  - Cognitive load timeline with spike badges.  
-  - Silence-for-emphasis spans (with beat/punch alignment).
-- [ ] Alignment timeline: paired audio/visual peak offsets + beats-vs-edits list (worst/best deltas) + modality over-reliance badge.
-- [ ] Second-order summary row: Alignment/Drift/Decay/Balance/Timing with short labels and hover hints; hide metrics marked unobserved.
-- [ ] Add an “Analysis status” chip summarizing observed/unobserved counts and fallback usage.
+- [ ] Add a multi-lane strip for the still-hidden metrics:
+  - Energy drift trend (prosody).
+  - Visual entropy strip with spikes.
+  - Cut-rate refinement summary (median/variance/beat coupling).
+  - Redundancy/complementarity proportions badge.
+  - Audience-address frequency badge (you/we per minute; rhetorical vs direct).
+- [ ] Second-order summary row: Alignment/Drift/Decay/Balance/Timing with short labels, hover hints, and “not observed” states.
+- [ ] Keep existing Alignment & Load panel; add glossary tooltips and links where missing.
 
 ---
 
 ## Phase 2: Domain Tabs – Deep Exposure
 
 ### Voice/Delivery
-- [ ] Show speaking pace mean/variance and within-segment drift mini-chart; include emphasis-alignment and energy-drift notes.
-- [ ] Add audience-address frequency badge (you/we per minute, rhetorical vs direct) with a short interpretation.
-- [ ] Humor timing and question mix widgets (setup→punch deltas, rhetorical vs genuine counts).
+- [ ] Add energy-drift and emphasis-alignment badges; keep existing pace mini-chart.
+- [ ] Audience-address frequency badge (you/we per minute, rhetorical vs direct) with short interpretation.
+- [ ] Keep humor timing/question mix widget; add prosody vs semantic importance note if observed.
 
 ### Language
-- [ ] Visualize analogy/example/definition ratios (stacked bar) and sentence compression distribution; show reference density per minute with type legend.
-- [ ] Surface metaphor density and concreteness in the score bars with tooltips that link to glossary.
+- [ ] Visualize analogy/example/definition ratios (stacked bar) and sentence compression distribution.
+- [ ] Reference density per minute with type legend; keep metaphor density/concreteness tooltips.
 
 ### Narrative
-- [ ] Display time-to-hook marker on a mini timeline; show hook strength chip and open-loop resolution list.  
-- [ ] Mini-arc bar overlays beats/segments plus cohesion drift timeline; flag drift when high.
+- [ ] Open-loop resolution list and segment cohesion drift mini-chart; keep time-to-hook/hook strength callout.
+- [ ] Mini-arc bar remains; add drift flag when high.
 
 ### Visual/Edit
-- [ ] Visual entropy strip chart with spikes annotated; cut-rate refinement card (median/variance/beat coupling).  
-- [ ] Silence-for-emphasis spans overlaid on timeline; highlight if aligned to beats/punchlines.  
-- [ ] Big-guns callouts (pace, cut rate, metaphor density) pinned for quick read.
+- [ ] Visual entropy strip with spike annotations; cut-rate refinement card (median/variance/beat coupling).
+- [ ] Keep silence spans overlay; add beat-aligned labels if present.
 
 ### Sound/Performance
-- [ ] Alignment note card (audio-visual emphasis alignment) and silence fidelity badge in Sound tab.  
-- [ ] If performance data exists, keep the refreshed layout from Iteration 8 but add alignment with beats (retention + beat overlays).
+- [ ] Add redundancy/complementarity badge to show mix of audio/visual/text signals.
+- [ ] Keep alignment note and silence fidelity badge; performance tab stays as refreshed in Iteration 8.
 
 ---
 
 ## Phase 3: Coaching & Copy
-- [ ] Generate actionable insights that map second-order scores to guidance (e.g., “Low timing: hooks land late; try moving first hook <10s and align silences with payoffs”).  
-- [ ] Add microcopy beside each chart explaining what “good” looks like (pull from metric semantics docs).  
+- [ ] Generate actionable insights that map second-order scores to guidance (e.g., “Low balance: redundancy high—add complementary visuals”).
+- [ ] Add microcopy beside each new chart explaining what “good” looks like (pull from metric semantics docs).
 - [ ] Guardrails: never show advice when metrics are unobserved; display a friendly “Not observed” chip instead.
 
 ---
 
 ## Phase 4: Responsiveness, States, and Accessibility
-- [ ] Collapsible sections for dense timelines on mobile; preserve hover data via tap-to-focus.  
-- [ ] Empty/fallback states per widget (pace timeline missing, silence spans missing, etc.) with reasons from diagnostics.  
+- [ ] Collapsible sections for dense timelines on mobile; preserve hover data via tap-to-focus.
+- [ ] Empty/fallback states per new widget (entropy timeline missing, cut refinement missing, etc.) with reasons from diagnostics.
 - [ ] ARIA/keyboard: ensure new charts and badges are keyboard-focusable with text alternatives; verify contrast.
 
 ---
 
 ## Phase 5: E2E & Regression
-- [ ] Add `docs/iteration_10_e2e.md` with a checklist that walks through every advanced surface on desktop and mobile (including mock mode).  
-- [ ] Update visual regression/screenshot set to cover the new advanced strips, silence spans, alignment timeline, and language texture charts.  
+- [ ] Add `docs/iteration_10_e2e.md` with a checklist that walks through every new advanced surface on desktop and mobile (including mock mode).
+- [ ] Update visual regression/screenshot set to cover the new advanced strips, entropy/cut refinement, language texture charts, and second-order summary row.
 - [ ] Quick smoke script to assert UI renders when any advanced metric is unobserved (no crashes, clear messaging).
 
 ---
 
 ## Done When
-- Users can see and interpret all `todo.md` signals in the UI with clear labels, timelines/spans, and short coaching.  
-- Alignment/load/pace/arc/silence and language texture visuals render on desktop and mobile with graceful fallbacks.  
-- Insights and badges never reference missing data; diagnostics explain what was observed.  
+- Users can see and interpret the remaining `todo.md` signals in the UI with clear labels, timelines/spans, and short coaching.
+- Alignment/load/pace/arc/silence visuals from Iteration 8 stay intact; new entropy/cut, language texture, and balance surfaces render on desktop and mobile with graceful fallbacks.
+- Insights and badges never reference missing data; diagnostics explain what was observed.
 - E2E checklist and visual snapshots cover the new components; no regressions or dead states.

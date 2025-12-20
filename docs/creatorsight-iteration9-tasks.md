@@ -21,9 +21,9 @@
 ---
 
 ## Phase 0: Gap Audit & Acceptance
-- [ ] Map each `todo.md` factor to schema fields (or new ones) with acceptance criteria; add to `docs/iteration_9_gap_matrix.md`.
-- [ ] Define measurement correctness thresholds (e.g., silence gap detection must find >80% of known pauses in a test clip).
-- [ ] Confirm rollback flag behaviour (`ENABLE_ADVANCED_METRICS`) still works with new metrics.
+- [x] Map each `todo.md` factor to schema fields (or new ones) with acceptance criteria; add to `docs/iteration_9_gap_matrix.md`.
+- [x] Define measurement correctness thresholds (e.g., silence gap detection must find >80% of known pauses in a test clip).
+- [x] Confirm rollback flag behaviour (`ENABLE_ADVANCED_METRICS`) still works with new metrics.
 
 ---
 
