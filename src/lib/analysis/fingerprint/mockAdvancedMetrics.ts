@@ -69,7 +69,12 @@ export const buildMockAdvancedMetrics = (seed: number): AdvancedFingerprintMetri
     analogyExampleDefinitionRatio: metric(l1, "balance of examples/analogies/definitions", {
       counts: { analogies: (l1 % 3) + 1, examples: (l1 % 4) + 2, definitions: (l1 % 2) + 1 },
     }),
-    sentenceCompressionRatio: metric(l2, `${10 + (l2 % 8)} words/idea`),
+    sentenceCompressionRatio: metric(l2, `${10 + (l2 % 8)} words/idea`, {
+      timeline: [
+        { timeSeconds: 5, value: clamp(10 + (l2 % 8)) },
+        { timeSeconds: 25, value: clamp(12 + (l2 % 6)) },
+      ],
+    }),
     humorTimingScore: metric(deriveScore(seed, 31), "setup/punch spacing", {
       items: [{ setupStart: 12, punchStart: 15, deltaSeconds: 3, landed: true }],
     }),
@@ -78,6 +83,10 @@ export const buildMockAdvancedMetrics = (seed: number): AdvancedFingerprintMetri
     }),
     questionRate: metric(deriveScore(seed, 33), `${(deriveScore(seed, 33) % 6) + 1} q/min`, {
       counts: { rhetorical: (seed % 3) + 1, genuine: (seed % 2) + 1 },
+      timeline: [
+        { timeSeconds: 14, value: clamp(deriveScore(seed, 33)) },
+        { timeSeconds: 44, value: clamp(deriveScore(seed, 33) - 5) },
+      ],
     }),
     audienceAddressFrequency: metric(deriveScore(seed, 46), `${(seed % 5) + 1} addr/min`, {
       counts: { direct: (seed % 3) + 1, rhetorical: (seed % 2) + 1 },

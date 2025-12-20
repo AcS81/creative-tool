@@ -78,10 +78,21 @@ const sampleRaw = {
     },
     languageTexture: {
       analogyExampleDefinitionRatio: rich("2/5/1", { counts: { analogies: 2, examples: 5, definitions: 1 } }),
-      sentenceCompressionRatio: rich("14 words/idea"),
+      sentenceCompressionRatio: rich("14 words/idea", {
+        timeline: [
+          { timeSeconds: 10, value: 14 },
+          { timeSeconds: 30, value: 16 },
+        ],
+      }),
       humorTimingScore: rich("setup/punch spacing", { items: [{ setupStart: 10, punchStart: 12.5, deltaSeconds: 2.5, landed: true }] }),
       referenceDensityPerMin: rich("3 refs/min", { counts: { cultural: 2, topical: 1 } }),
-      questionRate: rich("2 q/min", { counts: { rhetorical: 1, genuine: 1 } }),
+      questionRate: rich("2 q/min", {
+        counts: { rhetorical: 1, genuine: 1 },
+        timeline: [
+          { timeSeconds: 8, value: 2 },
+          { timeSeconds: 28, value: 1 },
+        ],
+      }),
       audienceAddressFrequency: rich("3 addr/min", {
         counts: { direct: 2, rhetorical: 1 },
         timeline: [
@@ -166,5 +177,14 @@ describe("analyzeVideoMultimodal", () => {
     expect(spans[0]?.alignedBeat).toBe("hook");
     expect(spans.some((span) => span?.alignedPunchline === true)).toBe(true);
     expect(typeof spans[0]?.value).toBe("number");
+  });
+
+  it("preserves language texture diagnostics (counts, timelines)", async () => {
+    const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
+    const language = result.advancedMetrics?.languageTexture;
+    expect(language?.analogyExampleDefinitionRatio.counts?.analogies).toBe(2);
+    expect(language?.sentenceCompressionRatio.timeline?.length).toBeGreaterThan(0);
+    expect(language?.questionRate.timeline?.length).toBeGreaterThan(0);
+    expect(language?.audienceAddressFrequency.counts?.direct).toBe(2);
   });
 });

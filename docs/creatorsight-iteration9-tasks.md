@@ -44,8 +44,8 @@
 - [x] Wire through prompt, validator, schema/types, mocks, and defaults; ensure axis metadata + glossary entries exist.
 
 ### Task 1.4: Language Texture Completeness
-- [ ] Ensure analogy/example/definition ratio, sentence compression, humor timing, question rate, and reference density all carry counts/timelines/items.
-- [ ] Add tests for partial/missing data; enforce non-empty diagnostics when observed.
+- [x] Ensure analogy/example/definition ratio, sentence compression, humor timing, question rate, and reference density all carry counts/timelines/items.
+- [x] Add tests for partial/missing data; enforce non-empty diagnostics when observed.
 
 ### Task 1.5: Pace/Energy/Visual Dynamics
 - [ ] Tighten speaking pace mean/variance and within-segment drift timelines; validate WPM ranges and % swings.
