@@ -47,6 +47,8 @@ export async function POST(request: Request) {
       ok: true,
       fromFallback: analysis.diagnostics.fromFallback,
       unobservedCounts: analysis.diagnostics.unobservedCounts,
+      coverage: analysis.diagnostics.coverage,
+      salvage: analysis.diagnostics.salvage,
       fingerprint,
       diagnostics: {
         source: "gemini-v2-multimodal",

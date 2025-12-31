@@ -88,6 +88,7 @@ const buildResponse = (): GeminiMultimodalResponse => ({
     mini_arc_density: metric("3"),
     foreshadow_callbacks: metric("2 callbacks"),
     transition_clarity: metric("guided"),
+    story_presence: metric("present"),
   },
   visual_edit_sound: {
     environment_stability: metric("78% same setup"),

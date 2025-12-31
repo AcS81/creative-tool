@@ -101,6 +101,8 @@ export async function analyzeVideo(
   const beats = multimodal.beats;
   const axisDetails = multimodal.axisDetails;
   const unobservedCounts = multimodal.diagnostics.unobservedCounts;
+  const coverage = multimodal.diagnostics.coverage;
+  const salvage = multimodal.diagnostics.salvage;
   const multimodalFallbackUsed = Boolean(multimodal.diagnostics.fromFallback);
 
   const perDomain: FingerprintPerDomain = {
@@ -196,6 +198,8 @@ export async function analyzeVideo(
       lowerConfidence,
       lowerConfidenceReason,
       unobservedCounts,
+      coverage,
+      salvage,
       advancedMetricsDefaulted,
       advancedMetricsObserved,
       advancedMetricsDefaultReason,

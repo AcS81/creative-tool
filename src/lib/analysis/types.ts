@@ -36,6 +36,16 @@ export interface AnalyzeVideoResult {
       cognitiveLoad?: boolean;
       secondOrder?: boolean;
     };
+    coverage?: {
+      core?: Record<string, { observed: number; total: number; missing: string[]; observedPct: number }>;
+      advanced?: Record<string, { observed: number; total: number; missing: string[]; observedPct: number; available?: boolean }>;
+      supplemental?: Record<string, { observed: number; total: number; missing: string[]; observedPct: number; available?: boolean }>;
+    };
+    salvage?: {
+      attempted?: boolean;
+      sections?: string[];
+      reason?: string;
+    };
   };
 }
 

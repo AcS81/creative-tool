@@ -6,6 +6,7 @@ import type {
   GeminiObservedMetric,
   GeminiRichMetric,
 } from "../types/multimodal";
+import { ADVANCED_METRIC_SECTIONS, BASE_DOMAIN_METRICS } from "../metricRegistry";
 
 const timelinePointSchema = z.object({
   timeSeconds: z.number().min(0),
@@ -58,100 +59,56 @@ const beatSchema: z.ZodType<GeminiBeat> = z
     path: ["end"],
   });
 
-const voiceSchema = z
-  .object({
-    speaking_rate: observedMetricSchema,
-    filler_rate: observedMetricSchema,
-    pauses: observedMetricSchema,
-    loudness_range: observedMetricSchema,
-    pitch_variation: observedMetricSchema,
-  })
-  .passthrough();
+const buildObservedMetricFields = (keys: readonly string[]) =>
+  Object.fromEntries(keys.map((key) => [key, observedMetricSchema])) as Record<
+    string,
+    z.ZodType<GeminiObservedMetric>
+  >;
 
-const languageSchema = z
-  .object({
-    concreteness: observedMetricSchema,
-    metaphor_density: observedMetricSchema,
-    references: observedMetricSchema,
-    humor: observedMetricSchema,
-    teaching_vs_riffing: observedMetricSchema,
-  })
-  .passthrough();
+const buildRichMetricFields = (keys: readonly string[]) =>
+  Object.fromEntries(keys.map((key) => [key, richMetricSchema])) as Record<
+    string,
+    z.ZodType<GeminiRichMetric>
+  >;
+
+const voiceSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.voice)).passthrough();
+
+const languageSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.language)).passthrough();
 
 const narrativeSchema = z
   .object({
     beats: z.array(beatSchema).min(1, "beats must contain at least one segment"),
-    mini_arc_density: observedMetricSchema,
-    foreshadow_callbacks: observedMetricSchema,
-    transition_clarity: observedMetricSchema,
+    ...buildObservedMetricFields(BASE_DOMAIN_METRICS.narrative),
+    devices: z
+      .array(
+        z.object({
+          type: z.string().min(1),
+          timestamp: z.number().min(0),
+        }),
+      )
+      .optional(),
   })
   .passthrough();
 
 const visualEditSoundSchema = z
-  .object({
-    environment_stability: observedMetricSchema,
-    talking_vs_broll_vs_graphics: observedMetricSchema,
-    cut_rate: observedMetricSchema,
-    pattern_interrupts: observedMetricSchema,
-    broll_coverage: observedMetricSchema,
-    music_coverage: observedMetricSchema,
-    music_changes: observedMetricSchema,
-    sfx_density: observedMetricSchema,
-    silence_for_emphasis: observedMetricSchema,
-  })
+  .object(buildObservedMetricFields(BASE_DOMAIN_METRICS.visual_edit_sound))
   .passthrough();
 
-const advancedProsodyArcSchema = z.object({
-  paceMeanWpm: richMetricSchema,
-  paceVariabilityPct: richMetricSchema,
-  withinSegmentPaceChangePct: richMetricSchema,
-  emphasisAlignmentScore: richMetricSchema,
-  energyDriftDbPerMin: richMetricSchema,
-});
+const advancedProsodyArcSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.prosodyArc));
 
-const advancedLanguageTextureSchema = z.object({
-  analogyExampleDefinitionRatio: richMetricSchema,
-  sentenceCompressionRatio: richMetricSchema,
-  humorTimingScore: richMetricSchema,
-  referenceDensityPerMin: richMetricSchema,
-  questionRate: richMetricSchema,
-  audienceAddressFrequency: richMetricSchema,
-});
+const advancedLanguageTextureSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.languageTexture));
 
-const advancedNarrativeArcSchema = z.object({
-  timeToHookSeconds: richMetricSchema,
-  hookStrengthScore: richMetricSchema,
-  segmentCohesionDrift: richMetricSchema,
-  openLoopsUnresolvedRatio: richMetricSchema,
-  endingResolutionScore: richMetricSchema,
-});
+const advancedNarrativeArcSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.narrativeArc));
 
-const advancedVisualEditAlignmentSchema = z.object({
-  visualEntropy: richMetricSchema,
-  cutRateRefinement: richMetricSchema,
-  silenceForEmphasisFidelity: richMetricSchema,
-  audioVisualEmphasisAlignment: richMetricSchema,
-  beatsVsEditsAlignment: richMetricSchema,
-  prosodyVsSemanticImportanceAlignment: richMetricSchema,
-});
+const advancedVisualEditAlignmentSchema = z.object(
+  buildRichMetricFields(ADVANCED_METRIC_SECTIONS.visualEditAlignment),
+);
 
-const advancedModalityBalanceSchema = z.object({
-  redundancyVsComplementarity: richMetricSchema,
-  modalityOverReliance: richMetricSchema,
-});
+const advancedModalityBalanceSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.modalityBalance));
 
-const advancedCognitiveLoadSchema = z.object({
-  loadPerSecond: richMetricSchema,
-  loadHighlights: richMetricSchema,
-});
+const advancedCognitiveLoadSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.cognitiveLoad));
 
-const advancedSecondOrderSchema = z.object({
-  alignmentScore: richMetricSchema,
-  driftScore: richMetricSchema,
-  decayScore: richMetricSchema,
-  balanceScore: richMetricSchema,
-  timingScore: richMetricSchema,
-});
+const advancedSecondOrderSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.secondOrder));
 
 const advancedMetricsSchema: z.ZodType<GeminiAdvancedMetrics> = z.object({
   prosodyArc: advancedProsodyArcSchema,

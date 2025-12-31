@@ -65,7 +65,7 @@ export interface GeminiNarrativeMetrics {
   mini_arc_density: GeminiObservedMetric;
   foreshadow_callbacks: GeminiObservedMetric;
   transition_clarity: GeminiObservedMetric;
-  story_presence?: GeminiObservedMetric;
+  story_presence: GeminiObservedMetric;
   devices?: Array<{
     type: string;
     timestamp: number;
@@ -98,6 +98,7 @@ export interface GeminiAdvancedLanguageTexture {
   humorTimingScore: GeminiRichMetric;
   referenceDensityPerMin: GeminiRichMetric;
   questionRate: GeminiRichMetric;
+  audienceAddressFrequency: GeminiRichMetric;
 }
 
 export interface GeminiAdvancedNarrativeArc {

@@ -10,6 +10,14 @@ type AnalysisResponse = {
   fingerprint?: VideoFingerprintJson;
   fromFallback?: boolean;
   unobservedCounts?: Record<string, number>;
+  coverage?: {
+    core?: Record<string, { observed: number; total: number; observedPct: number }>;
+    advanced?: Record<string, { observed: number; total: number; observedPct: number; available?: boolean }>;
+  };
+  salvage?: {
+    attempted?: boolean;
+    sections?: string[];
+  };
   raw?: unknown;
   error?: string;
   durationMs?: number;
@@ -119,6 +127,22 @@ export default function MultimodalDevPage() {
                 Unobserved metrics:{" "}
                 {Object.entries(result.unobservedCounts)
                   .map(([k, v]) => `${k}:${v}`)
+                  .join(" | ")}
+              </span>
+            ) : null}
+            {result.coverage?.core ? (
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-muted">
+                Coverage (core):{" "}
+                {Object.entries(result.coverage.core)
+                  .map(([k, v]) => `${k}:${v.observed}/${v.total}`)
+                  .join(" | ")}
+              </span>
+            ) : null}
+            {result.coverage?.advanced ? (
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-muted">
+                Coverage (advanced):{" "}
+                {Object.entries(result.coverage.advanced)
+                  .map(([k, v]) => `${k}:${v.observed}/${v.total}`)
                   .join(" | ")}
               </span>
             ) : null}

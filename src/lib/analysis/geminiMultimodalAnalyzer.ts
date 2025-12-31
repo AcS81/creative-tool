@@ -23,6 +23,7 @@ import { parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
 import type { DomainKey } from "../archetypes/descriptions";
 import { resolveAxisMetadata } from "./axisMetadata";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
+import { ADVANCED_METRIC_SECTIONS, BASE_DOMAIN_METRICS } from "./metricRegistry";
 
 type MultimodalProfiles = {
   voice: DomainProfile;
@@ -41,8 +42,42 @@ export type MultimodalAnalysisResult = {
   diagnostics: {
     fromFallback: boolean;
     unobservedCounts: Record<string, number>;
+    coverage?: CoverageDiagnostics;
+    salvage?: SalvageDiagnostics;
     rawStatus?: number;
   };
+};
+
+type CoverageStat = {
+  observed: number;
+  total: number;
+  missing: string[];
+  observedPct: number;
+  available: boolean;
+};
+
+type CoverageDiagnostics = {
+  core: {
+    voice: CoverageStat;
+    language: CoverageStat;
+    narrative: CoverageStat;
+    visual_edit_sound: CoverageStat;
+  };
+  advanced?: {
+    prosodyArc: CoverageStat;
+    languageTexture: CoverageStat;
+    narrativeArc: CoverageStat;
+    visualEditAlignment: CoverageStat;
+    modalityBalance: CoverageStat;
+    cognitiveLoad: CoverageStat;
+    secondOrder: CoverageStat;
+  };
+};
+
+type SalvageDiagnostics = {
+  attempted: boolean;
+  sections?: string[];
+  reason?: string;
 };
 
 const timelinePointSchema = {
@@ -119,32 +154,26 @@ const metricSchema = {
   required: ["score", "value", "explanation"],
 };
 
+const buildMetricProperties = (keys: readonly string[]) =>
+  Object.fromEntries(keys.map((key) => [key, metricSchema]));
+
+const buildMetricObjectSchema = (keys: readonly string[]) => ({
+  type: "object",
+  properties: buildMetricProperties(keys),
+  required: [...keys],
+});
+
+const narrativeMetricKeys = BASE_DOMAIN_METRICS.narrative as readonly string[];
+const advancedSectionKeys = Object.keys(ADVANCED_METRIC_SECTIONS) as Array<
+  keyof typeof ADVANCED_METRIC_SECTIONS
+>;
+
 // Lightweight JSON schema to guide Gemini; validation still enforced via zod.
 const responseJsonSchema = {
   type: "object",
   properties: {
-    voice: {
-      type: "object",
-      properties: {
-        speaking_rate: metricSchema,
-        filler_rate: metricSchema,
-        pauses: metricSchema,
-        loudness_range: metricSchema,
-        pitch_variation: metricSchema,
-      },
-      required: ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
-    },
-    language: {
-      type: "object",
-      properties: {
-        concreteness: metricSchema,
-        metaphor_density: metricSchema,
-        references: metricSchema,
-        humor: metricSchema,
-        teaching_vs_riffing: metricSchema,
-      },
-      required: ["concreteness", "metaphor_density", "references", "humor", "teaching_vs_riffing"],
-    },
+    voice: buildMetricObjectSchema(BASE_DOMAIN_METRICS.voice),
+    language: buildMetricObjectSchema(BASE_DOMAIN_METRICS.language),
     narrative: {
       type: "object",
       properties: {
@@ -162,10 +191,7 @@ const responseJsonSchema = {
           },
           minItems: 1,
         },
-        mini_arc_density: metricSchema,
-        foreshadow_callbacks: metricSchema,
-        transition_clarity: metricSchema,
-        story_presence: metricSchema,
+        ...buildMetricProperties(narrativeMetricKeys),
         devices: {
           type: "array",
           items: {
@@ -178,148 +204,24 @@ const responseJsonSchema = {
           },
         },
       },
-      required: ["beats", "mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
+      required: ["beats", ...narrativeMetricKeys],
     },
-    visual_edit_sound: {
-      type: "object",
-      properties: {
-        environment_stability: metricSchema,
-        talking_vs_broll_vs_graphics: metricSchema,
-        cut_rate: metricSchema,
-        pattern_interrupts: metricSchema,
-        broll_coverage: metricSchema,
-        music_coverage: metricSchema,
-        music_changes: metricSchema,
-        sfx_density: metricSchema,
-        silence_for_emphasis: metricSchema,
-      },
-      required: [
-        "environment_stability",
-        "talking_vs_broll_vs_graphics",
-        "cut_rate",
-        "pattern_interrupts",
-        "broll_coverage",
-        "music_coverage",
-        "music_changes",
-        "sfx_density",
-        "silence_for_emphasis",
-      ],
-    },
+    visual_edit_sound: buildMetricObjectSchema(BASE_DOMAIN_METRICS.visual_edit_sound),
     advanced_metrics: {
       type: "object",
       properties: {
-        prosodyArc: {
-          type: "object",
-          properties: {
-            paceMeanWpm: metricSchema,
-            paceVariabilityPct: metricSchema,
-            withinSegmentPaceChangePct: metricSchema,
-            emphasisAlignmentScore: metricSchema,
-            energyDriftDbPerMin: metricSchema,
-          },
-          required: [
-            "paceMeanWpm",
-            "paceVariabilityPct",
-            "withinSegmentPaceChangePct",
-            "emphasisAlignmentScore",
-            "energyDriftDbPerMin",
-          ],
-        },
-        languageTexture: {
-          type: "object",
-          properties: {
-            analogyExampleDefinitionRatio: metricSchema,
-            sentenceCompressionRatio: metricSchema,
-            humorTimingScore: metricSchema,
-            referenceDensityPerMin: metricSchema,
-            questionRate: metricSchema,
-            audienceAddressFrequency: metricSchema,
-          },
-          required: [
-            "analogyExampleDefinitionRatio",
-            "sentenceCompressionRatio",
-            "humorTimingScore",
-            "referenceDensityPerMin",
-            "questionRate",
-            "audienceAddressFrequency",
-          ],
-        },
-        narrativeArc: {
-          type: "object",
-          properties: {
-            timeToHookSeconds: metricSchema,
-            hookStrengthScore: metricSchema,
-            segmentCohesionDrift: metricSchema,
-            openLoopsUnresolvedRatio: metricSchema,
-            endingResolutionScore: metricSchema,
-          },
-          required: [
-            "timeToHookSeconds",
-            "hookStrengthScore",
-            "segmentCohesionDrift",
-            "openLoopsUnresolvedRatio",
-            "endingResolutionScore",
-          ],
-        },
-        visualEditAlignment: {
-          type: "object",
-          properties: {
-            visualEntropy: metricSchema,
-            cutRateRefinement: metricSchema,
-            silenceForEmphasisFidelity: metricSchema,
-            audioVisualEmphasisAlignment: metricSchema,
-            beatsVsEditsAlignment: metricSchema,
-            prosodyVsSemanticImportanceAlignment: metricSchema,
-          },
-          required: [
-            "visualEntropy",
-            "cutRateRefinement",
-            "silenceForEmphasisFidelity",
-            "audioVisualEmphasisAlignment",
-            "beatsVsEditsAlignment",
-            "prosodyVsSemanticImportanceAlignment",
-          ],
-        },
-        modalityBalance: {
-          type: "object",
-          properties: {
-            redundancyVsComplementarity: metricSchema,
-            modalityOverReliance: metricSchema,
-          },
-          required: ["redundancyVsComplementarity", "modalityOverReliance"],
-        },
-        cognitiveLoad: {
-          type: "object",
-          properties: {
-            loadPerSecond: metricSchema,
-            loadHighlights: metricSchema,
-          },
-          required: ["loadPerSecond", "loadHighlights"],
-        },
-        secondOrder: {
-          type: "object",
-          properties: {
-            alignmentScore: metricSchema,
-            driftScore: metricSchema,
-            decayScore: metricSchema,
-            balanceScore: metricSchema,
-            timingScore: metricSchema,
-          },
-          required: ["alignmentScore", "driftScore", "decayScore", "balanceScore", "timingScore"],
-        },
+        prosodyArc: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.prosodyArc),
+        languageTexture: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.languageTexture),
+        narrativeArc: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.narrativeArc),
+        visualEditAlignment: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.visualEditAlignment),
+        modalityBalance: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.modalityBalance),
+        cognitiveLoad: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.cognitiveLoad),
+        secondOrder: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.secondOrder),
       },
-      required: [
-        "prosodyArc",
-        "languageTexture",
-        "narrativeArc",
-        "visualEditAlignment",
-        "modalityBalance",
-        "cognitiveLoad",
-        "secondOrder",
-      ],
+      required: [...advancedSectionKeys],
     },
   },
-  required: ["voice", "language", "narrative", "visual_edit_sound", "advanced_metrics"],
+  required: ["voice", "language", "narrative", "visual_edit_sound"],
 };
 
 const systemInstruction = [
@@ -393,6 +295,91 @@ const toScores = (
 
 const unobserved = (metricKeys: string[], metrics: Record<string, GeminiObservedMetric>) =>
   metricKeys.filter((key) => metrics[key]?.value === "unobserved" || metrics[key]?.score === 0);
+
+const buildCoverage = (
+  metricKeys: readonly string[],
+  metrics: Record<string, GeminiObservedMetric>,
+  available = true,
+): CoverageStat => {
+  const missing = metricKeys.filter((key) => {
+    const metric = metrics[key];
+    if (!metric) return true;
+    return metric.value === "unobserved" || metric.score === 0;
+  });
+  const total = metricKeys.length;
+  const observed = Math.max(0, total - missing.length);
+  const observedPct = total === 0 ? 0 : Math.round((observed / total) * 100);
+  return { observed, total, missing, observedPct, available };
+};
+
+const buildCoverageDiagnostics = (response: GeminiMultimodalResponse): CoverageDiagnostics => {
+  const core = {
+    voice: buildCoverage(
+      BASE_DOMAIN_METRICS.voice,
+      response.voice as unknown as Record<string, GeminiObservedMetric>,
+      true,
+    ),
+    language: buildCoverage(
+      BASE_DOMAIN_METRICS.language,
+      response.language as unknown as Record<string, GeminiObservedMetric>,
+      true,
+    ),
+    narrative: buildCoverage(
+      BASE_DOMAIN_METRICS.narrative,
+      response.narrative as unknown as Record<string, GeminiObservedMetric>,
+      true,
+    ),
+    visual_edit_sound: buildCoverage(
+      BASE_DOMAIN_METRICS.visual_edit_sound,
+      response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>,
+      true,
+    ),
+  };
+
+  const advanced = response.advanced_metrics;
+  const advancedCoverage = {
+    prosodyArc: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.prosodyArc,
+      (advanced?.prosodyArc ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.prosodyArc),
+    ),
+    languageTexture: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.languageTexture,
+      (advanced?.languageTexture ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.languageTexture),
+    ),
+    narrativeArc: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.narrativeArc,
+      (advanced?.narrativeArc ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.narrativeArc),
+    ),
+    visualEditAlignment: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.visualEditAlignment,
+      (advanced?.visualEditAlignment ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.visualEditAlignment),
+    ),
+    modalityBalance: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.modalityBalance,
+      (advanced?.modalityBalance ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.modalityBalance),
+    ),
+    cognitiveLoad: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.cognitiveLoad,
+      (advanced?.cognitiveLoad ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.cognitiveLoad),
+    ),
+    secondOrder: buildCoverage(
+      ADVANCED_METRIC_SECTIONS.secondOrder,
+      (advanced?.secondOrder ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(advanced?.secondOrder),
+    ),
+  };
+
+  return {
+    core,
+    advanced: advancedCoverage,
+  };
+};
 
 const summarize = (
   domain: DomainKey,
@@ -473,7 +460,7 @@ const buildProfiles = (
   const voice = buildDomainProfile(
     "voice",
     "Voice",
-    ["speaking_rate", "filler_rate", "pauses", "loudness_range", "pitch_variation"],
+    [...BASE_DOMAIN_METRICS.voice],
     response.voice as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -481,17 +468,7 @@ const buildProfiles = (
   const language = buildDomainProfile(
     "language",
     "Language",
-    [
-      "concreteness",
-      "metaphor_density",
-      "references",
-      "humor",
-      "teaching_vs_riffing",
-      "sentiment",
-      "directive_density",
-      "self_disclosure",
-      "sarcasm_irony",
-    ],
+    [...BASE_DOMAIN_METRICS.language],
     response.language as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -499,7 +476,7 @@ const buildProfiles = (
   const narrative = buildDomainProfile(
     "narrative",
     "Narrative",
-    ["mini_arc_density", "foreshadow_callbacks", "transition_clarity", "story_presence"],
+    [...BASE_DOMAIN_METRICS.narrative],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
     fromFallback ? "Used fallback media path" : undefined,
@@ -546,19 +523,19 @@ const buildProfiles = (
 
 const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<string, number> => ({
   voice: unobserved(
-    Object.keys(response.voice),
+    BASE_DOMAIN_METRICS.voice as unknown as string[],
     response.voice as unknown as Record<string, GeminiObservedMetric>,
   ).length,
   language: unobserved(
-    Object.keys(response.language),
+    BASE_DOMAIN_METRICS.language as unknown as string[],
     response.language as unknown as Record<string, GeminiObservedMetric>,
   ).length,
   narrative: unobserved(
-    ["mini_arc_density", "foreshadow_callbacks", "transition_clarity"],
+    BASE_DOMAIN_METRICS.narrative as unknown as string[],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
   ).length,
   visual_edit_sound: unobserved(
-    Object.keys(response.visual_edit_sound),
+    BASE_DOMAIN_METRICS.visual_edit_sound as unknown as string[],
     response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>,
   ).length,
 });
@@ -737,6 +714,8 @@ export const analyzeVideoMultimodal = async (input: {
     diagnostics: {
       fromFallback: result.fromFallback,
       unobservedCounts: collectUnobservedCounts(parsed),
+      coverage: buildCoverageDiagnostics(parsed),
+      salvage: { attempted: false },
       rawStatus: result.status,
     },
     advancedMetrics,

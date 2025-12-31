@@ -82,15 +82,17 @@ Choose (and document) one:
 - **A3. Ephemeral media download + temp upload** (most reliable, highest complexity/compliance risk; must be vetted against YouTube terms and internal policies).
 - **A4. User upload fallback** (adds UX complexity; avoids YouTube download but changes product).
 
-**Recommendation**: A2 as the “always works” baseline + A1 primary> this is chosen
+**Decision**: A2 as the “always works” baseline + A1 primary.
+**Notes**: Keep a clear, user-facing error when entitlement is missing; avoid partial confusion.
 
 ### Decision B — Tiering (cost control)
 - **Free**: core pass only (fast, meaningful).
 - **Paid / Pro**: advanced passes + deeper coaching + storage/history.
-> this is chosen but will implement later, rn we want all things to work before we finalise up and market etc.
+**Decision**: Defer tiering until reliability is solid; keep all features available during stabilization.
 ### Decision C — Synchronous vs async analysis
 - **Sync** (current): simpler but fragile at scale and with multi-pass.
-- **Async**: `/api/analyze` creates a job, returns quickly, client polls/streams progress. > this is chosen
+- **Async**: `/api/analyze` creates a job, returns quickly, client polls/streams progress.
+**Decision**: Async for production hardening; keep sync for dev and early testing.
 
 
 
@@ -102,31 +104,31 @@ Choose (and document) one:
 
 ### Task 0.1: Align metric keys end-to-end
 **Goals**
-- [ ] Create a single source of truth for metric keys per domain/pass.
-- [ ] Remove references to metrics that are not requested anywhere (or explicitly add them to a pass).
-- [ ] Ensure UI components only expect what the analyzer can actually emit.
+- [x] Create a single source of truth for metric keys per domain/pass.
+- [x] Remove references to metrics that are not requested anywhere (or explicitly add them to a pass).
+- [x] Ensure UI components only expect what the analyzer can actually emit.
 
 **Acceptance Criteria**
-- [ ] No “phantom” axes show up as unobserved just because they’re never requested.
-- [ ] The analyzer prompt/schema, validator, and UI agree on the same set of keys.
+- [x] No “phantom” axes show up as unobserved just because they’re never requested.
+- [x] The analyzer prompt/schema, validator, and UI agree on the same set of keys.
 
 ### Task 0.2: Make `advanced_metrics` optional in the Gemini request schema
 **Goals**
-- [ ] Update the Gemini request JSON schema so `advanced_metrics` is optional or removed from the core pass.
+- [x] Update the Gemini request JSON schema so `advanced_metrics` is optional or removed from the core pass.
 
 **Acceptance Criteria**
-- [ ] Core analysis can succeed without advanced metrics.
-- [ ] Advanced metrics can be added via subsequent passes.
+- [x] Core analysis can succeed without advanced metrics.
+- [x] Advanced metrics can be added via subsequent passes.
 
 ### Task 0.3: Store and surface coverage diagnostics
 **Goals**
-- [ ] Add per-pass and per-section coverage stats:
+- [x] Add per-pass and per-section coverage stats:
   - observed count / total count,
   - which metrics are missing/unobserved,
   - whether salvage retry ran.
 
 **Acceptance Criteria**
-- [ ] Dev UI and API response can display “why this feels empty” with specific counts and reasons.
+- [x] Dev UI and API response can display “why this feels empty” with specific counts and reasons.
 
 ---
 
@@ -137,6 +139,7 @@ Choose (and document) one:
 - [ ] **Pass 1 (Core)**: base domains + beats/devices (no `advanced_metrics`).
 - [ ] **Pass 2 (Advanced: Audio/Text)**: prosodyArc + languageTexture + narrativeArc.
 - [ ] **Pass 3 (Advanced: Visual/Cross)**: visualEditAlignment + modalityBalance + cognitiveLoad.
+- [ ] **Pass 2b (Supplemental nuance)**: warmth + sentiment + directive density + self-disclosure + sarcasm/irony (text-heavy, optional).
 
 **Acceptance Criteria**
 - [ ] Core pass alone yields a “non-empty” report on the golden set.
@@ -341,4 +344,3 @@ These are optional until Phases 0–6 are solid.
 - `docs/iteration_9_gap_matrix.md` (advanced metric semantics + acceptance thresholds)
 - `docs/multimodal_golden_set.md` (regression runner expectations)
 - `docs/axes_and_domains.md` (glossary; “unobserved” semantics)
-
