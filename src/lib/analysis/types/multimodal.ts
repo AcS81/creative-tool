@@ -128,14 +128,6 @@ export interface GeminiAdvancedCognitiveLoad {
   loadHighlights: GeminiRichMetric;
 }
 
-export interface GeminiAdvancedSecondOrder {
-  alignmentScore: GeminiRichMetric;
-  driftScore: GeminiRichMetric;
-  decayScore: GeminiRichMetric;
-  balanceScore: GeminiRichMetric;
-  timingScore: GeminiRichMetric;
-}
-
 export interface GeminiAdvancedMetrics {
   prosodyArc: GeminiAdvancedProsodyArc;
   languageTexture: GeminiAdvancedLanguageTexture;
@@ -143,8 +135,9 @@ export interface GeminiAdvancedMetrics {
   visualEditAlignment: GeminiAdvancedVisualEditAlignment;
   modalityBalance: GeminiAdvancedModalityBalance;
   cognitiveLoad: GeminiAdvancedCognitiveLoad;
-  secondOrder: GeminiAdvancedSecondOrder;
 }
+
+export type GeminiAdvancedMetricsPartial = Partial<GeminiAdvancedMetrics>;
 
 export interface GeminiMultimodalResponse {
   voice: GeminiVoiceMetrics;

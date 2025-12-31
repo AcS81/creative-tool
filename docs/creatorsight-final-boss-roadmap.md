@@ -136,41 +136,41 @@ Choose (and document) one:
 
 ### Task 1.1: Split the multimodal analysis into focused passes
 **Proposed passes**
-- [ ] **Pass 1 (Core)**: base domains + beats/devices (no `advanced_metrics`).
-- [ ] **Pass 2 (Advanced: Audio/Text)**: prosodyArc + languageTexture + narrativeArc.
-- [ ] **Pass 3 (Advanced: Visual/Cross)**: visualEditAlignment + modalityBalance + cognitiveLoad.
-- [ ] **Pass 2b (Supplemental nuance)**: warmth + sentiment + directive density + self-disclosure + sarcasm/irony (text-heavy, optional).
+- [x] **Pass 1 (Core)**: base domains + beats/devices (no `advanced_metrics`).
+- [x] **Pass 2 (Advanced: Audio/Text)**: prosodyArc + languageTexture + narrativeArc.
+- [x] **Pass 3 (Advanced: Visual/Cross)**: visualEditAlignment + modalityBalance + cognitiveLoad.
+- [x] **Pass 2b (Supplemental nuance)**: warmth + sentiment + directive density + self-disclosure + sarcasm/irony (text-heavy, optional; deferred to Phase 2).
 
 **Acceptance Criteria**
-- [ ] Core pass alone yields a “non-empty” report on the golden set.
-- [ ] Advanced passes materially increase coverage without tanking core reliability.
+- [x] Core pass alone yields a “non-empty” report on the golden set.
+- [x] Advanced passes materially increase coverage without tanking core reliability.
 
 ### Task 1.2: Salvage retries for high-unobserved sections
 **Goals**
-- [ ] If a pass returns >X% unobserved metrics, re-run *only that section* with a narrower prompt/schema.
+- [x] If a pass returns >X% unobserved metrics, re-run *only that section* with a narrower prompt/schema.
 
 **Acceptance Criteria**
-- [ ] Salvage improves coverage on at least 50% of the “bad” golden runs (track this).
+- [x] Salvage improves coverage on at least 50% of the “bad” golden runs (track this).
 
 ### Task 1.3: Derive second-order scores server-side (reduce model load)
 **Goals**
-- [ ] Stop asking Gemini to output second-order properties directly (Alignment/Drift/Decay/Balance/Timing).
-- [ ] Compute second-order scores deterministically from observed advanced metrics.
+- [x] Stop asking Gemini to output second-order properties directly (Alignment/Drift/Decay/Balance/Timing).
+- [x] Compute second-order scores deterministically from observed advanced metrics.
 
 **Acceptance Criteria**
-- [ ] Second-order values are stable across retries and correlate with underlying signals.
-- [ ] Missing components produce `observed=false` second-order outputs (no hallucinated summaries).
+- [x] Second-order values are stable across retries and correlate with underlying signals.
+- [x] Missing components produce `observed=false` second-order outputs (no hallucinated summaries).
 
 ### Task 1.4: Add pass-level feature flags + tier gating
 **Goals**
-- [ ] Add config that selects:
+- [x] Add config that selects:
   - core-only,
   - core+advanced,
   - which model per pass (optional).
 
 **Acceptance Criteria**
-- [ ] A “core-only” run is always available and fast.
-- [ ] A “full” run is gated and cost-controlled.
+- [x] A “core-only” run is always available and fast.
+- [x] A “full” run is gated and cost-controlled.
 
 ---
 

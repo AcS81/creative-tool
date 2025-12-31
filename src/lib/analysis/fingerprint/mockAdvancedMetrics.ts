@@ -1,4 +1,5 @@
-import type { AdvancedFingerprintMetrics, ScoredMetric, SecondOrderSummary } from "../../types";
+import type { AdvancedFingerprintMetrics, ScoredMetric } from "../../types";
+import { computeSecondOrderScores } from "./secondOrder";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -43,50 +44,7 @@ const metric = (score: number, value: string, extras: Partial<ScoredMetric> = {}
   ...extras,
 });
 
-type AdvancedWithoutSecondOrder = Omit<AdvancedFingerprintMetrics, "secondOrder">;
-
-const weightedAverage = (...entries: Array<[number, number]>) => {
-  const totalWeight = entries.reduce((sum, [, w]) => sum + w, 0) || 1;
-  return entries.reduce((sum, [v, w]) => sum + v * w, 0) / totalWeight;
-};
-
-export const computeSecondOrderScores = (metrics: AdvancedWithoutSecondOrder): SecondOrderSummary => {
-  const alignmentScore = weightedAverage(
-    [metrics.prosodyArc.emphasisAlignmentScore.score, 0.3],
-    [metrics.visualEditAlignment.audioVisualEmphasisAlignment.score, 0.25],
-    [metrics.visualEditAlignment.beatsVsEditsAlignment.score, 0.25],
-    [metrics.visualEditAlignment.prosodyVsSemanticImportanceAlignment.score, 0.2],
-  );
-  const driftScore = weightedAverage(
-    [metrics.prosodyArc.energyDriftDbPerMin.score, 0.35],
-    [metrics.prosodyArc.paceVariabilityPct.score, 0.25],
-    [metrics.narrativeArc.segmentCohesionDrift.score, 0.4],
-  );
-  const decayScore = weightedAverage(
-    [metrics.prosodyArc.withinSegmentPaceChangePct.score, 0.4],
-    [metrics.prosodyArc.energyDriftDbPerMin.score, 0.3],
-    [metrics.cognitiveLoad.loadPerSecond.score, 0.3],
-  );
-  const balanceScore = weightedAverage(
-    [metrics.modalityBalance.redundancyVsComplementarity.score, 0.6],
-    [clamp(100 - metrics.modalityBalance.modalityOverReliance.score), 0.4],
-  );
-  const timingScore = weightedAverage(
-    [clamp(100 - metrics.narrativeArc.timeToHookSeconds.score / 2), 0.25],
-    [metrics.narrativeArc.hookStrengthScore.score, 0.25],
-    [metrics.visualEditAlignment.beatsVsEditsAlignment.score, 0.25],
-    [metrics.visualEditAlignment.silenceForEmphasisFidelity.score, 0.25],
-  );
-
-  const summary: SecondOrderSummary = {
-    alignmentScore: metric(alignmentScore, "alignment summary"),
-    driftScore: metric(driftScore, "drift summary"),
-    decayScore: metric(decayScore, "decay summary"),
-    balanceScore: metric(balanceScore, "balance summary"),
-    timingScore: metric(timingScore, "timing summary"),
-  };
-  return summary;
-};
+export { computeSecondOrderScores };
 
 export const buildMockAdvancedMetrics = (seed: number): AdvancedFingerprintMetrics => {
   const p1 = deriveScore(seed, 21);

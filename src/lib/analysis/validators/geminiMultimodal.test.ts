@@ -55,13 +55,6 @@ const advancedMetric = (): GeminiMultimodalResponse["advanced_metrics"] =>
       loadPerSecond: { ...metric("load timeline"), timeline: [{ timeSeconds: 0, value: 40 }] },
       loadHighlights: { ...metric("spikes"), spans: [{ startSeconds: 5, endSeconds: 8, value: 80, label: "dense" }] },
     },
-    secondOrder: {
-      alignmentScore: metric("overall alignment"),
-      driftScore: metric("drift"),
-      decayScore: metric("decay"),
-      balanceScore: metric("balance"),
-      timingScore: metric("timing"),
-    },
   } as GeminiMultimodalResponse["advanced_metrics"]);
 
 const buildResponse = (): GeminiMultimodalResponse => ({

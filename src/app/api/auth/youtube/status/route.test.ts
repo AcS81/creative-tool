@@ -28,6 +28,7 @@ describe("GET /api/auth/youtube/status", () => {
   });
 
   it("reports connected when tokens exist", async () => {
+    process.env.ANALYSIS_MODE = "mock";
     process.env.ENABLE_PERFORMANCE = "true";
     process.env.GOOGLE_CLIENT_ID = "client";
     process.env.GOOGLE_CLIENT_SECRET = "secret";

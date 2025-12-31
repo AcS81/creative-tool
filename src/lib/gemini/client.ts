@@ -48,7 +48,10 @@ type GetTranscriptAndScenesOptions = {
 };
 
 const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-pro";
-const GEMINI_ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const getGeminiEndpoint = (modelOverride?: string) => {
+  const model = modelOverride || GEMINI_MODEL;
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+};
 const parsePositiveInt = (raw: string | undefined, fallback: number) => {
   if (!raw) return fallback;
   const parsed = Number.parseInt(raw, 10);
@@ -115,7 +118,7 @@ export async function getTranscriptAndScenes(
   }
 
   const prompt = buildPrompt(input.videoUrl);
-  const url = `${GEMINI_ENDPOINT}?key=${apiKey}`;
+  const url = `${getGeminiEndpoint()}?key=${apiKey}`;
 
   let response: Response;
   try {
@@ -234,6 +237,7 @@ export type GeminiMultimodalRequest = {
   signal?: AbortSignal;
   config?: AppConfig;
   logger?: Logger;
+  model?: string;
   /**
    * Forces the client on even if ANALYSIS_MODE is mock or the feature flag is off.
    * Useful for tests and local development when you want to exercise the request builder.
@@ -347,8 +351,9 @@ const callGemini = async (input: {
   apiKey: string;
   body: Record<string, unknown>;
   signal?: AbortSignal;
+  model?: string;
 }): Promise<{ ok: boolean; status?: number; payload?: any; errorMessage?: string }> => {
-  const url = `${GEMINI_ENDPOINT}?key=${input.apiKey}`;
+  const url = `${getGeminiEndpoint(input.model)}?key=${input.apiKey}`;
 
   try {
     const response = await fetch(url, {
@@ -394,6 +399,7 @@ const callGeminiWithVideoPart = async (input: {
   jsonSchema?: unknown;
   systemInstruction?: string;
   signal?: AbortSignal;
+  model?: string;
 }): Promise<GeminiCallOutcome> => {
   const response = await callGemini({
     apiKey: input.apiKey,
@@ -404,6 +410,7 @@ const callGeminiWithVideoPart = async (input: {
       systemInstruction: input.systemInstruction,
     }),
     signal: input.signal,
+    model: input.model,
   });
 
   if (!response.ok) {
@@ -718,6 +725,7 @@ export const callGeminiMultimodalJson = async (
               jsonSchema: request.jsonSchema,
               systemInstruction: request.systemInstruction,
               signal: requestSignal,
+              model: request.model,
             }),
           ),
         );
@@ -763,6 +771,7 @@ export const callGeminiMultimodalJson = async (
           jsonSchema: request.jsonSchema,
           systemInstruction: request.systemInstruction,
           signal: requestSignal,
+          model: request.model,
         }),
       ),
     );

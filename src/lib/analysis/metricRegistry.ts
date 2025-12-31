@@ -48,8 +48,15 @@ export const ADVANCED_METRIC_SECTIONS = {
   ],
   modalityBalance: ["redundancyVsComplementarity", "modalityOverReliance"],
   cognitiveLoad: ["loadPerSecond", "loadHighlights"],
-  secondOrder: ["alignmentScore", "driftScore", "decayScore", "balanceScore", "timingScore"],
 } as const;
+
+export const SECOND_ORDER_METRICS = [
+  "alignmentScore",
+  "driftScore",
+  "decayScore",
+  "balanceScore",
+  "timingScore",
+] as const;
 
 export const SUPPLEMENTAL_METRICS = {
   voice: ["warmth"],

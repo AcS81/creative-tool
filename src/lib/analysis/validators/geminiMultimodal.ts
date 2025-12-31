@@ -1,12 +1,13 @@
 import { z } from "zod";
 import type {
   GeminiAdvancedMetrics,
+  GeminiAdvancedMetricsPartial,
   GeminiBeat,
   GeminiMultimodalResponse,
   GeminiObservedMetric,
   GeminiRichMetric,
 } from "../types/multimodal";
-import { ADVANCED_METRIC_SECTIONS, BASE_DOMAIN_METRICS } from "../metricRegistry";
+import { ADVANCED_METRIC_SECTIONS, BASE_DOMAIN_METRICS, type AdvancedSectionKey } from "../metricRegistry";
 
 const timelinePointSchema = z.object({
   timeSeconds: z.number().min(0),
@@ -108,8 +109,6 @@ const advancedModalityBalanceSchema = z.object(buildRichMetricFields(ADVANCED_ME
 
 const advancedCognitiveLoadSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.cognitiveLoad));
 
-const advancedSecondOrderSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.secondOrder));
-
 const advancedMetricsSchema: z.ZodType<GeminiAdvancedMetrics> = z.object({
   prosodyArc: advancedProsodyArcSchema,
   languageTexture: advancedLanguageTextureSchema,
@@ -117,8 +116,16 @@ const advancedMetricsSchema: z.ZodType<GeminiAdvancedMetrics> = z.object({
   visualEditAlignment: advancedVisualEditAlignmentSchema,
   modalityBalance: advancedModalityBalanceSchema,
   cognitiveLoad: advancedCognitiveLoadSchema,
-  secondOrder: advancedSecondOrderSchema,
 });
+
+const advancedSectionSchemaMap: Record<AdvancedSectionKey, z.ZodTypeAny> = {
+  prosodyArc: advancedProsodyArcSchema,
+  languageTexture: advancedLanguageTextureSchema,
+  narrativeArc: advancedNarrativeArcSchema,
+  visualEditAlignment: advancedVisualEditAlignmentSchema,
+  modalityBalance: advancedModalityBalanceSchema,
+  cognitiveLoad: advancedCognitiveLoadSchema,
+};
 
 export const GeminiMultimodalResponseSchema: z.ZodType<GeminiMultimodalResponse> = z
   .object({
@@ -155,3 +162,27 @@ export const parseGeminiMultimodalJson = (raw: unknown): GeminiMultimodalRespons
 export const isGeminiMultimodalResponse = (
   raw: unknown,
 ): raw is GeminiMultimodalResponse => GeminiMultimodalResponseSchema.safeParse(raw).success;
+
+const buildAdvancedMetricsSchemaForSections = (sections: AdvancedSectionKey[]) =>
+  z.object(
+    Object.fromEntries(sections.map((section) => [section, advancedSectionSchemaMap[section]])),
+  );
+
+const buildAdvancedMetricsResponseSchema = (sections: AdvancedSectionKey[]) =>
+  z
+    .object({
+      advanced_metrics: buildAdvancedMetricsSchemaForSections(sections),
+    })
+    .passthrough();
+
+export const parseGeminiAdvancedMetricsJson = (
+  raw: unknown,
+  sections: AdvancedSectionKey[],
+): GeminiAdvancedMetricsPartial => {
+  const schema = buildAdvancedMetricsResponseSchema(sections);
+  const result = schema.safeParse(raw);
+  if (!result.success) {
+    throw new InvalidGeminiResponseError(formatIssues(result.error));
+  }
+  return result.data.advanced_metrics;
+};

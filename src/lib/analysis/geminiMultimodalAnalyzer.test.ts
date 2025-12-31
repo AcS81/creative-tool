@@ -31,6 +31,12 @@ const silenceSpans = [
   { startSeconds: 42, endSeconds: 43.2, value: 88, label: "punch", alignedBeat: "payoff", alignedPunchline: true },
 ];
 
+const unobservedMetric = () => ({
+  score: 0,
+  value: "unobserved",
+  explanation: "not observed",
+});
+
 const sampleRaw = {
   voice: {
     speaking_rate: { score: 60, value: "155 wpm", explanation: "moderate pace" },
@@ -126,24 +132,59 @@ const sampleRaw = {
       loadPerSecond: rich("load timeline", { timeline: [{ timeSeconds: 0, value: 40 }] }),
       loadHighlights: rich("load spikes", { spans: [{ startSeconds: 20, endSeconds: 22, value: 75, label: "dense" }] }),
     },
-    secondOrder: {
-      alignmentScore: rich("aligned"),
-      driftScore: rich("steady"),
-      decayScore: rich("no decay"),
-      balanceScore: rich("balanced"),
-      timingScore: rich("on time"),
-    },
   },
 };
 
+const sampleCoreRaw = {
+  voice: sampleRaw.voice,
+  language: sampleRaw.language,
+  narrative: sampleRaw.narrative,
+  visual_edit_sound: sampleRaw.visual_edit_sound,
+};
+
+const sampleAdvancedAudioRaw = {
+  advanced_metrics: {
+    prosodyArc: sampleRaw.advanced_metrics.prosodyArc,
+    languageTexture: sampleRaw.advanced_metrics.languageTexture,
+    narrativeArc: sampleRaw.advanced_metrics.narrativeArc,
+  },
+};
+
+const sampleAdvancedAudioUnobserved = {
+  advanced_metrics: {
+    prosodyArc: {
+      paceMeanWpm: unobservedMetric(),
+      paceVariabilityPct: unobservedMetric(),
+      withinSegmentPaceChangePct: unobservedMetric(),
+      emphasisAlignmentScore: unobservedMetric(),
+      energyDriftDbPerMin: unobservedMetric(),
+    },
+    languageTexture: sampleRaw.advanced_metrics.languageTexture,
+    narrativeArc: sampleRaw.advanced_metrics.narrativeArc,
+  },
+};
+
+const sampleAdvancedVisualRaw = {
+  advanced_metrics: {
+    visualEditAlignment: sampleRaw.advanced_metrics.visualEditAlignment,
+    modalityBalance: sampleRaw.advanced_metrics.modalityBalance,
+    cognitiveLoad: sampleRaw.advanced_metrics.cognitiveLoad,
+  },
+};
+
+const mockGeminiOk = (rawJson: unknown, fromFallback = false) => ({
+  ok: true,
+  fromFallback,
+  rawJson,
+  status: 200,
+});
+
 describe("analyzeVideoMultimodal", () => {
   beforeEach(() => {
-    vi.mocked(callGeminiMultimodalJson).mockResolvedValue({
-      ok: true,
-      fromFallback: false,
-      rawJson: sampleRaw,
-      status: 200,
-    });
+    vi.mocked(callGeminiMultimodalJson)
+      .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedAudioRaw))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedVisualRaw));
   });
 
   it("returns domain profiles and beats from multimodal response", async () => {
@@ -157,12 +198,11 @@ describe("analyzeVideoMultimodal", () => {
   });
 
   it("flags fallback usage", async () => {
-    vi.mocked(callGeminiMultimodalJson).mockResolvedValueOnce({
-      ok: true,
-      fromFallback: true,
-      rawJson: sampleRaw,
-      status: 200,
-    });
+    vi.mocked(callGeminiMultimodalJson).mockReset();
+    vi.mocked(callGeminiMultimodalJson)
+      .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw, true))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedAudioRaw))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedVisualRaw));
     const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
     expect(result.profiles.voice.highlights?.some((h) => h.includes("fallback"))).toBe(true);
     expect(result.diagnostics.fromFallback).toBe(true);
@@ -186,5 +226,19 @@ describe("analyzeVideoMultimodal", () => {
     expect(language?.sentenceCompressionRatio.timeline?.length).toBeGreaterThan(0);
     expect(language?.questionRate.timeline?.length).toBeGreaterThan(0);
     expect(language?.audienceAddressFrequency.counts?.direct).toBe(2);
+  });
+
+  it("salvages sections with high unobserved coverage", async () => {
+    vi.mocked(callGeminiMultimodalJson).mockReset();
+    vi.mocked(callGeminiMultimodalJson)
+      .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedAudioUnobserved))
+      .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedVisualRaw))
+      .mockResolvedValueOnce(mockGeminiOk({ advanced_metrics: { prosodyArc: sampleRaw.advanced_metrics.prosodyArc } }));
+
+    const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
+    expect(result.diagnostics.salvage?.attempted).toBe(true);
+    expect(result.diagnostics.salvage?.sections).toContain("prosodyArc");
+    expect(result.advancedMetrics?.prosodyArc.paceMeanWpm.score).toBe(70);
   });
 });

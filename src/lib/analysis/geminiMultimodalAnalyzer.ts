@@ -14,16 +14,22 @@ import {
   type GeminiMultimodalResult,
 } from "../gemini/client";
 import type {
-  GeminiAdvancedMetrics,
+  GeminiAdvancedMetricsPartial,
   GeminiMultimodalResponse,
   GeminiObservedMetric,
   GeminiRichMetric,
 } from "./types/multimodal";
-import { parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
+import { parseGeminiAdvancedMetricsJson, parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
 import type { DomainKey } from "../archetypes/descriptions";
 import { resolveAxisMetadata } from "./axisMetadata";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
-import { ADVANCED_METRIC_SECTIONS, BASE_DOMAIN_METRICS } from "./metricRegistry";
+import { computeSecondOrderScores } from "./fingerprint/secondOrder";
+import {
+  ADVANCED_METRIC_SECTIONS,
+  BASE_DOMAIN_METRICS,
+  SECOND_ORDER_METRICS,
+  type AdvancedSectionKey,
+} from "./metricRegistry";
 
 type MultimodalProfiles = {
   voice: DomainProfile;
@@ -164,12 +170,31 @@ const buildMetricObjectSchema = (keys: readonly string[]) => ({
 });
 
 const narrativeMetricKeys = BASE_DOMAIN_METRICS.narrative as readonly string[];
-const advancedSectionKeys = Object.keys(ADVANCED_METRIC_SECTIONS) as Array<
-  keyof typeof ADVANCED_METRIC_SECTIONS
->;
+const ADVANCED_AUDIO_TEXT_SECTIONS: AdvancedSectionKey[] = [
+  "prosodyArc",
+  "languageTexture",
+  "narrativeArc",
+];
+const ADVANCED_VISUAL_CROSS_SECTIONS: AdvancedSectionKey[] = [
+  "visualEditAlignment",
+  "modalityBalance",
+  "cognitiveLoad",
+];
+const ADVANCED_GEMINI_SECTIONS: AdvancedSectionKey[] = [
+  ...ADVANCED_AUDIO_TEXT_SECTIONS,
+  ...ADVANCED_VISUAL_CROSS_SECTIONS,
+];
 
 // Lightweight JSON schema to guide Gemini; validation still enforced via zod.
-const responseJsonSchema = {
+const buildAdvancedMetricsJsonSchema = (sections: AdvancedSectionKey[]) => ({
+  type: "object",
+  properties: Object.fromEntries(
+    sections.map((section) => [section, buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS[section])]),
+  ),
+  required: [...sections],
+});
+
+const coreResponseJsonSchema = {
   type: "object",
   properties: {
     voice: buildMetricObjectSchema(BASE_DOMAIN_METRICS.voice),
@@ -207,21 +232,24 @@ const responseJsonSchema = {
       required: ["beats", ...narrativeMetricKeys],
     },
     visual_edit_sound: buildMetricObjectSchema(BASE_DOMAIN_METRICS.visual_edit_sound),
-    advanced_metrics: {
-      type: "object",
-      properties: {
-        prosodyArc: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.prosodyArc),
-        languageTexture: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.languageTexture),
-        narrativeArc: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.narrativeArc),
-        visualEditAlignment: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.visualEditAlignment),
-        modalityBalance: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.modalityBalance),
-        cognitiveLoad: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.cognitiveLoad),
-        secondOrder: buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS.secondOrder),
-      },
-      required: [...advancedSectionKeys],
-    },
   },
   required: ["voice", "language", "narrative", "visual_edit_sound"],
+};
+
+const advancedAudioTextResponseJsonSchema = {
+  type: "object",
+  properties: {
+    advanced_metrics: buildAdvancedMetricsJsonSchema(ADVANCED_AUDIO_TEXT_SECTIONS),
+  },
+  required: ["advanced_metrics"],
+};
+
+const advancedVisualCrossResponseJsonSchema = {
+  type: "object",
+  properties: {
+    advanced_metrics: buildAdvancedMetricsJsonSchema(ADVANCED_VISUAL_CROSS_SECTIONS),
+  },
+  required: ["advanced_metrics"],
 };
 
 const systemInstruction = [
@@ -233,33 +261,101 @@ const systemInstruction = [
   "Respond with strict JSON only.",
 ].join("\n");
 
-const userPrompt = [
+const ADVANCED_SECTION_LINES: Record<AdvancedSectionKey, string> = {
+  prosodyArc:
+    "prosodyArc: paceMeanWpm (timeline 10s windows), paceVariabilityPct (timeline), withinSegmentPaceChangePct (segments with deltaPct), emphasisAlignmentScore (items for stressed phrases + time), energyDriftDbPerMin (trend + smoothed timeline).",
+  languageTexture:
+    "languageTexture: analogyExampleDefinitionRatio (counts proportions), sentenceCompressionRatio (words per idea + distribution/timeline), humorTimingScore (items with setupStart/punchStart/deltaSeconds/landed), referenceDensityPerMin (counts by type), questionRate (counts for rhetorical vs genuine + timeline), audienceAddressFrequency (counts per minute with direct vs rhetorical breakdown and optional timeline).",
+  narrativeArc:
+    "narrativeArc: timeToHookSeconds (derive from first hook beat if present), hookStrengthScore (items with beatTime, devices, promiseClarity), segmentCohesionDrift (timeline per segment), openLoopsUnresolvedRatio (items openedAt/resolvedAt/label), endingResolutionScore (items payoffDelivered/ctaClarity/callbackCount).",
+  visualEditAlignment:
+    "visualEditAlignment: visualEntropy (timeline), cutRateRefinement (items medianShotSeconds/variance/beatCouplingDelta), silenceForEmphasisFidelity (relative-energy speech gaps >0.6s; spans include start/end/durationSec, value=strength 0-100, label=placement intent reset|punch|transition, alignedBeat/punchline), audioVisualEmphasisAlignment (timeline with offsets), beatsVsEditsAlignment (timeline per beat), prosodyVsSemanticImportanceAlignment (items phrase/importanceScore/stressed).",
+  modalityBalance:
+    "modalityBalance: redundancyVsComplementarity (proportions redundantPct/complementaryPct/conflictingPct), modalityOverReliance (proportions with dominant mode).",
+  cognitiveLoad: "cognitiveLoad: loadPerSecond (timeline 1 Hz), loadHighlights (spans with driver/label/value).",
+};
+
+const COMMON_ADVANCED_RULES = [
+  "- Provide timelines/spans/items for the metrics noted above; keep arrays non-empty when observable.",
+  "- JSON only; no prose.",
+  "- If safety filters block content, return an object matching the schema with unobserved metrics.",
+];
+
+const ADVANCED_SECTION_RULES: Partial<Record<AdvancedSectionKey, string[]>> = {
+  prosodyArc: [
+    "- Populate pace/energy timelines (mean/variability/within-segment/energy drift) so they are not left unobserved when media is available.",
+  ],
+  visualEditAlignment: [
+    "- For silence spans, detect relative drops vs local noise floor (tolerate crowd/bed noise), require >=0.6s duration, and annotate placement intent + strength; align to nearby beats/punchlines when present.",
+    "- Populate visual entropy/cut refinement timelines so they are not left unobserved when media is available.",
+  ],
+  cognitiveLoad: ["- Populate load timelines so they are not left unobserved when media is available."],
+};
+
+const corePrompt = [
   "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
   "Base domains:",
   "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation.",
   "- language: concreteness, metaphor_density, references, humor, teaching_vs_riffing.",
   "- narrative: beats [{label,start,end,role in hook|setup|escalation|payoff|outro|cta|break}], mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence, devices [{type,timestamp}].",
   "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
-  "Advanced metrics (alignment/arc/load): include an `advanced_metrics` object with these sections:",
-  "- prosodyArc: paceMeanWpm (timeline 10s windows), paceVariabilityPct (timeline), withinSegmentPaceChangePct (segments with deltaPct), emphasisAlignmentScore (items for stressed phrases + time), energyDriftDbPerMin (trend + smoothed timeline).",
-  "- languageTexture: analogyExampleDefinitionRatio (counts proportions), sentenceCompressionRatio (words per idea + distribution/timeline), humorTimingScore (items with setupStart/punchStart/deltaSeconds/landed), referenceDensityPerMin (counts by type), questionRate (counts for rhetorical vs genuine + timeline), audienceAddressFrequency (counts per minute with direct vs rhetorical breakdown and optional timeline).",
-  "- narrativeArc: timeToHookSeconds (derive from first hook beat if present), hookStrengthScore (items with beatTime, devices, promiseClarity), segmentCohesionDrift (timeline per segment), openLoopsUnresolvedRatio (items openedAt/resolvedAt/label), endingResolutionScore (items payoffDelivered/ctaClarity/callbackCount).",
-  "- visualEditAlignment: visualEntropy (timeline), cutRateRefinement (items medianShotSeconds/variance/beatCouplingDelta), silenceForEmphasisFidelity (relative-energy speech gaps >0.6s; spans include start/end/durationSec, value=strength 0-100, label=placement intent reset|punch|transition, alignedBeat/punchline), audioVisualEmphasisAlignment (timeline with offsets), beatsVsEditsAlignment (timeline per beat), prosodyVsSemanticImportanceAlignment (items phrase/importanceScore/stressed).",
-  "- modalityBalance: redundancyVsComplementarity (proportions redundantPct/complementaryPct/conflictingPct), modalityOverReliance (proportions with dominant mode).",
-  "- cognitiveLoad: loadPerSecond (timeline 1 Hz), loadHighlights (spans with driver/label/value).",
-  "- secondOrder: alignmentScore, driftScore, decayScore, balanceScore, timingScore (summaries).",
   "Rules:",
-  "- For silence spans, detect relative drops vs local noise floor (tolerate crowd/bed noise), require >=0.6s duration, and annotate placement intent + strength; align to nearby beats/punchlines when present.",
-  "- Provide timelines/spans/items for the metrics noted above; keep arrays non-empty when observable (e.g., counts for language texture, timelines for pace/entropy/load, items for jokes/loops).",
-  "- Populate pace/energy timelines (mean/variability/within-segment/energy drift) and visual entropy/cut refinement timelines so they are not left unobserved when media is available.",
   "- Provide beats using seconds and include hook/setup/escalation/payoff/outro labels when present; supply role in the beat object.",
   "- For narrative.devices, use types: contrast, foreshadow, callback, analogy, reversal, pattern_interrupt, stakes_change.",
   "- JSON only; no prose.",
   "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ].join("\n");
 
-export const multimodalResponseJsonSchema = responseJsonSchema;
-export const multimodalPrompt = userPrompt;
+const advancedAudioTextPrompt = [
+  "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
+  "Advanced metrics (audio/text): include an `advanced_metrics` object with these sections:",
+  `- ${ADVANCED_SECTION_LINES.prosodyArc}`,
+  `- ${ADVANCED_SECTION_LINES.languageTexture}`,
+  `- ${ADVANCED_SECTION_LINES.narrativeArc}`,
+  "Rules:",
+  ...COMMON_ADVANCED_RULES,
+  ...ADVANCED_SECTION_RULES.prosodyArc!,
+].join("\n");
+
+const advancedVisualCrossPrompt = [
+  "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
+  "Advanced metrics (visual/cross): include an `advanced_metrics` object with these sections:",
+  `- ${ADVANCED_SECTION_LINES.visualEditAlignment}`,
+  `- ${ADVANCED_SECTION_LINES.modalityBalance}`,
+  `- ${ADVANCED_SECTION_LINES.cognitiveLoad}`,
+  "Rules:",
+  ...COMMON_ADVANCED_RULES,
+  ...ADVANCED_SECTION_RULES.visualEditAlignment!,
+  ...ADVANCED_SECTION_RULES.cognitiveLoad!,
+].join("\n");
+
+const buildAdvancedSectionPrompt = (section: AdvancedSectionKey) =>
+  [
+    "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
+    `Advanced metrics (salvage): include an \`advanced_metrics\` object with only ${section}:`,
+    `- ${ADVANCED_SECTION_LINES[section]}`,
+    "Rules:",
+    ...COMMON_ADVANCED_RULES,
+    ...(ADVANCED_SECTION_RULES[section] ?? []),
+  ].join("\n");
+
+const parsePercent = (raw: string | undefined, fallback: number) => {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(100, Math.max(0, parsed));
+};
+
+const SALVAGE_UNOBSERVED_THRESHOLD_PCT = parsePercent(
+  process.env.MULTIMODAL_SALVAGE_UNOBSERVED_PCT,
+  50,
+);
+
+const shouldSalvageSection = (stat: CoverageStat) =>
+  stat.available && stat.total > 0 && 100 - stat.observedPct >= SALVAGE_UNOBSERVED_THRESHOLD_PCT;
+
+export const multimodalResponseJsonSchema = coreResponseJsonSchema;
+export const multimodalPrompt = corePrompt;
 export const multimodalSystemInstruction = systemInstruction;
 
 const axisId = (domain: DomainKey, metricKey: string): string => `${domain}.${metricKey}`;
@@ -312,7 +408,11 @@ const buildCoverage = (
   return { observed, total, missing, observedPct, available };
 };
 
-const buildCoverageDiagnostics = (response: GeminiMultimodalResponse): CoverageDiagnostics => {
+const buildCoverageDiagnostics = (
+  response: GeminiMultimodalResponse,
+  advanced?: GeminiAdvancedMetricsPartial,
+  derivedSecondOrder?: AdvancedFingerprintMetrics["secondOrder"],
+): CoverageDiagnostics => {
   const core = {
     voice: buildCoverage(
       BASE_DOMAIN_METRICS.voice,
@@ -336,7 +436,6 @@ const buildCoverageDiagnostics = (response: GeminiMultimodalResponse): CoverageD
     ),
   };
 
-  const advanced = response.advanced_metrics;
   const advancedCoverage = {
     prosodyArc: buildCoverage(
       ADVANCED_METRIC_SECTIONS.prosodyArc,
@@ -369,9 +468,9 @@ const buildCoverageDiagnostics = (response: GeminiMultimodalResponse): CoverageD
       Boolean(advanced?.cognitiveLoad),
     ),
     secondOrder: buildCoverage(
-      ADVANCED_METRIC_SECTIONS.secondOrder,
-      (advanced?.secondOrder ?? {}) as Record<string, GeminiObservedMetric>,
-      Boolean(advanced?.secondOrder),
+      SECOND_ORDER_METRICS,
+      (derivedSecondOrder ?? {}) as Record<string, GeminiObservedMetric>,
+      Boolean(derivedSecondOrder),
     ),
   };
 
@@ -561,12 +660,12 @@ const mapMetric = (metric: GeminiRichMetric | undefined, fallback: ScoredMetric)
 };
 
 const mapAdvancedMetrics = (
-  advanced?: GeminiAdvancedMetrics,
+  advanced?: GeminiAdvancedMetricsPartial,
   defaults?: AdvancedFingerprintMetrics,
 ): AdvancedFingerprintMetrics | undefined => {
   if (!advanced) return undefined;
   const base = defaults ?? buildDefaultAdvancedMetrics();
-  return {
+  const mapped: AdvancedFingerprintMetrics = {
     prosodyArc: {
       paceMeanWpm: mapMetric(advanced.prosodyArc?.paceMeanWpm, base.prosodyArc.paceMeanWpm),
       paceVariabilityPct: mapMetric(advanced.prosodyArc?.paceVariabilityPct, base.prosodyArc.paceVariabilityPct),
@@ -662,13 +761,10 @@ const mapAdvancedMetrics = (
       loadPerSecond: mapMetric(advanced.cognitiveLoad?.loadPerSecond, base.cognitiveLoad.loadPerSecond),
       loadHighlights: mapMetric(advanced.cognitiveLoad?.loadHighlights, base.cognitiveLoad.loadHighlights),
     },
-    secondOrder: {
-      alignmentScore: mapMetric(advanced.secondOrder?.alignmentScore, base.secondOrder.alignmentScore),
-      driftScore: mapMetric(advanced.secondOrder?.driftScore, base.secondOrder.driftScore),
-      decayScore: mapMetric(advanced.secondOrder?.decayScore, base.secondOrder.decayScore),
-      balanceScore: mapMetric(advanced.secondOrder?.balanceScore, base.secondOrder.balanceScore),
-      timingScore: mapMetric(advanced.secondOrder?.timingScore, base.secondOrder.timingScore),
-    },
+  };
+  return {
+    ...mapped,
+    secondOrder: computeSecondOrderScores(mapped),
   };
 };
 
@@ -686,16 +782,114 @@ const toError = (result: GeminiMultimodalResult): GeminiApiError & { code?: Gemi
   return error;
 };
 
+type AdvancedPassOutcome = {
+  metrics?: GeminiAdvancedMetricsPartial;
+  fromFallback: boolean;
+  status?: number;
+};
+
+const mergeAdvancedMetrics = (
+  ...parts: Array<GeminiAdvancedMetricsPartial | undefined>
+): GeminiAdvancedMetricsPartial | undefined => {
+  const merged: GeminiAdvancedMetricsPartial = {};
+  for (const part of parts) {
+    if (!part) continue;
+    for (const [key, value] of Object.entries(part)) {
+      if (value) {
+        merged[key as AdvancedSectionKey] =
+          value as GeminiAdvancedMetricsPartial[AdvancedSectionKey];
+      }
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+};
+
+const shouldReplaceSection = (
+  section: AdvancedSectionKey,
+  current: GeminiAdvancedMetricsPartial[AdvancedSectionKey] | undefined,
+  salvage: GeminiAdvancedMetricsPartial[AdvancedSectionKey] | undefined,
+) => {
+  if (!salvage) return false;
+  if (!current) return true;
+  const currentCoverage = buildCoverage(
+    ADVANCED_METRIC_SECTIONS[section],
+    current as unknown as Record<string, GeminiObservedMetric>,
+    true,
+  );
+  const salvageCoverage = buildCoverage(
+    ADVANCED_METRIC_SECTIONS[section],
+    salvage as unknown as Record<string, GeminiObservedMetric>,
+    true,
+  );
+  return salvageCoverage.observed >= currentCoverage.observed;
+};
+
+const applySalvageMetrics = (
+  current: GeminiAdvancedMetricsPartial | undefined,
+  salvage: GeminiAdvancedMetricsPartial | undefined,
+): GeminiAdvancedMetricsPartial | undefined => {
+  if (!salvage) return current;
+  const merged: GeminiAdvancedMetricsPartial = { ...(current ?? {}) };
+  for (const [key, value] of Object.entries(salvage)) {
+    const section = key as AdvancedSectionKey;
+    if (shouldReplaceSection(section, merged[section], value as GeminiAdvancedMetricsPartial[AdvancedSectionKey])) {
+      merged[section] = value as GeminiAdvancedMetricsPartial[AdvancedSectionKey];
+    }
+  }
+  return Object.keys(merged).length > 0 ? merged : undefined;
+};
+
+const runAdvancedPass = async (input: {
+  youtubeUrl: string;
+  config?: AppConfig;
+  prompt: string;
+  jsonSchema: unknown;
+  sections: AdvancedSectionKey[];
+  model?: string;
+}): Promise<AdvancedPassOutcome> => {
+  const result = await callGeminiMultimodalJson({
+    youtubeUrl: input.youtubeUrl,
+    prompt: input.prompt,
+    systemInstruction,
+    jsonSchema: input.jsonSchema,
+    config: input.config,
+    model: input.model,
+  });
+
+  if (!result.ok) {
+    return { fromFallback: false, status: result.status };
+  }
+
+  try {
+    const parsed = parseGeminiAdvancedMetricsJson(result.rawJson, input.sections);
+    return {
+      metrics: parsed,
+      fromFallback: result.fromFallback,
+      status: result.status,
+    };
+  } catch {
+    return { fromFallback: result.fromFallback, status: result.status };
+  }
+};
+
 export const analyzeVideoMultimodal = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
 }): Promise<MultimodalAnalysisResult> => {
+  const passMode = input.config?.multimodalPassMode ?? "full";
+  const advancedMetricsEnabled = passMode !== "core" && input.config?.advancedMetricsEnabled !== false;
+  const coreModel = input.config?.geminiMultimodalCoreModel;
+  const advancedAudioModel = input.config?.geminiMultimodalAdvancedAudioModel;
+  const advancedVisualModel = input.config?.geminiMultimodalAdvancedVisualModel;
+  const salvageModel = input.config?.geminiMultimodalSalvageModel;
+
   const result = await callGeminiMultimodalJson({
     youtubeUrl: input.youtubeUrl,
-    prompt: userPrompt,
+    prompt: corePrompt,
     systemInstruction,
-    jsonSchema: responseJsonSchema,
+    jsonSchema: coreResponseJsonSchema,
     config: input.config,
+    model: coreModel,
   });
 
   if (!result.ok) {
@@ -705,17 +899,90 @@ export const analyzeVideoMultimodal = async (input: {
   const parsed = parseGeminiMultimodalJson(result.rawJson);
   const axisDetails: Record<string, AxisDetail> = {};
   const profiles = buildProfiles(parsed, result.fromFallback, axisDetails);
-  const advancedMetrics = mapAdvancedMetrics(parsed.advanced_metrics);
+  const audioTextPass = advancedMetricsEnabled
+    ? await runAdvancedPass({
+        youtubeUrl: input.youtubeUrl,
+        prompt: advancedAudioTextPrompt,
+        jsonSchema: advancedAudioTextResponseJsonSchema,
+        sections: ADVANCED_AUDIO_TEXT_SECTIONS,
+        config: input.config,
+        model: advancedAudioModel,
+      })
+    : undefined;
+  const visualCrossPass = advancedMetricsEnabled
+    ? await runAdvancedPass({
+        youtubeUrl: input.youtubeUrl,
+        prompt: advancedVisualCrossPrompt,
+        jsonSchema: advancedVisualCrossResponseJsonSchema,
+        sections: ADVANCED_VISUAL_CROSS_SECTIONS,
+        config: input.config,
+        model: advancedVisualModel,
+      })
+    : undefined;
+
+  let mergedAdvanced = mergeAdvancedMetrics(audioTextPass?.metrics, visualCrossPass?.metrics);
+  const coverageBeforeSalvage = buildCoverageDiagnostics(parsed, mergedAdvanced);
+  const salvageSections: AdvancedSectionKey[] = [];
+
+  if (advancedMetricsEnabled && coverageBeforeSalvage.advanced) {
+    for (const section of ADVANCED_GEMINI_SECTIONS) {
+      const stat = coverageBeforeSalvage.advanced[section];
+      if (stat && shouldSalvageSection(stat)) {
+        salvageSections.push(section);
+      }
+    }
+  }
+
+  let salvageFromFallback = false;
+  if (advancedMetricsEnabled && salvageSections.length > 0) {
+    for (const section of salvageSections) {
+      const fallbackModel =
+        ADVANCED_AUDIO_TEXT_SECTIONS.includes(section) ? advancedAudioModel : advancedVisualModel;
+      const salvagePass = await runAdvancedPass({
+        youtubeUrl: input.youtubeUrl,
+        prompt: buildAdvancedSectionPrompt(section),
+        jsonSchema: {
+          type: "object",
+          properties: {
+            advanced_metrics: buildAdvancedMetricsJsonSchema([section]),
+          },
+          required: ["advanced_metrics"],
+        },
+        sections: [section],
+        config: input.config,
+        model: salvageModel ?? fallbackModel,
+      });
+      salvageFromFallback = salvageFromFallback || salvagePass.fromFallback;
+      mergedAdvanced = applySalvageMetrics(
+        mergedAdvanced,
+        mergeAdvancedMetrics(salvagePass.metrics),
+      );
+    }
+  }
+
+  const advancedMetrics = mapAdvancedMetrics(mergedAdvanced);
+  const fromFallback =
+    result.fromFallback ||
+    Boolean(audioTextPass?.fromFallback) ||
+    Boolean(visualCrossPass?.fromFallback) ||
+    salvageFromFallback;
 
   return {
     profiles,
     beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
     axisDetails,
     diagnostics: {
-      fromFallback: result.fromFallback,
+      fromFallback,
       unobservedCounts: collectUnobservedCounts(parsed),
-      coverage: buildCoverageDiagnostics(parsed),
-      salvage: { attempted: false },
+      coverage: buildCoverageDiagnostics(parsed, mergedAdvanced, advancedMetrics?.secondOrder),
+      salvage: {
+        attempted: salvageSections.length > 0,
+        sections: salvageSections.length > 0 ? salvageSections : undefined,
+        reason:
+          salvageSections.length > 0
+            ? `unobserved >= ${SALVAGE_UNOBSERVED_THRESHOLD_PCT}%`
+            : undefined,
+      },
       rawStatus: result.status,
     },
     advancedMetrics,

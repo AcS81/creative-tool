@@ -1,5 +1,6 @@
 export type AnalysisMode = "mock" | "gemini";
 export type AnalysisVersion = "v1" | "v2";
+export type MultimodalPassMode = "core" | "full";
 
 export type AppConfig = {
   analysisMode: AnalysisMode;
@@ -13,6 +14,11 @@ export type AppConfig = {
   googleRedirectUrl?: string;
   tokenEncryptionKey?: string;
   analysisV2MultimodalEnabled: boolean;
+  multimodalPassMode?: MultimodalPassMode;
+  geminiMultimodalCoreModel?: string;
+  geminiMultimodalAdvancedAudioModel?: string;
+  geminiMultimodalAdvancedVisualModel?: string;
+  geminiMultimodalSalvageModel?: string;
 };
 
 export class ConfigError extends Error {
@@ -40,6 +46,14 @@ const normalizeAnalysisVersion = (raw?: string | null): AnalysisVersion | undefi
   return undefined;
 };
 
+const normalizePassMode = (raw?: string | null): MultimodalPassMode | undefined => {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "core") return "core";
+  if (normalized === "full") return "full";
+  return undefined;
+};
+
 const parseBoolean = (raw?: string | null) => {
   if (!raw) return false;
   const normalized = raw.trim().toLowerCase();
@@ -62,6 +76,11 @@ export const getAppConfig = (): AppConfig => {
   const rawAdvancedMetricsFlag = process.env.ENABLE_ADVANCED_METRICS;
   const advancedMetricsFlag =
     typeof rawAdvancedMetricsFlag === "string" ? parseBoolean(rawAdvancedMetricsFlag) : undefined;
+  const passModeFromEnv = normalizePassMode(process.env.MULTIMODAL_PASS_MODE);
+  const geminiMultimodalCoreModel = process.env.GEMINI_MULTIMODAL_CORE_MODEL;
+  const geminiMultimodalAdvancedAudioModel = process.env.GEMINI_MULTIMODAL_ADV_AUDIO_MODEL;
+  const geminiMultimodalAdvancedVisualModel = process.env.GEMINI_MULTIMODAL_ADV_VISUAL_MODEL;
+  const geminiMultimodalSalvageModel = process.env.GEMINI_MULTIMODAL_SALVAGE_MODEL;
 
   if (analysisMode === "gemini") {
     const missingKeys = [!geminiApiKey && "GEMINI_API_KEY", !youtubeApiKey && "YOUTUBE_API_KEY"].filter(
@@ -108,8 +127,11 @@ export const getAppConfig = (): AppConfig => {
     analysisVersion = analysisV2MultimodalEnabled ? "v2" : "v1";
   }
 
-  const advancedMetricsEnabled =
+  const advancedMetricsEnabledRaw =
     typeof advancedMetricsFlag === "boolean" ? advancedMetricsFlag : defaultAdvancedMetricsEnabled;
+  const multimodalPassMode: MultimodalPassMode =
+    passModeFromEnv ?? (advancedMetricsEnabledRaw ? "full" : "core");
+  const advancedMetricsEnabled = multimodalPassMode === "core" ? false : advancedMetricsEnabledRaw;
 
   return {
     analysisMode,
@@ -123,5 +145,10 @@ export const getAppConfig = (): AppConfig => {
     googleRedirectUrl,
     tokenEncryptionKey,
     analysisV2MultimodalEnabled,
+    multimodalPassMode,
+    geminiMultimodalCoreModel,
+    geminiMultimodalAdvancedAudioModel,
+    geminiMultimodalAdvancedVisualModel,
+    geminiMultimodalSalvageModel,
   };
 };
