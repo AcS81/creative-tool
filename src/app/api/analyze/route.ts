@@ -6,7 +6,7 @@ import { generateInsights } from "../../../lib/analysis/insights";
 import { generateDomainInsights } from "../../../lib/analysis/domainInsights";
 import { ConfigError, getAppConfig } from "../../../lib/config";
 import { fetchYoutubeMetadata, YoutubeApiError } from "../../../lib/youtube/api";
-import { GeminiApiError } from "../../../lib/gemini/client";
+import { GeminiApiError, preflightGeminiIngestion } from "../../../lib/gemini/client";
 import { getAuthContext } from "../../../lib/auth/context";
 import { buildSessionCookie, ensureSessionId } from "../../../lib/session";
 import { fetchReferenceData } from "./utils";
@@ -81,11 +81,40 @@ export async function POST(request: Request) {
     });
     videoAnalysisId = videoAnalysis.id;
 
+    const ingestionPreflight =
+      config.analysisMode === "gemini" && config.analysisV2MultimodalEnabled
+        ? await preflightGeminiIngestion({ youtubeUrl, config, logger: console })
+        : undefined;
+
+    const allowTranscriptFallback = Boolean(
+      ingestionPreflight &&
+        config.transcriptFallbackEnabled &&
+        ingestionPreflight.fileData.status === "blocked" &&
+        ingestionPreflight.fallback.checked &&
+        ingestionPreflight.fallback.viable === false,
+    );
+
+    if (ingestionPreflight && !ingestionPreflight.ok && !allowTranscriptFallback) {
+      const message = ingestionPreflight.failureMessage ?? "Video ingestion preflight failed.";
+      await prisma.videoAnalysis.update({
+        where: { id: videoAnalysis.id },
+        data: { status: "failed", failureReason: message },
+      });
+      return NextResponse.json(
+        {
+          error: "IngestionPreflightFailed",
+          message,
+          diagnostics: { ingestionPreflight },
+        },
+        { status: 422 },
+      );
+    }
+
     const authContext = await getAuthContext();
 
     const analysisResult = await analyzeVideo(
       { videoId, title, durationSeconds, creatorDisplayName, channelId: metadata.channelId },
-      { config, auth: authContext ?? undefined },
+      { config, auth: authContext ?? undefined, ingestionPreflight },
     );
 
     await prisma.videoFingerprint.create({
@@ -128,7 +157,10 @@ export async function POST(request: Request) {
       insights: insights.bullets,
       insightDetails: insights,
       domainInsights,
-      diagnostics: analysisResult.diagnostics ?? { source: "gemini-v2-multimodal" },
+      diagnostics: {
+        ...analysisResult.diagnostics,
+        ingestionPreflight,
+      },
       metadata: {
         title: metadata.title,
         channelTitle: metadata.channelTitle,

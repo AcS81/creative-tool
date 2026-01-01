@@ -12,17 +12,18 @@ export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   diagnostics?: {
-    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal";
+    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal" | "gemini-v2-transcript";
     hashSeed?: number;
     performanceAttached?: boolean;
     performanceErrorType?: string;
     performanceErrorMessage?: string;
     analysisVersion?: "v1" | "v2";
     multimodalFallbackUsed?: boolean;
+    transcriptFallbackUsed?: boolean;
     lowerConfidence?: boolean;
     lowerConfidenceReason?: string;
     unobservedCounts?: Record<string, number>;
-    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
+    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock" | "gemini-v2-transcript";
     analysisErrorMessage?: string;
     advancedMetricsDefaulted?: boolean;
     advancedMetricsObserved?: boolean;
@@ -46,8 +47,28 @@ export interface AnalyzeVideoResult {
       sections?: string[];
       reason?: string;
     };
+    ingestionPreflight?: IngestionPreflight;
   };
 }
+
+export type IngestionPreflight = {
+  ok: boolean;
+  failureMessage?: string;
+  validUrl: boolean;
+  fileData: {
+    eligible: boolean;
+    status: "unknown" | "allowed" | "blocked";
+    reason?: string;
+  };
+  fallback: {
+    checked: boolean;
+    viable?: boolean;
+    status?: number;
+    contentType?: string;
+    looksLikeHtml?: boolean;
+    reason?: string;
+  };
+};
 
 // Multimodal analysis v2 response contracts.
 export * from "./types/multimodal";

@@ -17,6 +17,7 @@ describe("getAppConfig", () => {
     delete process.env.YOUTUBE_API_KEY;
     delete process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
     delete process.env.ENABLE_ADVANCED_METRICS;
+    delete process.env.ENABLE_TRANSCRIPT_FALLBACK;
   });
 
   it("defaults to mock mode and performance disabled", () => {

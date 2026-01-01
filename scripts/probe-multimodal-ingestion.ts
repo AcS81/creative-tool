@@ -132,6 +132,8 @@ async function main() {
     geminiApiKey: process.env.GEMINI_API_KEY,
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "unused",
     performanceEnabled: false,
+    transcriptFallbackEnabled: false,
+    advancedMetricsEnabled: true,
   };
 
   console.log(`=== Gemini multimodal call (forceFallback=${args.forceFallback ? "true" : "false"}) ===`);

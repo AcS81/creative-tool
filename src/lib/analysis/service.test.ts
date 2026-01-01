@@ -6,9 +6,11 @@ import { ConfigError } from "../config";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 const mockAnalyzeVideoMultimodal = vi.fn();
+const mockAnalyzeVideoTranscriptFallback = vi.fn();
 
 vi.mock("./geminiMultimodalAnalyzer", () => ({
   analyzeVideoMultimodal: (...args: any[]) => mockAnalyzeVideoMultimodal(...args),
+  analyzeVideoTranscriptFallback: (...args: any[]) => mockAnalyzeVideoTranscriptFallback(...args),
 }));
 
 function mockDomain(label: string, base: number): DomainProfile {
@@ -32,11 +34,13 @@ const baseConfig: AppConfig = {
   youtubeApiKey: "yt",
   performanceEnabled: false,
   advancedMetricsEnabled: true,
+  transcriptFallbackEnabled: false,
 };
 
 describe("analyzeVideo service", () => {
   beforeEach(() => {
     mockAnalyzeVideoMultimodal.mockReset();
+    mockAnalyzeVideoTranscriptFallback.mockReset();
   });
 
   afterEach(() => {

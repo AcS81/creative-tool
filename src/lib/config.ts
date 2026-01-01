@@ -9,6 +9,7 @@ export type AppConfig = {
   youtubeApiKey?: string;
   performanceEnabled: boolean;
   advancedMetricsEnabled: boolean;
+  transcriptFallbackEnabled: boolean;
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUrl?: string;
@@ -76,6 +77,7 @@ export const getAppConfig = (): AppConfig => {
   const rawAdvancedMetricsFlag = process.env.ENABLE_ADVANCED_METRICS;
   const advancedMetricsFlag =
     typeof rawAdvancedMetricsFlag === "string" ? parseBoolean(rawAdvancedMetricsFlag) : undefined;
+  const rawTranscriptFallbackFlag = process.env.ENABLE_TRANSCRIPT_FALLBACK;
   const passModeFromEnv = normalizePassMode(process.env.MULTIMODAL_PASS_MODE);
   const geminiMultimodalCoreModel = process.env.GEMINI_MULTIMODAL_CORE_MODEL;
   const geminiMultimodalAdvancedAudioModel = process.env.GEMINI_MULTIMODAL_ADV_AUDIO_MODEL;
@@ -113,6 +115,7 @@ export const getAppConfig = (): AppConfig => {
   const geminiConfigured = analysisMode === "gemini" && Boolean(geminiApiKey) && Boolean(youtubeApiKey);
   const defaultMultimodalEnabled = geminiConfigured;
   const defaultAdvancedMetricsEnabled = geminiConfigured;
+  const defaultTranscriptFallbackEnabled = geminiConfigured;
 
   let analysisVersion: AnalysisVersion;
   let analysisV2MultimodalEnabled: boolean;
@@ -132,6 +135,10 @@ export const getAppConfig = (): AppConfig => {
   const multimodalPassMode: MultimodalPassMode =
     passModeFromEnv ?? (advancedMetricsEnabledRaw ? "full" : "core");
   const advancedMetricsEnabled = multimodalPassMode === "core" ? false : advancedMetricsEnabledRaw;
+  const transcriptFallbackEnabled =
+    typeof rawTranscriptFallbackFlag === "string"
+      ? parseBoolean(rawTranscriptFallbackFlag)
+      : defaultTranscriptFallbackEnabled;
 
   return {
     analysisMode,
@@ -140,6 +147,7 @@ export const getAppConfig = (): AppConfig => {
     youtubeApiKey,
     performanceEnabled,
     advancedMetricsEnabled,
+    transcriptFallbackEnabled,
     googleClientId,
     googleClientSecret,
     googleRedirectUrl,

@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { DomainProfile, VideoFingerprintJson } from "../lib/types";
+import type { AnalyzeVideoResult } from "../lib/analysis/types";
 import { RadarChartOverview } from "../components/RadarChartOverview";
 import { AnalysisLayout } from "../components/Layout/AnalysisLayout";
 import { DomainTimeline } from "../components/DomainTimeline";
@@ -52,12 +53,7 @@ type AnalyzeResponse = {
     durationSeconds?: number;
     thumbnailUrl?: string;
   };
-  diagnostics?: {
-    source?: string;
-    performanceAttached?: boolean;
-    performanceErrorType?: string;
-    performanceErrorMessage?: string;
-  };
+  diagnostics?: AnalyzeVideoResult["diagnostics"];
 };
 
 type RecentAnalysisSummary = {

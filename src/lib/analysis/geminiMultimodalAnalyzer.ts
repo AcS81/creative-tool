@@ -5,11 +5,15 @@ import type {
   BeatRole,
   BeatSegment,
   DomainProfile,
+  SceneSegment,
   ScoredMetric,
+  TranscriptSegment,
 } from "../types";
 import {
   callGeminiMultimodalJson,
+  callGeminiTextJson,
   GeminiApiError,
+  getTranscriptAndScenes,
   type GeminiMultimodalErrorCode,
   type GeminiMultimodalResult,
 } from "../gemini/client";
@@ -50,6 +54,20 @@ export type MultimodalAnalysisResult = {
     unobservedCounts: Record<string, number>;
     coverage?: CoverageDiagnostics;
     salvage?: SalvageDiagnostics;
+    rawStatus?: number;
+  };
+};
+
+export type TranscriptFallbackResult = {
+  profiles: MultimodalProfiles;
+  beats?: BeatSegment[];
+  axisDetails: Record<string, AxisDetail>;
+  transcriptSegments: TranscriptSegment[];
+  sceneSegments: SceneSegment[];
+  diagnostics: {
+    transcriptFallback: true;
+    unobservedCounts: Record<string, number>;
+    coverage?: CoverageDiagnostics;
     rawStatus?: number;
   };
 };
@@ -306,6 +324,32 @@ const corePrompt = [
   "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ].join("\n");
 
+const transcriptFallbackSystemInstruction = [
+  "You are a transcript-only analysis engine.",
+  "You only have transcript segments with timestamps; do not invent visuals or audio you cannot infer.",
+  "Return strict JSON only.",
+].join("\n");
+
+const formatTranscriptSegments = (segments: TranscriptSegment[]) =>
+  segments.map((segment) => `[${segment.startSeconds}-${segment.endSeconds}] ${segment.text}`);
+
+const buildTranscriptFallbackPrompt = (segments: TranscriptSegment[], scenes?: SceneSegment[]) =>
+  [
+    "Transcript-only fallback: use ONLY the transcript segments below.",
+    "For voice metrics you may infer speaking_rate, filler_rate, and pauses from transcript timing; set loudness_range and pitch_variation to value:\"unobserved\" and score:0.",
+    "Set ALL visual_edit_sound metrics to value:\"unobserved\" and score:0.",
+    "Compute language and narrative metrics from the transcript text; infer beats from timing.",
+    "If any metric cannot be inferred from text, set value:\"unobserved\" and score:0.",
+    corePrompt,
+    scenes && scenes.length > 0
+      ? `Scene segments (summary): ${scenes
+          .map((scene) => `[${scene.startSeconds}-${scene.endSeconds}] ${scene.label}: ${scene.shortSummary}`)
+          .join(" | ")}`
+      : "Scene segments: none provided.",
+    "Transcript segments:",
+    ...formatTranscriptSegments(segments),
+  ].join("\n");
+
 const advancedAudioTextPrompt = [
   "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
   "Advanced metrics (audio/text): include an `advanced_metrics` object with these sections:",
@@ -529,7 +573,7 @@ const buildDomainProfile = (
   metricKeys: string[],
   metrics: Record<string, GeminiObservedMetric>,
   axisDetails: Record<string, AxisDetail>,
-  extraHighlight?: string,
+  extraHighlights?: string[],
 ): DomainProfile => {
   const domainDetails: Record<string, AxisDetail> = {};
   const scores = toScores(domain, metricKeys, metrics, {
@@ -538,7 +582,7 @@ const buildDomainProfile = (
   });
   const missing = unobserved(metricKeys, metrics);
   const highlights = [
-    ...(extraHighlight ? [extraHighlight] : []),
+    ...(extraHighlights ?? []),
     ...(missing.length ? [`Unobserved: ${missing.join(", ")}`] : []),
   ];
 
@@ -555,14 +599,20 @@ const buildProfiles = (
   response: GeminiMultimodalResponse,
   fromFallback: boolean,
   axisDetails: Record<string, AxisDetail>,
+  fallbackNotice?: string,
 ): MultimodalProfiles => {
+  const fallbackHighlights = fallbackNotice
+    ? [fallbackNotice]
+    : fromFallback
+      ? ["Used fallback media path"]
+      : [];
   const voice = buildDomainProfile(
     "voice",
     "Voice",
     [...BASE_DOMAIN_METRICS.voice],
     response.voice as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
   const language = buildDomainProfile(
     "language",
@@ -570,7 +620,7 @@ const buildProfiles = (
     [...BASE_DOMAIN_METRICS.language],
     response.language as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
   const narrative = buildDomainProfile(
     "narrative",
@@ -578,7 +628,7 @@ const buildProfiles = (
     [...BASE_DOMAIN_METRICS.narrative],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const ves = response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>;
@@ -589,7 +639,7 @@ const buildProfiles = (
     ["environment_stability", "talking_vs_broll_vs_graphics", "pattern_interrupts"],
     ves,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const editing = buildDomainProfile(
@@ -598,7 +648,7 @@ const buildProfiles = (
     ["cut_rate", "pattern_interrupts", "broll_coverage"],
     ves,
     axisDetails,
-    fromFallback ? "Used fallback media path" : undefined,
+    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const soundHighlights: string[] = [];
@@ -608,13 +658,14 @@ const buildProfiles = (
   if (ves.music_changes?.value && ves.music_changes.value !== "unobserved") {
     soundHighlights.push(`Music changes: ${ves.music_changes.value}`);
   }
+  const soundExtraHighlights = [...fallbackHighlights, ...soundHighlights].filter(Boolean);
   const sound = buildDomainProfile(
     "sound",
     "Sound",
     ["music_coverage", "music_changes", "sfx_density", "silence_for_emphasis"],
     ves,
     axisDetails,
-    fromFallback ? "Used fallback media path" : soundHighlights.join("; "),
+    soundExtraHighlights.length ? soundExtraHighlights : undefined,
   );
 
   return { voice, language, narrative, visual, editing, sound };
@@ -870,6 +921,43 @@ const runAdvancedPass = async (input: {
   } catch {
     return { fromFallback: result.fromFallback, status: result.status };
   }
+};
+
+const TRANSCRIPT_FALLBACK_SEGMENT_LIMIT = 40;
+
+export const analyzeVideoTranscriptFallback = async (input: {
+  youtubeUrl: string;
+  config?: AppConfig;
+}): Promise<TranscriptFallbackResult> => {
+  const transcript = await getTranscriptAndScenes({ videoUrl: input.youtubeUrl }, { config: input.config });
+  const transcriptSegments = transcript.transcriptSegments.slice(0, TRANSCRIPT_FALLBACK_SEGMENT_LIMIT);
+  const sceneSegments = transcript.sceneSegments.slice(0, TRANSCRIPT_FALLBACK_SEGMENT_LIMIT);
+  const prompt = buildTranscriptFallbackPrompt(transcriptSegments, sceneSegments);
+  const response = await callGeminiTextJson({
+    prompt,
+    systemInstruction: transcriptFallbackSystemInstruction,
+    jsonSchema: coreResponseJsonSchema,
+    config: input.config,
+    model: input.config?.geminiMultimodalCoreModel,
+  });
+
+  const parsed = parseGeminiMultimodalJson(response.rawJson);
+  const axisDetails: Record<string, AxisDetail> = {};
+  const profiles = buildProfiles(parsed, false, axisDetails, "Transcript-only fallback");
+
+  return {
+    profiles,
+    beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
+    axisDetails,
+    transcriptSegments: transcript.transcriptSegments,
+    sceneSegments: transcript.sceneSegments,
+    diagnostics: {
+      transcriptFallback: true,
+      unobservedCounts: collectUnobservedCounts(parsed),
+      coverage: buildCoverageDiagnostics(parsed),
+      rawStatus: response.status,
+    },
+  };
 };
 
 export const analyzeVideoMultimodal = async (input: {

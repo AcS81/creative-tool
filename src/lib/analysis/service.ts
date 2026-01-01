@@ -1,6 +1,6 @@
 import { ConfigError, getAppConfig, type AppConfig } from "../config";
 import { mockAnalyzeVideo } from "./mock";
-import type { AnalyzeVideoInput, AnalyzeVideoResult } from "./types";
+import type { AnalyzeVideoInput, AnalyzeVideoResult, IngestionPreflight } from "./types";
 import type {
   MetaAxes,
   VideoFingerprintJson,
@@ -13,7 +13,8 @@ import { fetchVideoAnalytics } from "../youtube/analytics";
 import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
-import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
+import { analyzeVideoMultimodal, analyzeVideoTranscriptFallback } from "./geminiMultimodalAnalyzer";
+import { GeminiApiError } from "../gemini/client";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
 
@@ -21,6 +22,7 @@ type AnalyzeOptions = {
   config?: AppConfig;
   useMock?: boolean;
   auth?: AuthContext | null;
+  ingestionPreflight?: IngestionPreflight;
 };
 
 const archetypeForMeta = (meta: MetaAxes) => {
@@ -90,7 +92,129 @@ export async function analyzeVideo(
   }
 
   const videoUrl = buildVideoUrl(input.videoId);
-  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+  const shouldTranscriptFallback = (preflight?: IngestionPreflight) =>
+    Boolean(
+      config.transcriptFallbackEnabled &&
+        preflight?.fileData.status === "blocked" &&
+        preflight?.fallback?.checked === true &&
+        preflight?.fallback?.viable === false,
+    );
+
+  const attachPerformance = async (currentFingerprint: VideoFingerprintJson) => {
+    let fingerprint = currentFingerprint;
+    let performanceAttached = false;
+    let performanceErrorType: string | undefined;
+    let performanceErrorMessage: string | undefined;
+
+    if (config.performanceEnabled && options.auth?.userId && input.channelId) {
+      try {
+        const analytics = await fetchVideoAnalytics(
+          { videoId: input.videoId, channelId: input.channelId, auth: options.auth },
+          { config },
+        );
+        const timeline = buildPerformanceTimeline({
+          retentionSeries: analytics.retentionSeries,
+          beats: fingerprint.supporting?.beats,
+          scenes: fingerprint.supporting?.sceneSegments,
+          durationSeconds: input.durationSeconds,
+        });
+        const performanceProfile = buildPerformanceProfile({ analytics, timeline });
+        fingerprint = {
+          ...fingerprint,
+          performanceProfile,
+          hasPerformanceData: true,
+        };
+        performanceAttached = true;
+      } catch (error) {
+        console.error("Performance analytics failed; continuing without performance data", error);
+        const err: any = error;
+        if (err && typeof err === "object") {
+          if (typeof err.type === "string") {
+            performanceErrorType = err.type;
+          }
+          if (typeof err.message === "string") {
+            performanceErrorMessage = err.message;
+          }
+        }
+      }
+    }
+
+    return { fingerprint, performanceAttached, performanceErrorType, performanceErrorMessage };
+  };
+
+  const buildTranscriptFallbackResult = async (): Promise<AnalyzeVideoResult> => {
+    const transcript = await analyzeVideoTranscriptFallback({ youtubeUrl: videoUrl, config });
+    const perDomain: FingerprintPerDomain = {
+      voiceProfile: transcript.profiles.voice,
+      languageProfile: transcript.profiles.language,
+      narrativeProfile: transcript.profiles.narrative,
+      visualProfile: transcript.profiles.visual,
+      editingProfile: transcript.profiles.editing,
+      soundProfile: transcript.profiles.sound,
+    };
+    const metaAxes = computeMetaAxesFromProfiles(perDomain);
+    const overallArchetype = archetypeForMeta(metaAxes);
+    const advancedMetrics = buildDefaultAdvancedMetrics();
+    let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
+      metaAxes,
+      overallArchetype,
+      supporting: {
+        beats: transcript.beats,
+        axisDetails: transcript.axisDetails,
+        transcriptSegments: transcript.transcriptSegments,
+        sceneSegments: transcript.sceneSegments,
+      },
+      hasPerformanceData: false,
+      advancedMetrics,
+    });
+
+    const performance = await attachPerformance(fingerprint);
+    fingerprint = performance.fingerprint;
+
+    const validated = validateFingerprint(fingerprint);
+
+    return {
+      fingerprint: validated,
+      overallArchetype,
+      diagnostics: {
+        source: "gemini-v2-transcript",
+        performanceAttached: performance.performanceAttached,
+        performanceErrorType: performance.performanceErrorType,
+        performanceErrorMessage: performance.performanceErrorMessage,
+        analysisPath: "gemini-v2-transcript",
+        analysisErrorMessage: undefined,
+        analysisVersion: "v2",
+        multimodalFallbackUsed: false,
+        transcriptFallbackUsed: true,
+        lowerConfidence: true,
+        lowerConfidenceReason: "Transcript-only fallback: visual/edit/sound metrics not observed.",
+        unobservedCounts: transcript.diagnostics.unobservedCounts,
+        coverage: transcript.diagnostics.coverage,
+        salvage: { attempted: false },
+        advancedMetricsDefaulted: true,
+        advancedMetricsObserved: false,
+        advancedMetricsDefaultReason: "Transcript-only fallback; advanced metrics unavailable.",
+      },
+    };
+  };
+
+  if (shouldTranscriptFallback(options.ingestionPreflight)) {
+    return buildTranscriptFallbackResult();
+  }
+
+  let multimodal;
+  try {
+    multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+  } catch (error) {
+    if (
+      config.transcriptFallbackEnabled &&
+      error instanceof GeminiApiError &&
+      (error as GeminiApiError & { code?: string }).code === "FALLBACK_FAILED"
+    ) {
+      return buildTranscriptFallbackResult();
+    }
+    throw error;
+  }
 
   const voiceProfile = multimodal.profiles.voice;
   const languageProfile = multimodal.profiles.language;
@@ -144,42 +268,8 @@ export async function analyzeVideo(
     advancedMetrics,
   });
 
-  let performanceAttached = false;
-  let performanceErrorType: string | undefined;
-  let performanceErrorMessage: string | undefined;
-
-  if (config.performanceEnabled && options.auth?.userId && input.channelId) {
-    try {
-      const analytics = await fetchVideoAnalytics(
-        { videoId: input.videoId, channelId: input.channelId, auth: options.auth },
-        { config },
-      );
-      const timeline = buildPerformanceTimeline({
-        retentionSeries: analytics.retentionSeries,
-        beats: fingerprint.supporting?.beats,
-        scenes: fingerprint.supporting?.sceneSegments,
-        durationSeconds: input.durationSeconds,
-      });
-      const performanceProfile = buildPerformanceProfile({ analytics, timeline });
-      fingerprint = {
-        ...fingerprint,
-        performanceProfile,
-        hasPerformanceData: true,
-      };
-      performanceAttached = true;
-    } catch (error) {
-      console.error("Performance analytics failed; continuing without performance data", error);
-      const err: any = error;
-      if (err && typeof err === "object") {
-        if (typeof err.type === "string") {
-          performanceErrorType = err.type;
-        }
-        if (typeof err.message === "string") {
-          performanceErrorMessage = err.message;
-        }
-      }
-    }
-  }
+  const performance = await attachPerformance(fingerprint);
+  fingerprint = performance.fingerprint;
 
   const validated = validateFingerprint(fingerprint);
 
@@ -188,13 +278,14 @@ export async function analyzeVideo(
     overallArchetype,
     diagnostics: {
       source: "gemini-v2-multimodal",
-      performanceAttached,
-      performanceErrorType,
-      performanceErrorMessage,
+      performanceAttached: performance.performanceAttached,
+      performanceErrorType: performance.performanceErrorType,
+      performanceErrorMessage: performance.performanceErrorMessage,
       analysisPath: "gemini-v2-multimodal",
       analysisErrorMessage: undefined,
       analysisVersion: "v2",
       multimodalFallbackUsed,
+      transcriptFallbackUsed: false,
       lowerConfidence,
       lowerConfidenceReason,
       unobservedCounts,

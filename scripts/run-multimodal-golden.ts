@@ -156,6 +156,7 @@ async function run() {
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "dev",
     performanceEnabled: false,
     advancedMetricsEnabled: true,
+    transcriptFallbackEnabled: false,
   };
 
 const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMultimodal>>["profiles"]): FingerprintPerDomain => ({

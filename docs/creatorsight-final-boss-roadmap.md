@@ -178,23 +178,23 @@ Choose (and document) one:
 
 ### Task 2.1: Preflight entitlement & content-type checks
 **Goals**
-- [ ] Preflight the YouTube URL for:
+- [x] Preflight the YouTube URL for:
   - validity,
   - whether `file_data` path is available,
   - whether fallback (if chosen) is viable.
 
 **Acceptance Criteria**
-- [ ] No confusing runs where “media wasn’t actually ingested” but the UI blames the model.
+- [x] No confusing runs where “media wasn’t actually ingested” but the UI blames the model.
 
 ### Task 2.2: Implement chosen fallback strategy (Decision A)
 Pick one path and execute it fully with diagnostics:
-- [ ] A1 entitlement-required (clear error UX)
-- [ ] A2 transcript-only partial analysis
+- [x] A1 entitlement-required (clear error UX)
+- [x] A2 transcript-only partial analysis
 - [ ] A3 ephemeral media download + temp upload (compliance reviewed)
 - [ ] A4 user upload fallback
 
 **Acceptance Criteria**
-- [ ] If multimodal ingestion fails, we still return *something* valuable or a crisp failure message.
+- [x] If multimodal ingestion fails, we still return *something* valuable or a crisp failure message.
 
 ---
 

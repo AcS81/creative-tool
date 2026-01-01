@@ -90,6 +90,7 @@ describe("callGeminiMultimodalJson", () => {
     performanceEnabled: false,
     analysisV2MultimodalEnabled: true,
     advancedMetricsEnabled: true,
+    transcriptFallbackEnabled: false,
   };
 
   const sampleCandidate = (data: unknown) =>
