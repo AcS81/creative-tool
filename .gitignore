@@ -36,6 +36,9 @@ yarn-error.log*
 /prisma/dev.db
 /prisma/dev.db-journal
 
+# golden set (keep canonical URLs private by default)
+/scripts/golden-set.json
+
 # vercel
 .vercel
 

@@ -94,8 +94,6 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
       hashSeed: seed,
       analysisPath: "mock",
       analysisVersion: "v2",
-      multimodalFallbackUsed: false,
-      lowerConfidence: false,
       advancedMetricsDefaulted: false,
       advancedMetricsObserved: true,
     },

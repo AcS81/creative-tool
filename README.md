@@ -31,7 +31,7 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
 - `npm run seed` (populate reference creators + fingerprints)
 - Seed note: Option B chosen—refresh seeds with a one-time Gemini run. Until you run the refresh (see `docs/reference_seed_refresh.md`), seeds stay mock-generated for determinism.
 - `npm run test` (Vitest)
-- `npm run probe:ingestion` (dev probe for Gemini file_data vs fallback ingestion)
+- `npm run probe:ingestion` (dev probe for Gemini URL ingestion)
 - `npm run eval:golden` (run multimodal pipeline against the documented golden YouTube set)
 - `npm run visual:check` (optional Playwright screenshots of landing/sample/performance; requires `npm install` to fetch Playwright)
 
@@ -74,6 +74,7 @@ The current app covers the PRD MVP features:
 ### Latency and cost expectations
 - Gemini + YouTube mode may take up to 5–10 minutes for a long video; calls are synchronous in this iteration.
 - API usage incurs Gemini and YouTube quotas/billing; pick a lighter model (e.g., `gemini-2.5-flash`) if you want lower cost/latency.
+- Pricing reference + cost estimation: see `docs/gemini_pricing.md` (uses Gemini usageMetadata; excludes caching/grounding/storage).
 
 ### Privacy
 - No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. When performance is enabled, only YouTube Analytics metrics are stored; OAuth tokens are encrypted and can be revoked via the UI (Disconnect YouTube) or by deleting token rows.
@@ -84,8 +85,8 @@ The current app covers the PRD MVP features:
 - Disconnect YouTube at any time via the landing page (tokens revoked/deleted).
 
 ### Debugging & regression helpers
-- `/dev/multimodal` (dev-only) hits the same multimodal pipeline as `/api/analyze`; it shows whether `file_data` vs inline upload fallback was used, includes unobserved metric counts, and links to `docs/axes_and_domains.md` for axis definitions.
-- `npm run probe:ingestion -- --url <youtube-url>` tests Gemini YouTube ingestion vs the inline upload fallback path with timing and status output.
+- `/dev/multimodal` (dev-only) hits the same multimodal pipeline as `/api/analyze`; it includes unobserved metric counts and links to `docs/axes_and_domains.md` for axis definitions.
+- `npm run probe:ingestion -- --url <youtube-url>` tests Gemini YouTube URL ingestion with timing and status output.
 - `npm run golden:multimodal` runs the small golden set against live Gemini keys to spot regressions in story/music/pacing detection (see `docs/multimodal_golden_set.md`).
 
 ### E2E flows and iteration docs

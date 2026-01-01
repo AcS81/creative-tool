@@ -6,11 +6,9 @@ import { ConfigError } from "../config";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 const mockAnalyzeVideoMultimodal = vi.fn();
-const mockAnalyzeVideoTranscriptFallback = vi.fn();
 
 vi.mock("./geminiMultimodalAnalyzer", () => ({
   analyzeVideoMultimodal: (...args: any[]) => mockAnalyzeVideoMultimodal(...args),
-  analyzeVideoTranscriptFallback: (...args: any[]) => mockAnalyzeVideoTranscriptFallback(...args),
 }));
 
 function mockDomain(label: string, base: number): DomainProfile {
@@ -34,13 +32,11 @@ const baseConfig: AppConfig = {
   youtubeApiKey: "yt",
   performanceEnabled: false,
   advancedMetricsEnabled: true,
-  transcriptFallbackEnabled: false,
 };
 
 describe("analyzeVideo service", () => {
   beforeEach(() => {
     mockAnalyzeVideoMultimodal.mockReset();
-    mockAnalyzeVideoTranscriptFallback.mockReset();
   });
 
   afterEach(() => {
@@ -61,7 +57,6 @@ describe("analyzeVideo service", () => {
       beats: [{ startSeconds: 0, endSeconds: 10, label: "hook", devices: [] }],
       axisDetails: {},
       diagnostics: {
-        fromFallback: false,
         unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
       },
     });
@@ -79,33 +74,6 @@ describe("analyzeVideo service", () => {
     expect(result.diagnostics?.advancedMetricsDefaulted).toBe(true);
     expect(result.diagnostics?.advancedMetricsObserved).toBe(false);
     expect(result.diagnostics?.advancedMetricsDefaultReason).toContain("unavailable");
-    expect(result.diagnostics?.lowerConfidence).toBe(false);
-  });
-
-  it("surfaces fallback diagnostics when fallback media path is used", async () => {
-    mockAnalyzeVideoMultimodal.mockResolvedValue({
-      profiles: {
-        voice: mockDomain("Voice", 60),
-        language: mockDomain("Language", 65),
-        narrative: mockDomain("Narrative", 70),
-        visual: mockDomain("Visual", 55),
-        editing: mockDomain("Editing", 62),
-        sound: mockDomain("Sound", 58),
-      },
-      beats: [],
-      axisDetails: {},
-      diagnostics: {
-        fromFallback: true,
-        unobservedCounts: { voice: 1, language: 0, narrative: 0, visual_edit_sound: 2 },
-      },
-    });
-
-    const result = await analyzeVideo({ videoId: "abc-fallback" }, { config: baseConfig });
-    expect(result.diagnostics?.multimodalFallbackUsed).toBe(true);
-    expect(result.diagnostics?.unobservedCounts?.voice).toBe(1);
-    expect(result.diagnostics?.source).toBe("gemini-v2-multimodal");
-    expect(result.diagnostics?.lowerConfidence).toBe(true);
-    expect(result.diagnostics?.lowerConfidenceReason).toContain("fallback");
   });
 
   it("surfaces rollback diagnostics when advanced metrics are disabled", async () => {
@@ -143,7 +111,6 @@ describe("analyzeVideo service", () => {
       beats: [{ startSeconds: 0, endSeconds: 10, label: "hook", devices: [] }],
       axisDetails: {},
       diagnostics: {
-        fromFallback: false,
         unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
       },
       advancedMetrics,

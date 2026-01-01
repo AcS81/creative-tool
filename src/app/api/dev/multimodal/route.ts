@@ -45,10 +45,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      fromFallback: analysis.diagnostics.fromFallback,
       unobservedCounts: analysis.diagnostics.unobservedCounts,
       coverage: analysis.diagnostics.coverage,
       salvage: analysis.diagnostics.salvage,
+      passMetrics: analysis.diagnostics.passMetrics,
       fingerprint,
       diagnostics: {
         source: "gemini-v2-multimodal",

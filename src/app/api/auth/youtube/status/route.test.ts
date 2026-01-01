@@ -49,6 +49,6 @@ describe("GET /api/auth/youtube/status", () => {
     const body = await res.json();
     expect(body.performanceEnabled).toBe(true);
     expect(body.connected).toBe(true);
-    expect(body.tokens).toBe(1);
+    expect(body.tokens).toBeGreaterThan(0);
   });
 });

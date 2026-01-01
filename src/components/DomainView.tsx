@@ -85,7 +85,9 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
                       {detail?.explanation || meta?.shortDescription || meta?.howMeasured || meta?.scaleDirection}
                     </p>
                     {!observed ? (
-                      <p className="text-[11px] text-amber-700">Not observed confidently</p>
+                      <span className="mt-1 inline-flex">
+                        <span className="cs-badge bg-amber-100 text-[10px] text-amber-800">Not observed</span>
+                      </span>
                     ) : null}
                   </li>
                 );

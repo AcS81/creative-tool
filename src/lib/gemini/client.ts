@@ -189,26 +189,7 @@ export async function getTranscriptAndScenes(
 
 type Logger = Pick<typeof console, "warn" | "error" | "info">;
 
-type FileDataEntitlementStatus = IngestionPreflight["fileData"]["status"];
-
-type FileDataEntitlementState = {
-  status: FileDataEntitlementStatus;
-  reason?: string;
-};
-
-let fileDataEntitlement: FileDataEntitlementState = { status: "unknown" };
-
-export const getFileDataEntitlement = (): FileDataEntitlementState => ({ ...fileDataEntitlement });
-
-const setFileDataEntitlement = (status: FileDataEntitlementStatus, reason?: string) => {
-  fileDataEntitlement = { status, reason };
-};
-
 const DEFAULT_VIDEO_MIME_TYPE = "video/mp4";
-const FALLBACK_PREFLIGHT_BYTES = parsePositiveInt(process.env.GEMINI_FALLBACK_PREFLIGHT_BYTES, 2048);
-const FALLBACK_PREFLIGHT_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_FALLBACK_PREFLIGHT_TIMEOUT_MS, 8000);
-const FALLBACK_MAX_BYTES = 5 * 1024 * 1024; // 5 MB sample to keep temp files small
-const FALLBACK_DOWNLOAD_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_FALLBACK_DOWNLOAD_TIMEOUT_MS, 20000);
 const MULTIMODAL_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS, 180000);
 
 const withTimeoutSignal = (parent: AbortSignal | undefined, timeoutMs: number) => {
@@ -236,21 +217,39 @@ const withTimeoutSignal = (parent: AbortSignal | undefined, timeoutMs: number) =
   return { signal: controller.signal, cleanup };
 };
 
-const looksLikeHtmlPreview = (preview: string) => {
-  const lower = preview.toLowerCase();
-  return lower.includes("<!doctype html") || lower.includes("<html");
-};
 export type GeminiMultimodalErrorCode =
   | "FEATURE_DISABLED"
   | "CONFIG_MISSING"
   | "INVALID_URL"
   | "UPSTREAM_ERROR"
-  | "INVALID_RESPONSE"
-  | "FALLBACK_FAILED";
+  | "INVALID_RESPONSE";
+
+export type GeminiUsage = {
+  promptTokens?: number;
+  candidateTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+};
+
+export type GeminiRequestMetrics = {
+  durationMs: number;
+  attempts: number;
+  retries: number;
+  status?: number;
+  model?: string;
+  usage?: GeminiUsage;
+  estimatedCostUsd?: number;
+};
 
 export type GeminiMultimodalResult =
-  | { ok: true; fromFallback: boolean; rawJson: unknown; status: number }
-  | { ok: false; errorCode: GeminiMultimodalErrorCode; errorMessage: string; status?: number };
+  | { ok: true; rawJson: unknown; status: number; metrics?: GeminiRequestMetrics }
+  | {
+      ok: false;
+      errorCode: GeminiMultimodalErrorCode;
+      errorMessage: string;
+      status?: number;
+      metrics?: GeminiRequestMetrics;
+    };
 
 export type GeminiMultimodalRequest = {
   youtubeUrl: string;
@@ -266,11 +265,6 @@ export type GeminiMultimodalRequest = {
    * Useful for tests and local development when you want to exercise the request builder.
    */
   forceEnable?: boolean;
-  /**
-   * Dev-only: skip the primary file_data path and run the inline fallback directly.
-   * Useful for validating whether the fetched bytes look like media vs HTML.
-   */
-  forceFallback?: boolean;
 };
 
 type GeminiVideoPart =
@@ -279,22 +273,11 @@ type GeminiVideoPart =
         mime_type: string;
         file_uri: string;
       };
-    }
-  | {
-      inline_data: {
-        mime_type: string;
-        data: string;
-      };
     };
 
 type GeminiCallOutcome =
-  | { ok: true; status: number; data: unknown }
-  | { ok: false; status?: number; errorMessage?: string; shouldFallback?: boolean };
-
-type TempUploadHandle = {
-  part: GeminiVideoPart;
-  cleanup: () => Promise<void>;
-};
+  | { ok: true; status: number; data: unknown; usage?: GeminiUsage }
+  | { ok: false; status?: number; errorMessage?: string; usage?: GeminiUsage };
 
 export const isMultimodalClientEnabled = (config: AppConfig = getAppConfig()) =>
   Boolean(config.analysisV2MultimodalEnabled);
@@ -471,13 +454,87 @@ export async function callGeminiTextJson(input: {
   return { rawJson: parsed.data, status: response.status ?? 200 };
 }
 
-const isFileDataEntitlementError = (status?: number, message?: string) => {
-  if (!status) return false;
-  if (status === 403) return true;
-  if (status === 400 && message) {
-    return message.toLowerCase().includes("file_data") || message.toLowerCase().includes("file data");
+const parseOptionalNumber = (raw: string | undefined) => {
+  if (!raw) return undefined;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : undefined;
+};
+
+const COST_PER_1K_INPUT_TOKENS = parseOptionalNumber(process.env.GEMINI_COST_PER_1K_INPUT_TOKENS);
+const COST_PER_1K_OUTPUT_TOKENS = parseOptionalNumber(process.env.GEMINI_COST_PER_1K_OUTPUT_TOKENS);
+const COST_PER_1K_TOTAL_TOKENS = parseOptionalNumber(process.env.GEMINI_COST_PER_1K_TOKENS);
+
+const PRO_PROMPT_THRESHOLD = 200_000;
+const PRICING_PRO_STANDARD = { inputPer1K: 0.00125, outputPer1K: 0.01 };
+const PRICING_PRO_LARGE = { inputPer1K: 0.0025, outputPer1K: 0.015 };
+const PRICING_FLASH = { inputPer1K: 0.0003, outputPer1K: 0.0025 };
+const PRICING_FLASH_LITE = { inputPer1K: 0.0001, outputPer1K: 0.0004 };
+
+const resolveModelPricing = (model: string, usage?: GeminiUsage) => {
+  const normalized = model.toLowerCase();
+  if (normalized.includes("flash-lite")) return PRICING_FLASH_LITE;
+  if (normalized.includes("flash")) return PRICING_FLASH;
+  if (normalized.includes("pro")) {
+    if (usage?.promptTokens && usage.promptTokens > PRO_PROMPT_THRESHOLD) {
+      return PRICING_PRO_LARGE;
+    }
+    return PRICING_PRO_STANDARD;
   }
-  return false;
+  return undefined;
+};
+
+const estimateCostUsd = (usage?: GeminiUsage, model?: string): number | undefined => {
+  if (!usage) return undefined;
+  const promptTokens = usage.promptTokens;
+  const candidateTokens = usage.candidateTokens;
+  const totalTokens = usage.totalTokens;
+
+  if (COST_PER_1K_INPUT_TOKENS !== undefined && COST_PER_1K_OUTPUT_TOKENS !== undefined) {
+    if (promptTokens !== undefined || candidateTokens !== undefined) {
+      const input = promptTokens ?? 0;
+      const output = candidateTokens ?? 0;
+      return (input * COST_PER_1K_INPUT_TOKENS + output * COST_PER_1K_OUTPUT_TOKENS) / 1000;
+    }
+  }
+
+  if (COST_PER_1K_TOTAL_TOKENS !== undefined && totalTokens !== undefined) {
+    return (totalTokens * COST_PER_1K_TOTAL_TOKENS) / 1000;
+  }
+
+  const resolvedModel = model ?? GEMINI_MODEL;
+  const pricing = resolveModelPricing(resolvedModel, usage);
+  if (!pricing) return undefined;
+
+  if (promptTokens !== undefined || candidateTokens !== undefined) {
+    const input = promptTokens ?? 0;
+    const output = candidateTokens ?? 0;
+    return (input * pricing.inputPer1K + output * pricing.outputPer1K) / 1000;
+  }
+
+  return undefined;
+};
+
+const extractUsageMetadata = (payload: any): GeminiUsage | undefined => {
+  const usage = payload?.usageMetadata ?? payload?.usage;
+  if (!usage || typeof usage !== "object") return undefined;
+  const promptTokens =
+    usage.promptTokenCount ?? usage.promptTokens ?? usage.inputTokenCount ?? usage.input_tokens;
+  const candidateTokens =
+    usage.candidatesTokenCount ??
+    usage.candidatesTokens ??
+    usage.outputTokenCount ??
+    usage.output_tokens;
+  const totalTokens = usage.totalTokenCount ?? usage.totalTokens ?? usage.total_tokens;
+  const cachedTokens = usage.cachedContentTokenCount ?? usage.cachedTokens ?? usage.cached_tokens;
+
+  const parsed: GeminiUsage = {
+    promptTokens: Number.isFinite(promptTokens) ? Number(promptTokens) : undefined,
+    candidateTokens: Number.isFinite(candidateTokens) ? Number(candidateTokens) : undefined,
+    totalTokens: Number.isFinite(totalTokens) ? Number(totalTokens) : undefined,
+    cachedTokens: Number.isFinite(cachedTokens) ? Number(cachedTokens) : undefined,
+  };
+
+  return Object.values(parsed).some((value) => value !== undefined) ? parsed : undefined;
 };
 
 const callGeminiWithVideoPart = async (input: {
@@ -501,12 +558,14 @@ const callGeminiWithVideoPart = async (input: {
     model: input.model,
   });
 
+  const usage = extractUsageMetadata(response.payload);
+
   if (!response.ok) {
     return {
       ok: false,
       status: response.status,
       errorMessage: response.errorMessage,
-      shouldFallback: isFileDataEntitlementError(response.status, response.errorMessage),
+      usage,
     };
   }
 
@@ -516,7 +575,7 @@ const callGeminiWithVideoPart = async (input: {
       ok: false,
       status: response.status,
       errorMessage: parsed.errorMessage || "Gemini returned an invalid JSON payload.",
-      shouldFallback: false,
+      usage,
     };
   }
 
@@ -524,213 +583,33 @@ const callGeminiWithVideoPart = async (input: {
     ok: true,
     status: response.status ?? 200,
     data: parsed.data,
-  };
-};
-
-type FallbackProbeResult = {
-  ok: boolean;
-  status?: number;
-  contentType?: string;
-  looksLikeHtml?: boolean;
-  reason?: string;
-};
-
-const probeFallbackSample = async (
-  youtubeUrl: string,
-  signal?: AbortSignal,
-  logger?: Logger,
-): Promise<FallbackProbeResult> => {
-  const { signal: guardedSignal, cleanup } = withTimeoutSignal(signal, FALLBACK_PREFLIGHT_TIMEOUT_MS);
-  const started = Date.now();
-
-  try {
-    const response = await fetch(youtubeUrl, {
-      headers: { Range: `bytes=0-${FALLBACK_PREFLIGHT_BYTES - 1}` },
-      signal: guardedSignal,
-    });
-
-    const contentType = response.headers?.get?.("content-type")?.toLowerCase() ?? "";
-    const buffer = Buffer.from(await response.arrayBuffer());
-    const preview = buffer.subarray(0, Math.min(buffer.length, 256)).toString("utf8");
-    const looksLikeHtml = looksLikeHtmlPreview(preview);
-
-    let reason: string | undefined;
-    if (!response.ok) {
-      reason = `Fallback probe returned ${response.status}`;
-    } else if (buffer.length === 0) {
-      reason = "Fallback probe returned an empty body.";
-    } else if (contentType.includes("text/html")) {
-      reason = "Fallback probe content-type is HTML.";
-    } else if (looksLikeHtml) {
-      reason = "Fallback probe body looks like HTML.";
-    }
-
-    return {
-      ok: !reason,
-      status: response.status,
-      contentType,
-      looksLikeHtml,
-      reason,
-    };
-  } catch (error) {
-    return { ok: false, reason: describeError(error) };
-  } finally {
-    cleanup();
-    logger?.info?.(`Fallback preflight elapsed ${Date.now() - started}ms`);
-  }
-};
-
-const downloadVideoSample = async (
-  youtubeUrl: string,
-  signal?: AbortSignal,
-  logger?: Logger,
-): Promise<Buffer> => {
-  const { signal: guardedSignal, cleanup } = withTimeoutSignal(signal, FALLBACK_DOWNLOAD_TIMEOUT_MS);
-  const started = Date.now();
-  try {
-    const response = await fetch(youtubeUrl, {
-      headers: { Range: `bytes=0-${FALLBACK_MAX_BYTES - 1}` },
-      signal: guardedSignal,
-    });
-
-    if (!response.ok) {
-      throw new Error(`Failed to fetch media sample, status ${response.status}`);
-    }
-
-    const contentType = response.headers?.get?.("content-type")?.toLowerCase() ?? "";
-    if (contentType.includes("text/html")) {
-      throw new Error("Fallback download returned HTML, not media bytes.");
-    }
-
-    const readBuffer = async (): Promise<Buffer> => {
-      if (!response.body || typeof response.body.getReader !== "function") {
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const clamped = buffer.subarray(0, Math.min(buffer.length, FALLBACK_MAX_BYTES));
-        return Buffer.from(clamped);
-      }
-
-      const reader = response.body.getReader();
-      const chunks: Buffer[] = [];
-      let received = 0;
-
-      while (received < FALLBACK_MAX_BYTES) {
-        const { done, value } = await reader.read();
-        if (done || !value) break;
-        const allowed = Math.min(value.length, FALLBACK_MAX_BYTES - received);
-        chunks.push(Buffer.from(value.subarray(0, allowed)));
-        received += allowed;
-        if (received >= FALLBACK_MAX_BYTES) {
-          try {
-            await reader.cancel();
-          } catch {
-            // ignore cancellation errors
-          }
-          break;
-        }
-      }
-
-      return Buffer.concat(chunks, received);
-    };
-
-    const buffer = await readBuffer();
-    if (buffer.length === 0) {
-      throw new Error("Media fetch returned empty body.");
-    }
-
-    const sniff = buffer.subarray(0, 128).toString("utf8");
-    if (looksLikeHtmlPreview(sniff)) {
-      throw new Error("Fallback download returned HTML content.");
-    }
-
-    const elapsed = Date.now() - started;
-    if (elapsed > FALLBACK_DOWNLOAD_TIMEOUT_MS) {
-      throw new Error(`Fallback media fetch exceeded ${FALLBACK_DOWNLOAD_TIMEOUT_MS}ms.`);
-    }
-
-    return buffer;
-  } finally {
-    cleanup();
-    logger?.info?.(`Fallback fetch elapsed ${Date.now() - started}ms`);
-  }
-};
-
-const prepareFallbackUpload = async (
-  youtubeUrl: string,
-  signal?: AbortSignal,
-  logger?: Logger,
-): Promise<TempUploadHandle> => {
-  const mediaBuffer = await downloadVideoSample(youtubeUrl, signal, logger);
-  logger?.info?.(`Fallback media sample fetched: ${mediaBuffer.byteLength} bytes`);
-
-  const cleanup = async () => {
-    try {
-      mediaBuffer.fill(0);
-    } catch {
-      // noop
-    }
-  };
-
-  return {
-    part: {
-      inline_data: {
-        mime_type: DEFAULT_VIDEO_MIME_TYPE,
-        data: mediaBuffer.toString("base64"),
-      },
-    },
-    cleanup,
+    usage,
   };
 };
 
 export const preflightGeminiIngestion = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
-  signal?: AbortSignal;
-  logger?: Logger;
-  checkFallback?: boolean;
 }): Promise<IngestionPreflight> => {
   const config = input.config ?? getAppConfig();
   const validUrl = isValidYoutubeUrl(input.youtubeUrl);
-  const fileDataEligible =
+  const urlIngestionEligible =
     config.analysisMode === "gemini" && isMultimodalClientEnabled(config) && Boolean(config.geminiApiKey);
-
-  const fileDataEntitlement = getFileDataEntitlement();
-  const fileData = {
-    eligible: fileDataEligible,
-    status: fileDataEntitlement.status,
-    reason: fileDataEntitlement.reason,
-  };
-
-  const shouldCheckFallback = input.checkFallback ?? fileDataEntitlement.status !== "allowed";
-  let fallback: IngestionPreflight["fallback"] = { checked: false };
-
-  if (shouldCheckFallback) {
-    const probe = await probeFallbackSample(input.youtubeUrl, input.signal, input.logger);
-    fallback = {
-      checked: true,
-      viable: probe.ok,
-      status: probe.status,
-      contentType: probe.contentType,
-      looksLikeHtml: probe.looksLikeHtml,
-      reason: probe.reason,
-    };
-  }
 
   let failureMessage: string | undefined;
   if (!validUrl) {
     failureMessage = `Invalid YouTube URL: ${input.youtubeUrl}`;
-  } else if (!fileDataEligible) {
+  } else if (!urlIngestionEligible) {
     failureMessage = "Multimodal ingestion is not enabled or GEMINI_API_KEY is missing.";
-  } else if (fileDataEntitlement.status === "blocked" && fallback.checked && fallback.viable === false) {
-    const detail = fallback.reason ? ` ${fallback.reason}` : "";
-    failureMessage = `Gemini file_data ingestion is unavailable; fallback probe failed.${detail}`;
   }
 
   return {
     ok: !failureMessage,
     failureMessage,
     validUrl,
-    fileData,
-    fallback,
+    urlIngestion: {
+      eligible: urlIngestionEligible,
+    },
   };
 };
 
@@ -760,14 +639,6 @@ const toInvalidResponse = (message: string, status?: number): GeminiMultimodalRe
   status,
 });
 
-const toFallbackFailed = (message: string): GeminiMultimodalResult => ({
-  ok: false,
-  errorCode: "FALLBACK_FAILED",
-  errorMessage: message,
-});
-
-const describeError = (error: unknown) => (error instanceof Error ? error.message : "Unknown error");
-
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
 
 const shouldRetryOutcome = (outcome: GeminiCallOutcome): boolean => {
@@ -777,12 +648,14 @@ const shouldRetryOutcome = (outcome: GeminiCallOutcome): boolean => {
   return message.includes("overloaded") || message.includes("unavailable") || message.includes("temporarily");
 };
 
-const shouldForceFallbackOnOverload = (outcome: GeminiCallOutcome): boolean => {
-  if (outcome.ok) return false;
-  if (outcome.shouldFallback) return true;
-  if (outcome.status && RETRYABLE_STATUSES.has(outcome.status)) return true;
-  const message = outcome.errorMessage?.toLowerCase() ?? "";
-  return message.includes("overloaded") || message.includes("unavailable") || message.includes("temporarily");
+const shouldRetryWithoutSchema = (message?: string) => {
+  const lower = message?.toLowerCase() ?? "";
+  return (
+    lower.includes("response_schema") ||
+    lower.includes("response schema") ||
+    lower.includes("too many states") ||
+    lower.includes("schema produces a constraint")
+  );
 };
 
 const waitWithBackoff = async (attempt: number, signal?: AbortSignal) => {
@@ -827,15 +700,18 @@ const withGeminiSlot = async <T>(fn: () => Promise<T>): Promise<T> => {
 };
 
 /**
- * Runs a single multimodal Gemini call using `file_data` for the YouTube URL.
- * Falls back once to a temporary inline upload if the primary path is rejected (403/unsupported).
+ * Runs a single multimodal Gemini call using the YouTube URL (URL-only ingestion).
  */
 export const callGeminiMultimodalJson = async (
   request: GeminiMultimodalRequest,
 ): Promise<GeminiMultimodalResult> => {
   const config = request.config ?? getAppConfig();
   const logger = request.logger ?? console;
-  const forceFallbackRequested = request.forceFallback === true;
+  const responseSchemaEnabled = config.geminiResponseSchemaEnabled === true;
+  const jsonSchema = responseSchemaEnabled ? request.jsonSchema : undefined;
+  const startTime = Date.now();
+  let attemptCount = 0;
+  let lastUsage: GeminiUsage | undefined;
   const { signal: requestSignal, cleanup: cleanupRequestTimeout } = withTimeoutSignal(
     request.signal,
     MULTIMODAL_TIMEOUT_MS,
@@ -876,7 +752,11 @@ export const callGeminiMultimodalJson = async (
       let lastOutcome: GeminiCallOutcome | undefined;
 
       while (attempt < maxAttempts) {
+        attemptCount += 1;
         lastOutcome = await fn();
+        if (lastOutcome.usage) {
+          lastUsage = lastOutcome.usage;
+        }
         if (!shouldRetryOutcome(lastOutcome)) {
           return lastOutcome;
         }
@@ -898,107 +778,73 @@ export const callGeminiMultimodalJson = async (
       return lastOutcome as GeminiCallOutcome;
     };
 
-    const attemptFallback = async (): Promise<GeminiMultimodalResult> => {
-      logger.warn("Using inline_data fallback path for Gemini multimodal call.");
-
-      let upload: TempUploadHandle | undefined;
-      try {
-        upload = await prepareFallbackUpload(request.youtubeUrl, requestSignal, logger);
-      } catch (error) {
-        logger.error("Failed to prepare fallback upload", error);
-        return toFallbackFailed(describeError(error));
+    const callWithSchemaFallback = async (
+      label: string,
+      schema: unknown | undefined,
+      buildCall: (schemaOverride: unknown | undefined) => Promise<GeminiCallOutcome>,
+    ): Promise<GeminiCallOutcome> => {
+      const outcome = await callWithRetries(label, () => buildCall(schema));
+      if (outcome.ok || !schema || !shouldRetryWithoutSchema(outcome.errorMessage)) {
+        return outcome;
       }
-
-      try {
-        const fallbackOutcome = await callWithRetries("fallback inline_data", () =>
-          withGeminiSlot(() =>
-            callGeminiWithVideoPart({
-              apiKey,
-              videoPart: upload.part,
-              prompt: request.prompt,
-              jsonSchema: request.jsonSchema,
-              systemInstruction: request.systemInstruction,
-              signal: requestSignal,
-              model: request.model,
-            }),
-          ),
-        );
-
-        if (fallbackOutcome.ok) {
-          return {
-            ok: true,
-            fromFallback: true,
-            rawJson: fallbackOutcome.data,
-            status: fallbackOutcome.status,
-          };
-        }
-
-        const message =
-          fallbackOutcome.errorMessage ||
-          "Gemini returned an error while using the fallback inline upload.";
-        if (fallbackOutcome.status && fallbackOutcome.status >= 200 && fallbackOutcome.status < 300) {
-          return toInvalidResponse(message, fallbackOutcome.status);
-        }
-        return toUpstreamError(message, fallbackOutcome.status);
-      } finally {
-        if (upload) {
-          await upload.cleanup();
-        }
-      }
+      logger.warn("Gemini response_schema rejected; retrying without responseSchema.");
+      return callWithRetries(`${label} (no schema)`, () => buildCall(undefined));
     };
 
-    if (forceFallbackRequested) {
-      return attemptFallback();
-    }
-
-    const primaryOutcome = await callWithRetries("primary file_data", () =>
-      withGeminiSlot(() =>
-        callGeminiWithVideoPart({
-          apiKey,
-          videoPart: {
-            file_data: {
-              mime_type: DEFAULT_VIDEO_MIME_TYPE,
-              file_uri: request.youtubeUrl,
+    const primaryOutcome = await callWithSchemaFallback(
+      "primary url ingestion",
+      jsonSchema,
+      (schemaOverride) =>
+        withGeminiSlot(() =>
+          callGeminiWithVideoPart({
+            apiKey,
+            videoPart: {
+              file_data: {
+                mime_type: DEFAULT_VIDEO_MIME_TYPE,
+                file_uri: request.youtubeUrl,
+              },
             },
-          },
-          prompt: request.prompt,
-          jsonSchema: request.jsonSchema,
-          systemInstruction: request.systemInstruction,
-          signal: requestSignal,
-          model: request.model,
-        }),
-      ),
+            prompt: request.prompt,
+            jsonSchema: schemaOverride,
+            systemInstruction: request.systemInstruction,
+            signal: requestSignal,
+            model: request.model,
+          }),
+        ),
     );
 
+    const buildMetrics = (status?: number): GeminiRequestMetrics => ({
+      durationMs: Date.now() - startTime,
+      attempts: attemptCount,
+      retries: Math.max(0, attemptCount - 1),
+      status,
+      model: request.model ?? GEMINI_MODEL,
+      usage: lastUsage,
+      estimatedCostUsd: estimateCostUsd(lastUsage, request.model ?? GEMINI_MODEL),
+    });
+
     if (primaryOutcome.ok) {
-      setFileDataEntitlement("allowed");
       return {
         ok: true,
-        fromFallback: false,
         rawJson: primaryOutcome.data,
         status: primaryOutcome.status,
+        metrics: buildMetrics(primaryOutcome.status),
       };
     }
 
-    if (primaryOutcome.shouldFallback) {
-      setFileDataEntitlement("blocked", primaryOutcome.errorMessage);
-    }
-
     const message =
-      primaryOutcome.errorMessage ||
-      "Gemini returned an error before fallback could be attempted.";
-
-    if (primaryOutcome.shouldFallback || shouldForceFallbackOnOverload(primaryOutcome) || forceFallbackRequested) {
-      logger.warn(
-        `Gemini file_data path returned ${primaryOutcome.status ?? "unknown"}; forcing fallback inline upload.`,
-      );
-      return attemptFallback();
-    }
+      primaryOutcome.errorMessage || "Gemini returned an error while ingesting the URL.";
 
     if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
-      return toInvalidResponse(message, primaryOutcome.status);
+      return {
+        ...toInvalidResponse(message, primaryOutcome.status),
+        metrics: buildMetrics(primaryOutcome.status),
+      };
     }
-    return toUpstreamError(message, primaryOutcome.status);
+    return {
+      ...toUpstreamError(message, primaryOutcome.status),
+      metrics: buildMetrics(primaryOutcome.status),
+    };
   } finally {
     cleanupRequestTimeout();
   }

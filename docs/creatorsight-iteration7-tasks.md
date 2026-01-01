@@ -7,7 +7,7 @@
 - **Status**: Draft – Ready after Iteration 6 completion  
 - **Target Outcome**: Replace mock-only alignment/arc/load signals with real multimodal Gemini measurements, keep schema v1.3.0 stable, and harden quality with diagnostics + regression checks.
 
-> Scope: Turn the Iteration 6 scaffolding (schema v1.3.0, mock alignment/load metrics, UI cards) into a production-quality multimodal path that measures these signals for real YouTube inputs, with safe fallbacks and regression coverage.
+> Scope: Turn the Iteration 6 scaffolding (schema v1.3.0, mock alignment/load metrics, UI cards) into a production-quality multimodal path that measures these signals for real YouTube inputs, with safe defaults and regression coverage.
 
 ---
 
@@ -24,11 +24,11 @@
 ### Task 0.1: Mode/Flag Wiring
 - Make real alignment/load measurement **default** when `ANALYSIS_MODE=gemini`; keep mock behaviour unchanged.
 - Add a guarded rollback flag (e.g., `ENABLE_ADVANCED_METRICS=false`) that forces defaults + diagnostics but does not break schema.
-- Diagnostics: expose `diagnostics.advancedMetricsObserved`, `advancedMetricsDefaulted`, `multimodalFallbackUsed`, and a short reason when defaults were applied.
+- Diagnostics: expose `diagnostics.advancedMetricsObserved`, `advancedMetricsDefaulted`, and a short reason when defaults were applied.
 
 ### Task 0.2: Prompt Safety & Cost Guards
 - Keep temperature low; ensure single multimodal call still <2–3 min typical.
-- Add size/time guards for downloading YouTube bytes when `file_data` fails (reuse Iteration 2 fallback); surface a “lower confidence” indicator when fallback path is used.
+- Treat URL ingestion failures as explicit errors (no download/upload fallback); surface a “lower confidence” indicator only when metrics are unobserved/defaulted.
 
 ---
 

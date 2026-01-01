@@ -1,19 +1,18 @@
-# CreatorSight – Native Multimodal Analysis Plan (Gemini with YouTube URL file parts)
+# CreatorSight – Native Multimodal Analysis Plan (Gemini URL Ingestion)
 
-This replaces the previous plan. It assumes we use Gemini’s native video ingestion (YouTube URL passed as a `file_data` part) so the model “sees/hears” the video instead of hallucinating from text. Scope and outputs stay aligned to the MVP PRD.
+This replaces the previous plan. It assumes we use Gemini’s native URL ingestion (YouTube URL provided as the video input) so the model “sees/hears” the video instead of hallucinating from text. Scope and outputs stay aligned to the MVP PRD.
 
 ---
 
 ## 1) Reality Check: How Gemini Must Be Called
 - Passing the URL as plain text is text-only → hallucinations.
-- Passing the URL as `file_data` with `mime_type: "video/*"` (Google AI Studio / Vertex “YouTube import” capability) lets Gemini fetch frames/audio directly.
-- We must verify entitlement: if `file_data` fails (403/unsupported), fall back to a lightweight fetch + signed URL upload, still without persisting raw media after use.
+- Passing the URL as a video input (Gemini URL ingestion) lets Gemini fetch frames/audio directly.
+- If URL ingestion fails (entitlement/model/project), surface a clear error and retry with a different model/key. No download/upload fallback.
 
 ### Multimodal Reality (Iteration 2 – Task 0.1)
-- New probe script: `tsx scripts/probe-multimodal-ingestion.ts --url <youtube-url> [--force-fallback] [--skip-gemini] [--bytes N]`. It runs the multimodal call (when `GEMINI_API_KEY` is set) and also inspects the fallback download bytes.
-- Observation from the fallback downloader (Node fetch with Range bytes): a plain watch URL returns `status=200`, `content-type=text/html`, ~1.5MB of HTML starting with `<!DOCTYPE html>`. This means our current fallback (`inline_data` built from `fetch(youtubeUrl)`) is not providing audio/video to Gemini.
-- Primary `file_data` entitlement could not be validated in this environment (no `GEMINI_API_KEY` available at run time); rerun the probe with a key to confirm whether direct YouTube ingestion works for this account.
-- Recommendation: treat the PRD “no download” non-goal as needing a narrow exception—fallback must stream real media bytes (e.g., via a short progressive audio/video pull or a signed temp upload) instead of watch-page HTML, otherwise multimodal quality will remain unreliable.
+- New probe script: `tsx scripts/probe-multimodal-ingestion.ts --url <youtube-url> [--skip-gemini]`. It runs the multimodal call (when `GEMINI_API_KEY` is set) and summarizes unobserved counts + highlights.
+- URL ingestion entitlement could not be validated in this environment (no `GEMINI_API_KEY` available at run time); rerun the probe with a key to confirm whether direct YouTube ingestion works for this account.
+- Recommendation: stay URL-only and fail fast; do not add download/upload fallbacks.
 - Axis semantics and glossary live in `docs/axes_and_domains.md`; the UI now links to this doc from the Overview to explain how each axis is measured and what “unobserved” means.
 
 ---
@@ -21,19 +20,16 @@ This replaces the previous plan. It assumes we use Gemini’s native video inges
 ## 2) Architecture (per analysis job)
 1) **Metadata**: YouTube Data API (title, channel, duration).  
 2) **Primary path: Native Gemini video read**  
-   - Call Gemini once per domain bundle with a `file_data` part referencing the YouTube URL.  
+   - Call Gemini once per domain bundle using URL ingestion for the video input.  
    - Use a single, wide system instruction + structured JSON schema covering all domains.  
-3) **Fallback path (only if file_data rejected)**  
-   - Stream audio + sparse frames to temp storage, upload as a FilePart (signed URL), then invoke Gemini.  
-   - Delete temp artifacts immediately after the call.  
-4) **Post-process**: build fingerprint, meta-axes, archetypes, nearest references; optional performance overlay if OAuth + ownership.
+3) **Post-process**: build fingerprint, meta-axes, archetypes, nearest references; optional performance overlay if OAuth + ownership.
 
 ---
 
 ## 3) API Call Design (client rewrite)
 - Endpoint: Gemini 1.5 Pro (multimodal).  
 - Request parts:
-  - `file_data`: `{ mime_type: "video/mp4", file_uri: youtubeUrl }`  
+  - Video input: YouTube URL + `mime_type` (`video/*`) via URL ingestion.  
   - `text`: system + user instruction containing required metrics and JSON schema.  
 - Temperature: 0.2; `responseMimeType: "application/json"`.  
 - Single-shot response containing **all domains**, not fragmented per-domain calls.
@@ -86,31 +82,31 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 ---
 
 ## 5) Prompt Content (embedded in client)
-- System: “You are a video analysis engine. You watch the attached YouTube video via file_data. You must measure the requested metrics from the audio + visual content, then emit strict JSON matching the schema. Do not guess or hallucinate; if a metric is not observable, set `value: "unobserved"` and `score: 0`.”
+- System: “You are a video analysis engine. You watch the attached YouTube video via the provided URL. You must measure the requested metrics from the audio + visual content, then emit strict JSON matching the schema. Do not guess or hallucinate; if a metric is not observable, set `value: "unobserved"` and `score: 0`.”
 - User: include definitions for each metric (speaking rate, filler, concreteness, simile/metaphor, hook/setup/escalation/payoff/outro, environment stability, b-roll, cut pace, pattern interrupts, music coverage, SFX, silence). Require timestamps for beats.
 - Response: `responseMimeType: "application/json"`.
 
 ---
 
 ## 6) Implementation Steps (repo-specific)
-1) **Gemini client rewrite** (`src/lib/gemini/client.ts`): add multimodal request builder using `file_data` for YouTube URL; add fallback path for temp upload if direct fetch rejected. Keep schema validation.  
+1) **Gemini client rewrite** (`src/lib/gemini/client.ts`): add multimodal request builder using URL ingestion for YouTube URLs. Keep schema validation.  
 2) **Domain analyzer consolidation** (`src/lib/analysis/geminiDomains.ts` → new multimodal call): move to a single-call schema (above) instead of six separate text-only calls. Parse into DomainProfiles + supporting beats/cuts/music stats.  
 3) **Axis metadata single source**: keep one module for labels/explanations; frontend reads from it for tooltips and descriptions.  
 4) **Fingerprint builder**: map multimodal JSON into `VideoFingerprintJson` (meta axes, per-domain scores, beats, music coverage, cut pace).  
-5) **UI wiring**: show explanations from the response; no placeholder axes. Surface diagnostics when fallback (temp upload) was used or when metrics are `unobserved`.  
-6) **Tests**: add integration test stubs with mocked Gemini response; unit tests for parser/validator and the fallback path selection.
+5) **UI wiring**: show explanations from the response; no placeholder axes. Surface diagnostics when metrics are `unobserved`.  
+6) **Tests**: add integration test stubs with mocked Gemini response; unit tests for parser/validator.
 
 ---
 
 ## 7) Validation Plan
 - Use a video with clear music bed and a simple story arc; verify returned `music_changes`, `beats`, and `cut_rate` match reality.  
 - Check that removing captions still works (Gemini should rely on audio/video).  
-- Ensure any failure to fetch via `file_data` triggers the fallback and surfaces a “lower confidence” flag in diagnostics.
+- Ensure any URL ingestion failure surfaces a clear error and does not silently downgrade outputs.
 
 ---
 
 ## 8) Risks & Mitigations
-- **Entitlement/quotas**: file_data access to YouTube may be gated; mitigate with temp-upload fallback.  
+- **Entitlement/quotas**: URL ingestion access to YouTube may be gated; mitigate with explicit error messaging and model/key retries.  
 - **Latency/cost**: single multimodal call is heavier; keep temperature low and request only needed fields.  
 - **Schema drift**: enforce zod schema and reject non-conforming responses; display partial results with clear flags.
 
@@ -120,5 +116,5 @@ Meta-axes and archetypes derive from these scores; axis labels/explanations come
 - `ANALYSIS_MODE=mock` → deterministic offline pipeline. `ANALYSIS_MODE=gemini` → requires Gemini + YouTube keys.
 - Multimodal is **default-on** when `ANALYSIS_MODE=gemini` and keys are present. Text-only v1 is **removed**; `ANALYSIS_VERSION=v1` now throws a configuration error instead of routing to the deprecated path.
 - Optional override: `ANALYSIS_VERSION=v2` keeps the canonical path explicit; no extra flag needed in normal dev/prod.
-- `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v2-multimodal` for new runs (legacy records may still show `gemini-v1-text`) and includes `diagnostics.multimodalFallbackUsed` when the temp-upload inline path is taken.
+- `/api/analyze` surfaces `diagnostics.source` as `mock | gemini-v2-multimodal` for new runs (legacy records may still show `gemini-v1-text`).
 - Fingerprint schema: `VideoFingerprintJson` v2 (`version=1.3.0`) is canonical. Legacy v1.1 and v1.2 fingerprints are accepted only via an upgrade shim that rewrites them to `1.3.0`; new analyses always emit `1.3.0`.

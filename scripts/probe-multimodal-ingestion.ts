@@ -1,4 +1,3 @@
-import { Buffer } from "node:buffer";
 import { callGeminiMultimodalJson } from "../src/lib/gemini/client";
 import {
   multimodalPrompt,
@@ -11,12 +10,8 @@ import { isValidYouTubeUrl } from "../src/lib/youtube";
 
 type CliArgs = {
   url: string;
-  forceFallback: boolean;
   skipGemini: boolean;
-  sampleBytes: number;
 };
-
-const DEFAULT_SAMPLE_BYTES = 2048;
 
 const parseArgs = (): CliArgs => {
   const args = process.argv.slice(2);
@@ -25,43 +20,12 @@ const parseArgs = (): CliArgs => {
 
   return {
     url,
-    forceFallback: args.includes("--force-fallback"),
     skipGemini: args.includes("--skip-gemini"),
-    sampleBytes: (() => {
-      const idx = args.findIndex((arg) => arg === "--bytes");
-      if (idx >= 0) {
-        const parsed = Number.parseInt(args[idx + 1], 10);
-        if (Number.isFinite(parsed) && parsed > 0) return parsed;
-      }
-      return DEFAULT_SAMPLE_BYTES;
-    })(),
-  };
-};
-
-const looksLikeHtml = (preview: string) => {
-  const lower = preview.toLowerCase();
-  return lower.includes("<!doctype html") || lower.includes("<html");
-};
-
-const probeFallbackSample = async (youtubeUrl: string, maxBytes: number) => {
-  const response = await fetch(youtubeUrl, {
-    headers: { Range: `bytes=0-${maxBytes - 1}` },
-  });
-
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const preview = buffer.subarray(0, Math.min(buffer.length, 200)).toString("utf8");
-
-  return {
-    status: response.status,
-    contentType: response.headers.get("content-type") || "unknown",
-    byteLength: buffer.byteLength,
-    preview,
-    looksLikeHtml: looksLikeHtml(preview),
   };
 };
 
 const warnMissingUrl = () => {
-  console.error("Usage: tsx scripts/probe-multimodal-ingestion.ts --url <youtube-url> [--force-fallback] [--skip-gemini] [--bytes N]");
+  console.error("Usage: tsx scripts/probe-multimodal-ingestion.ts --url <youtube-url> [--skip-gemini]");
   process.exit(1);
 };
 
@@ -103,18 +67,6 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("=== Fallback download probe (Range request) ===");
-  try {
-    const sample = await probeFallbackSample(args.url, args.sampleBytes);
-    console.log(
-      `Status ${sample.status}, content-type ${sample.contentType}, bytes ${sample.byteLength}, looksLikeHtml=${sample.looksLikeHtml}`,
-    );
-    console.log(`Preview: ${sample.preview.replace(/\s+/g, " ").slice(0, 140)}`);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Fallback probe failed:", message);
-  }
-
   if (args.skipGemini) {
     console.log("Skipping Gemini call (requested via --skip-gemini).");
     return;
@@ -132,11 +84,10 @@ async function main() {
     geminiApiKey: process.env.GEMINI_API_KEY,
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "unused",
     performanceEnabled: false,
-    transcriptFallbackEnabled: false,
     advancedMetricsEnabled: true,
   };
 
-  console.log(`=== Gemini multimodal call (forceFallback=${args.forceFallback ? "true" : "false"}) ===`);
+  console.log("=== Gemini multimodal call (URL-only ingestion) ===");
   const result = await callGeminiMultimodalJson({
     youtubeUrl: args.url,
     prompt: multimodalPrompt,
@@ -144,7 +95,6 @@ async function main() {
     systemInstruction: multimodalSystemInstruction,
     config,
     forceEnable: true,
-    forceFallback: args.forceFallback,
   });
 
   if (!result.ok) {
@@ -156,10 +106,7 @@ async function main() {
   }
 
   const { parsed, unobserved, highlights } = summarizeGeminiResponse(result.rawJson);
-  console.log(
-    `Gemini OK (status ${result.status}) via ${result.fromFallback ? "fallback inline_data" : "file_data"}; unobserved counts:`,
-    unobserved,
-  );
+  console.log(`Gemini OK (status ${result.status}) via URL ingestion; unobserved counts:`, unobserved);
   console.log("Highlights:", highlights);
   console.log("First two beats:", parsed.narrative.beats.slice(0, 2));
 }

@@ -17,7 +17,7 @@ describe("getAppConfig", () => {
     delete process.env.YOUTUBE_API_KEY;
     delete process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
     delete process.env.ENABLE_ADVANCED_METRICS;
-    delete process.env.ENABLE_TRANSCRIPT_FALLBACK;
+    delete process.env.GEMINI_RESPONSE_SCHEMA_ENABLED;
   });
 
   it("defaults to mock mode and performance disabled", () => {
@@ -27,6 +27,7 @@ describe("getAppConfig", () => {
     expect(config.performanceEnabled).toBe(false);
     expect(config.analysisV2MultimodalEnabled).toBe(false);
     expect(config.advancedMetricsEnabled).toBe(false);
+    expect(config.geminiResponseSchemaEnabled).toBe(false);
   });
 
   it("enables multimodal by default in gemini mode when keys are present", () => {

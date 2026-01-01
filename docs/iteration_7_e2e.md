@@ -9,7 +9,7 @@ Use this quick pass to verify the real alignment/load path in Gemini mode. Mock 
 
 ## Steps
 1) Paste a public YouTube URL (ideally with clear edits + music). Submit.
-2) Confirm `/api/analyze` response includes `diagnostics.source="gemini-v2-multimodal"`, `advancedMetricsObserved=true`, and `multimodalFallbackUsed` matches log (fallback use marks lower confidence).
+2) Confirm `/api/analyze` response includes `diagnostics.source="gemini-v2-multimodal"` and `advancedMetricsObserved=true`.
 3) In the Overview → Alignment & Load panel:
    - Audio-visual / Beats vs edits scores present (not “—”).
    - Cognitive load sparkline renders (or a clear “No load timeline” message if unobserved).
@@ -23,5 +23,5 @@ Use this quick pass to verify the real alignment/load path in Gemini mode. Mock 
 
 ## Expected
 - Fingerprint version `1.3.0` with advanced metrics populated (or defaulted with diagnostics if Gemini could not observe them).
-- Diagnostics reflect fallback use and advanced metric observation state.
+- Diagnostics reflect advanced metric observation state and unobserved counts.
 - UI surfaces alignment/load metrics gracefully even if some metrics are unobserved.

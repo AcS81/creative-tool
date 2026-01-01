@@ -66,7 +66,6 @@ When this iteration is done:
     - Multimodal returns a hard error code explicitly marked as “unsupported in this environment”.  
 - [ ] Ensure `/api/analyze` responses always include:
   - [ ] `diagnostics.source` (`'gemini-v2-multimodal' | 'gemini-v1-text' | 'mock'`).  
-  - [ ] A simple `diagnostics.multimodalFallbackUsed` boolean when the temp-upload path is taken.
 
 **Constraints**
 
@@ -324,7 +323,7 @@ When this iteration is done:
 **Goals**
 
 - [x] Update `docs/analysis_functionality_plan.md` to:
-  - [x] Mark which steps are **fully implemented** and which were adjusted during real-world implementation (e.g., any nuances around `file_data` entitlement).  
+  - [x] Mark which steps are **fully implemented** and which were adjusted during real-world implementation (e.g., any nuances around URL ingestion entitlement).  
   - [x] Note the final flag strategy and any deviations from initial assumptions.  
 - [x] Add a short addendum or new section to `docs/iteration_5_prd_mvp_status.md` (or a new `iteration_6_multimodal_status.md` if preferred) that:
   - [x] Confirms FR‑5–FR‑15 are now backed by the multimodal pipeline.  
@@ -354,7 +353,7 @@ When this iteration is done:
 
 - [x] Review `/dev/multimodal` (or equivalent) and ensure it:
   - [x] Clearly indicates that it’s exercising the **same** pipeline used by `/api/analyze`.  
-  - [x] Shows whether `file_data` or fallback was used, plus counts of `unobserved` metrics.  
+  - [x] Shows whether URL ingestion succeeded, plus counts of `unobserved` metrics.  
   - [x] Links to `docs/axes_and_domains.md` for axis definitions.  
 - [x] Trim any debug-only features that rely on the old text-only path or outdated schemas.  
 - [x] Update README or a small dev doc to explain how to:

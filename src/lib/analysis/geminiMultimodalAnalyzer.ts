@@ -5,17 +5,15 @@ import type {
   BeatRole,
   BeatSegment,
   DomainProfile,
-  SceneSegment,
   ScoredMetric,
-  TranscriptSegment,
 } from "../types";
 import {
   callGeminiMultimodalJson,
-  callGeminiTextJson,
   GeminiApiError,
-  getTranscriptAndScenes,
   type GeminiMultimodalErrorCode,
+  type GeminiRequestMetrics,
   type GeminiMultimodalResult,
+  type GeminiUsage,
 } from "../gemini/client";
 import type {
   GeminiAdvancedMetricsPartial,
@@ -50,26 +48,28 @@ export type MultimodalAnalysisResult = {
   axisDetails: Record<string, AxisDetail>;
   advancedMetrics?: AdvancedFingerprintMetrics;
   diagnostics: {
-    fromFallback: boolean;
     unobservedCounts: Record<string, number>;
     coverage?: CoverageDiagnostics;
     salvage?: SalvageDiagnostics;
     rawStatus?: number;
+    passMetrics?: PassMetricsDiagnostics;
   };
 };
 
-export type TranscriptFallbackResult = {
-  profiles: MultimodalProfiles;
-  beats?: BeatSegment[];
-  axisDetails: Record<string, AxisDetail>;
-  transcriptSegments: TranscriptSegment[];
-  sceneSegments: SceneSegment[];
-  diagnostics: {
-    transcriptFallback: true;
-    unobservedCounts: Record<string, number>;
-    coverage?: CoverageDiagnostics;
-    rawStatus?: number;
-  };
+type PassMetricsTotals = {
+  durationMs: number;
+  attempts: number;
+  retries: number;
+  usage?: GeminiUsage;
+  estimatedCostUsd?: number;
+};
+
+type PassMetricsDiagnostics = {
+  core?: GeminiRequestMetrics;
+  advancedAudioText?: GeminiRequestMetrics;
+  advancedVisualCross?: GeminiRequestMetrics;
+  salvage?: Record<string, GeminiRequestMetrics>;
+  totals?: PassMetricsTotals;
 };
 
 type CoverageStat = {
@@ -161,16 +161,26 @@ const metricSchema = {
     },
     items: {
       type: "array",
-      items: { type: "object" },
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string" },
+          value: { type: "number" },
+        },
+      },
       minItems: 1,
     },
     proportions: {
       type: "object",
-      additionalProperties: { type: "number" },
+      properties: {
+        value: { type: "number" },
+      },
     },
     counts: {
       type: "object",
-      additionalProperties: { type: "number" },
+      properties: {
+        value: { type: "number" },
+      },
     },
     trend: { type: "number" },
     observed: { type: "boolean" },
@@ -272,7 +282,7 @@ const advancedVisualCrossResponseJsonSchema = {
 
 const systemInstruction = [
   "You are a video analysis engine.",
-  "You watch the attached YouTube video via file_data.",
+  "You analyze the provided YouTube video URL directly.",
   "Measure the requested metrics directly from audio + visuals.",
   "If a metric cannot be observed, set value: \"unobserved\" and score: 0.",
   "Always include timelines/spans/items where requested; do not leave required arrays empty.",
@@ -323,32 +333,6 @@ const corePrompt = [
   "- JSON only; no prose.",
   "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ].join("\n");
-
-const transcriptFallbackSystemInstruction = [
-  "You are a transcript-only analysis engine.",
-  "You only have transcript segments with timestamps; do not invent visuals or audio you cannot infer.",
-  "Return strict JSON only.",
-].join("\n");
-
-const formatTranscriptSegments = (segments: TranscriptSegment[]) =>
-  segments.map((segment) => `[${segment.startSeconds}-${segment.endSeconds}] ${segment.text}`);
-
-const buildTranscriptFallbackPrompt = (segments: TranscriptSegment[], scenes?: SceneSegment[]) =>
-  [
-    "Transcript-only fallback: use ONLY the transcript segments below.",
-    "For voice metrics you may infer speaking_rate, filler_rate, and pauses from transcript timing; set loudness_range and pitch_variation to value:\"unobserved\" and score:0.",
-    "Set ALL visual_edit_sound metrics to value:\"unobserved\" and score:0.",
-    "Compute language and narrative metrics from the transcript text; infer beats from timing.",
-    "If any metric cannot be inferred from text, set value:\"unobserved\" and score:0.",
-    corePrompt,
-    scenes && scenes.length > 0
-      ? `Scene segments (summary): ${scenes
-          .map((scene) => `[${scene.startSeconds}-${scene.endSeconds}] ${scene.label}: ${scene.shortSummary}`)
-          .join(" | ")}`
-      : "Scene segments: none provided.",
-    "Transcript segments:",
-    ...formatTranscriptSegments(segments),
-  ].join("\n");
 
 const advancedAudioTextPrompt = [
   "Return JSON matching the schema. Use camelCase metric keys. All scores are 0-100. If any metric is not observable, set value:\"unobserved\" and score:0.",
@@ -404,6 +388,17 @@ export const multimodalSystemInstruction = systemInstruction;
 
 const axisId = (domain: DomainKey, metricKey: string): string => `${domain}.${metricKey}`;
 
+const normalizeMetricValue = (value: GeminiObservedMetric["value"] | undefined): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+};
+
 const toScores = (
   domain: DomainKey,
   metricKeys: string[],
@@ -418,10 +413,12 @@ const toScores = (
       const axisKey = axisId(domain, key);
       const meta = resolveAxisMetadata(axisKey) ?? resolveAxisMetadata(key);
       const resolvedKey = meta?.id ?? axisKey;
+      const rawValue = normalizeMetricValue(metric.value);
+      const normalizedValue = rawValue === "" && safeScore === 0 ? "unobserved" : rawValue;
       const detail: AxisDetail = {
-        rawValue: metric.value ?? "",
-        explanation: metric.explanation,
-        observed: metric.value !== "unobserved" && metric.score !== 0,
+        rawValue: normalizedValue,
+        explanation: metric.explanation ?? "",
+        observed: normalizedValue !== "unobserved" && safeScore !== 0,
       };
       if (detailMaps?.domainDetails) {
         detailMaps.domainDetails[resolvedKey] = detail;
@@ -536,7 +533,10 @@ const summarize = (
 
   const snippets = observed
     .slice(0, 2)
-    .map(({ key, metric }) => `${resolveAxisMetadata(axisId(domain, key))?.label ?? key}: ${metric.value}`);
+    .map(
+      ({ key, metric }) =>
+        `${resolveAxisMetadata(axisId(domain, key))?.label ?? key}: ${normalizeMetricValue(metric.value)}`,
+    );
   if (snippets.length === 0) return `${domainName} metrics could not be observed with confidence.`;
   return `${domainName} highlights — ${snippets.join("; ")}.`;
 };
@@ -597,22 +597,14 @@ const buildDomainProfile = (
 
 const buildProfiles = (
   response: GeminiMultimodalResponse,
-  fromFallback: boolean,
   axisDetails: Record<string, AxisDetail>,
-  fallbackNotice?: string,
 ): MultimodalProfiles => {
-  const fallbackHighlights = fallbackNotice
-    ? [fallbackNotice]
-    : fromFallback
-      ? ["Used fallback media path"]
-      : [];
   const voice = buildDomainProfile(
     "voice",
     "Voice",
     [...BASE_DOMAIN_METRICS.voice],
     response.voice as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
   const language = buildDomainProfile(
     "language",
@@ -620,7 +612,6 @@ const buildProfiles = (
     [...BASE_DOMAIN_METRICS.language],
     response.language as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
   const narrative = buildDomainProfile(
     "narrative",
@@ -628,7 +619,6 @@ const buildProfiles = (
     [...BASE_DOMAIN_METRICS.narrative],
     response.narrative as unknown as Record<string, GeminiObservedMetric>,
     axisDetails,
-    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const ves = response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>;
@@ -639,7 +629,6 @@ const buildProfiles = (
     ["environment_stability", "talking_vs_broll_vs_graphics", "pattern_interrupts"],
     ves,
     axisDetails,
-    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const editing = buildDomainProfile(
@@ -648,17 +637,18 @@ const buildProfiles = (
     ["cut_rate", "pattern_interrupts", "broll_coverage"],
     ves,
     axisDetails,
-    fallbackHighlights.length ? fallbackHighlights : undefined,
   );
 
   const soundHighlights: string[] = [];
-  if (ves.music_coverage?.value && ves.music_coverage.value !== "unobserved") {
-    soundHighlights.push(`Music coverage ~${ves.music_coverage.value}`);
+  const musicCoverageValue = normalizeMetricValue(ves.music_coverage?.value);
+  if (musicCoverageValue && musicCoverageValue.toLowerCase() !== "unobserved") {
+    soundHighlights.push(`Music coverage ~${musicCoverageValue}`);
   }
-  if (ves.music_changes?.value && ves.music_changes.value !== "unobserved") {
-    soundHighlights.push(`Music changes: ${ves.music_changes.value}`);
+  const musicChangesValue = normalizeMetricValue(ves.music_changes?.value);
+  if (musicChangesValue && musicChangesValue.toLowerCase() !== "unobserved") {
+    soundHighlights.push(`Music changes: ${musicChangesValue}`);
   }
-  const soundExtraHighlights = [...fallbackHighlights, ...soundHighlights].filter(Boolean);
+  const soundExtraHighlights = soundHighlights.filter(Boolean);
   const sound = buildDomainProfile(
     "sound",
     "Sound",
@@ -692,13 +682,14 @@ const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<str
 
 const mapMetric = (metric: GeminiRichMetric | undefined, fallback: ScoredMetric): ScoredMetric => {
   if (!metric) return fallback;
+  const normalizedValue = normalizeMetricValue(metric.value);
   const observed =
     metric.observed !== undefined
       ? metric.observed
-      : metric.value?.toLowerCase() !== "unobserved" && metric.score !== 0;
+      : normalizedValue.toLowerCase() !== "unobserved" && metric.score !== 0;
   return {
     score: Number.isFinite(metric.score) ? metric.score : fallback.score,
-    value: metric.value ?? fallback.value,
+    value: normalizedValue || fallback.value,
     observed,
     timeline: metric.timeline ?? fallback.timeline,
     spans: metric.spans ?? fallback.spans,
@@ -835,8 +826,54 @@ const toError = (result: GeminiMultimodalResult): GeminiApiError & { code?: Gemi
 
 type AdvancedPassOutcome = {
   metrics?: GeminiAdvancedMetricsPartial;
-  fromFallback: boolean;
   status?: number;
+  passMetrics?: GeminiRequestMetrics;
+};
+
+const addUsageTotals = (acc: GeminiUsage, usage?: GeminiUsage) => {
+  if (!usage) return;
+  acc.promptTokens = (acc.promptTokens ?? 0) + (usage.promptTokens ?? 0);
+  acc.candidateTokens = (acc.candidateTokens ?? 0) + (usage.candidateTokens ?? 0);
+  acc.totalTokens = (acc.totalTokens ?? 0) + (usage.totalTokens ?? 0);
+  acc.cachedTokens = (acc.cachedTokens ?? 0) + (usage.cachedTokens ?? 0);
+};
+
+const buildPassTotals = (metrics: PassMetricsDiagnostics): PassMetricsTotals | undefined => {
+  const allMetrics: GeminiRequestMetrics[] = [];
+  if (metrics.core) allMetrics.push(metrics.core);
+  if (metrics.advancedAudioText) allMetrics.push(metrics.advancedAudioText);
+  if (metrics.advancedVisualCross) allMetrics.push(metrics.advancedVisualCross);
+  if (metrics.salvage) {
+    allMetrics.push(...Object.values(metrics.salvage));
+  }
+  if (allMetrics.length === 0) return undefined;
+
+  let durationMs = 0;
+  let attempts = 0;
+  let retries = 0;
+  let costTotal: number | undefined;
+  let usageTotal: GeminiUsage | undefined;
+
+  for (const entry of allMetrics) {
+    durationMs += entry.durationMs;
+    attempts += entry.attempts;
+    retries += entry.retries;
+    if (entry.estimatedCostUsd !== undefined) {
+      costTotal = (costTotal ?? 0) + entry.estimatedCostUsd;
+    }
+    if (entry.usage) {
+      usageTotal = usageTotal ?? {};
+      addUsageTotals(usageTotal, entry.usage);
+    }
+  }
+
+  return {
+    durationMs,
+    attempts,
+    retries,
+    usage: usageTotal,
+    estimatedCostUsd: costTotal,
+  };
 };
 
 const mergeAdvancedMetrics = (
@@ -908,56 +945,19 @@ const runAdvancedPass = async (input: {
   });
 
   if (!result.ok) {
-    return { fromFallback: false, status: result.status };
+    return { status: result.status, passMetrics: result.metrics };
   }
 
   try {
     const parsed = parseGeminiAdvancedMetricsJson(result.rawJson, input.sections);
     return {
       metrics: parsed,
-      fromFallback: result.fromFallback,
       status: result.status,
+      passMetrics: result.metrics,
     };
   } catch {
-    return { fromFallback: result.fromFallback, status: result.status };
+    return { status: result.status, passMetrics: result.metrics };
   }
-};
-
-const TRANSCRIPT_FALLBACK_SEGMENT_LIMIT = 40;
-
-export const analyzeVideoTranscriptFallback = async (input: {
-  youtubeUrl: string;
-  config?: AppConfig;
-}): Promise<TranscriptFallbackResult> => {
-  const transcript = await getTranscriptAndScenes({ videoUrl: input.youtubeUrl }, { config: input.config });
-  const transcriptSegments = transcript.transcriptSegments.slice(0, TRANSCRIPT_FALLBACK_SEGMENT_LIMIT);
-  const sceneSegments = transcript.sceneSegments.slice(0, TRANSCRIPT_FALLBACK_SEGMENT_LIMIT);
-  const prompt = buildTranscriptFallbackPrompt(transcriptSegments, sceneSegments);
-  const response = await callGeminiTextJson({
-    prompt,
-    systemInstruction: transcriptFallbackSystemInstruction,
-    jsonSchema: coreResponseJsonSchema,
-    config: input.config,
-    model: input.config?.geminiMultimodalCoreModel,
-  });
-
-  const parsed = parseGeminiMultimodalJson(response.rawJson);
-  const axisDetails: Record<string, AxisDetail> = {};
-  const profiles = buildProfiles(parsed, false, axisDetails, "Transcript-only fallback");
-
-  return {
-    profiles,
-    beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
-    axisDetails,
-    transcriptSegments: transcript.transcriptSegments,
-    sceneSegments: transcript.sceneSegments,
-    diagnostics: {
-      transcriptFallback: true,
-      unobservedCounts: collectUnobservedCounts(parsed),
-      coverage: buildCoverageDiagnostics(parsed),
-      rawStatus: response.status,
-    },
-  };
 };
 
 export const analyzeVideoMultimodal = async (input: {
@@ -984,9 +984,10 @@ export const analyzeVideoMultimodal = async (input: {
     throw toError(result);
   }
 
+  const corePassMetrics = result.metrics;
   const parsed = parseGeminiMultimodalJson(result.rawJson);
   const axisDetails: Record<string, AxisDetail> = {};
-  const profiles = buildProfiles(parsed, result.fromFallback, axisDetails);
+  const profiles = buildProfiles(parsed, axisDetails);
   const audioTextPass = advancedMetricsEnabled
     ? await runAdvancedPass({
         youtubeUrl: input.youtubeUrl,
@@ -1007,10 +1008,16 @@ export const analyzeVideoMultimodal = async (input: {
         model: advancedVisualModel,
       })
     : undefined;
+  const passMetrics: PassMetricsDiagnostics = {
+    core: corePassMetrics,
+    advancedAudioText: audioTextPass?.passMetrics,
+    advancedVisualCross: visualCrossPass?.passMetrics,
+  };
 
   let mergedAdvanced = mergeAdvancedMetrics(audioTextPass?.metrics, visualCrossPass?.metrics);
   const coverageBeforeSalvage = buildCoverageDiagnostics(parsed, mergedAdvanced);
   const salvageSections: AdvancedSectionKey[] = [];
+  const salvagePassMetrics: Record<string, GeminiRequestMetrics> = {};
 
   if (advancedMetricsEnabled && coverageBeforeSalvage.advanced) {
     for (const section of ADVANCED_GEMINI_SECTIONS) {
@@ -1021,10 +1028,9 @@ export const analyzeVideoMultimodal = async (input: {
     }
   }
 
-  let salvageFromFallback = false;
   if (advancedMetricsEnabled && salvageSections.length > 0) {
     for (const section of salvageSections) {
-      const fallbackModel =
+      const sectionModel =
         ADVANCED_AUDIO_TEXT_SECTIONS.includes(section) ? advancedAudioModel : advancedVisualModel;
       const salvagePass = await runAdvancedPass({
         youtubeUrl: input.youtubeUrl,
@@ -1038,9 +1044,11 @@ export const analyzeVideoMultimodal = async (input: {
         },
         sections: [section],
         config: input.config,
-        model: salvageModel ?? fallbackModel,
+        model: salvageModel ?? sectionModel,
       });
-      salvageFromFallback = salvageFromFallback || salvagePass.fromFallback;
+      if (salvagePass.passMetrics) {
+        salvagePassMetrics[section] = salvagePass.passMetrics;
+      }
       mergedAdvanced = applySalvageMetrics(
         mergedAdvanced,
         mergeAdvancedMetrics(salvagePass.metrics),
@@ -1049,18 +1057,16 @@ export const analyzeVideoMultimodal = async (input: {
   }
 
   const advancedMetrics = mapAdvancedMetrics(mergedAdvanced);
-  const fromFallback =
-    result.fromFallback ||
-    Boolean(audioTextPass?.fromFallback) ||
-    Boolean(visualCrossPass?.fromFallback) ||
-    salvageFromFallback;
+  if (Object.keys(salvagePassMetrics).length > 0) {
+    passMetrics.salvage = salvagePassMetrics;
+  }
+  passMetrics.totals = buildPassTotals(passMetrics);
 
   return {
     profiles,
     beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
     axisDetails,
     diagnostics: {
-      fromFallback,
       unobservedCounts: collectUnobservedCounts(parsed),
       coverage: buildCoverageDiagnostics(parsed, mergedAdvanced, advancedMetrics?.secondOrder),
       salvage: {
@@ -1072,6 +1078,7 @@ export const analyzeVideoMultimodal = async (input: {
             : undefined,
       },
       rawStatus: result.status,
+      passMetrics,
     },
     advancedMetrics,
   };

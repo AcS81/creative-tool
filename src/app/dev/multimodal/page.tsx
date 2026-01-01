@@ -8,7 +8,6 @@ import type { VideoFingerprintJson } from "../../../lib/types";
 type AnalysisResponse = {
   ok: boolean;
   fingerprint?: VideoFingerprintJson;
-  fromFallback?: boolean;
   unobservedCounts?: Record<string, number>;
   coverage?: {
     core?: Record<string, { observed: number; total: number; observedPct: number }>;
@@ -18,9 +17,41 @@ type AnalysisResponse = {
     attempted?: boolean;
     sections?: string[];
   };
+  passMetrics?: {
+    core?: PassMetrics;
+    advancedAudioText?: PassMetrics;
+    advancedVisualCross?: PassMetrics;
+    salvage?: Record<string, PassMetrics>;
+    totals?: PassMetricsTotals;
+  };
   raw?: unknown;
   error?: string;
   durationMs?: number;
+};
+
+type PassUsage = {
+  promptTokens?: number;
+  candidateTokens?: number;
+  totalTokens?: number;
+  cachedTokens?: number;
+};
+
+type PassMetrics = {
+  durationMs: number;
+  attempts: number;
+  retries: number;
+  status?: number;
+  model?: string;
+  usage?: PassUsage;
+  estimatedCostUsd?: number;
+};
+
+type PassMetricsTotals = {
+  durationMs: number;
+  attempts: number;
+  retries: number;
+  usage?: PassUsage;
+  estimatedCostUsd?: number;
 };
 
 export default function MultimodalDevPage() {
@@ -61,14 +92,45 @@ export default function MultimodalDevPage() {
     }
   };
 
+  const formatUsage = (usage?: PassUsage) => {
+    if (!usage) return "tokens n/a";
+    const parts = [
+      usage.promptTokens !== undefined ? `in ${usage.promptTokens}` : null,
+      usage.candidateTokens !== undefined ? `out ${usage.candidateTokens}` : null,
+      usage.totalTokens !== undefined ? `total ${usage.totalTokens}` : null,
+      usage.cachedTokens !== undefined ? `cached ${usage.cachedTokens}` : null,
+    ].filter(Boolean);
+    return parts.length ? `tokens ${parts.join(" / ")}` : "tokens n/a";
+  };
+
+  const formatCost = (cost?: number) =>
+    typeof cost === "number" ? `$${cost.toFixed(4)}` : "cost n/a";
+
+  const renderPass = (label: string, metrics?: PassMetrics) => {
+    if (!metrics) return null;
+    return (
+      <div className="rounded border border-border bg-white px-3 py-2 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 text-foreground">
+          <span className="font-semibold">{label}</span>
+          <span className="text-muted">
+            {metrics.durationMs} ms · attempts {metrics.attempts} · retries {metrics.retries}
+          </span>
+        </div>
+        <div className="mt-1 text-muted">
+          {metrics.model ? `model ${metrics.model}` : "model n/a"} · {formatUsage(metrics.usage)} ·{" "}
+          {formatCost(metrics.estimatedCostUsd)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">
       <div className="space-y-2">
         <h1 className="text-xl font-semibold">Multimodal Dev Runner</h1>
         <p className="text-sm text-muted">
           Exercises the same multimodal pipeline used by <code className="rounded bg-slate-100 px-1 py-0.5">/api/analyze</code>{" "}
-          (analyzeVideoMultimodal + v2 fingerprint). Shows whether we used the inline upload fallback and counts of
-          unobserved metrics.
+          (analyzeVideoMultimodal + v2 fingerprint). Shows counts of unobserved metrics and coverage by section.
         </p>
         <p className="text-xs text-muted">
           Axis glossary:{" "}
@@ -115,13 +177,6 @@ export default function MultimodalDevPage() {
                 {result.durationMs} ms
               </span>
             ) : null}
-            {result.fromFallback ? (
-              <span className="rounded-full bg-amber-100 px-2 py-1 text-xs text-amber-700">
-                Inline upload fallback
-              </span>
-            ) : (
-              <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-700">Primary file_data</span>
-            )}
             {result.unobservedCounts ? (
               <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-muted">
                 Unobserved metrics:{" "}
@@ -146,6 +201,14 @@ export default function MultimodalDevPage() {
                   .join(" | ")}
               </span>
             ) : null}
+            {result.passMetrics?.totals ? (
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-xs text-muted">
+                Pass totals: {result.passMetrics.totals.durationMs} ms, attempts {result.passMetrics.totals.attempts}
+                {typeof result.passMetrics.totals.estimatedCostUsd === "number"
+                  ? `, est $${result.passMetrics.totals.estimatedCostUsd.toFixed(4)}`
+                  : ""}
+              </span>
+            ) : null}
           </div>
 
           {result.fingerprint ? (
@@ -165,6 +228,29 @@ export default function MultimodalDevPage() {
             </div>
           ) : null}
 
+          {result.passMetrics ? (
+            <div className="space-y-2">
+              <p className="font-semibold text-foreground">Pass metrics</p>
+              <div className="grid gap-2 md:grid-cols-2">
+                {renderPass("core", result.passMetrics.core)}
+                {renderPass("advanced audio/text", result.passMetrics.advancedAudioText)}
+                {renderPass("advanced visual/cross", result.passMetrics.advancedVisualCross)}
+                {result.passMetrics.salvage
+                  ? Object.entries(result.passMetrics.salvage).map(([key, value]) =>
+                      renderPass(`salvage: ${key}`, value),
+                    )
+                  : null}
+              </div>
+              {result.passMetrics.totals ? (
+                <p className="text-xs text-muted">
+                  Totals: {result.passMetrics.totals.durationMs} ms · attempts {result.passMetrics.totals.attempts} ·
+                  retries {result.passMetrics.totals.retries} · {formatUsage(result.passMetrics.totals.usage)} ·{" "}
+                  {formatCost(result.passMetrics.totals.estimatedCostUsd)}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
           <div className="space-y-2">
             <p className="font-semibold text-foreground">Raw response (validated)</p>
             <pre className="max-h-80 overflow-auto rounded-md border border-border bg-slate-950 p-3 text-xs text-slate-50">
@@ -173,6 +259,7 @@ export default function MultimodalDevPage() {
                   ? {
                       fingerprint: result.fingerprint,
                       unobservedCounts: result.unobservedCounts,
+                      passMetrics: result.passMetrics,
                     }
                   : { error: result.error },
                 null,

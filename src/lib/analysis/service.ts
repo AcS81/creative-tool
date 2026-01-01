@@ -13,8 +13,7 @@ import { fetchVideoAnalytics } from "../youtube/analytics";
 import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
-import { analyzeVideoMultimodal, analyzeVideoTranscriptFallback } from "./geminiMultimodalAnalyzer";
-import { GeminiApiError } from "../gemini/client";
+import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
 
@@ -92,14 +91,6 @@ export async function analyzeVideo(
   }
 
   const videoUrl = buildVideoUrl(input.videoId);
-  const shouldTranscriptFallback = (preflight?: IngestionPreflight) =>
-    Boolean(
-      config.transcriptFallbackEnabled &&
-        preflight?.fileData.status === "blocked" &&
-        preflight?.fallback?.checked === true &&
-        preflight?.fallback?.viable === false,
-    );
-
   const attachPerformance = async (currentFingerprint: VideoFingerprintJson) => {
     let fingerprint = currentFingerprint;
     let performanceAttached = false;
@@ -142,79 +133,7 @@ export async function analyzeVideo(
     return { fingerprint, performanceAttached, performanceErrorType, performanceErrorMessage };
   };
 
-  const buildTranscriptFallbackResult = async (): Promise<AnalyzeVideoResult> => {
-    const transcript = await analyzeVideoTranscriptFallback({ youtubeUrl: videoUrl, config });
-    const perDomain: FingerprintPerDomain = {
-      voiceProfile: transcript.profiles.voice,
-      languageProfile: transcript.profiles.language,
-      narrativeProfile: transcript.profiles.narrative,
-      visualProfile: transcript.profiles.visual,
-      editingProfile: transcript.profiles.editing,
-      soundProfile: transcript.profiles.sound,
-    };
-    const metaAxes = computeMetaAxesFromProfiles(perDomain);
-    const overallArchetype = archetypeForMeta(metaAxes);
-    const advancedMetrics = buildDefaultAdvancedMetrics();
-    let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
-      metaAxes,
-      overallArchetype,
-      supporting: {
-        beats: transcript.beats,
-        axisDetails: transcript.axisDetails,
-        transcriptSegments: transcript.transcriptSegments,
-        sceneSegments: transcript.sceneSegments,
-      },
-      hasPerformanceData: false,
-      advancedMetrics,
-    });
-
-    const performance = await attachPerformance(fingerprint);
-    fingerprint = performance.fingerprint;
-
-    const validated = validateFingerprint(fingerprint);
-
-    return {
-      fingerprint: validated,
-      overallArchetype,
-      diagnostics: {
-        source: "gemini-v2-transcript",
-        performanceAttached: performance.performanceAttached,
-        performanceErrorType: performance.performanceErrorType,
-        performanceErrorMessage: performance.performanceErrorMessage,
-        analysisPath: "gemini-v2-transcript",
-        analysisErrorMessage: undefined,
-        analysisVersion: "v2",
-        multimodalFallbackUsed: false,
-        transcriptFallbackUsed: true,
-        lowerConfidence: true,
-        lowerConfidenceReason: "Transcript-only fallback: visual/edit/sound metrics not observed.",
-        unobservedCounts: transcript.diagnostics.unobservedCounts,
-        coverage: transcript.diagnostics.coverage,
-        salvage: { attempted: false },
-        advancedMetricsDefaulted: true,
-        advancedMetricsObserved: false,
-        advancedMetricsDefaultReason: "Transcript-only fallback; advanced metrics unavailable.",
-      },
-    };
-  };
-
-  if (shouldTranscriptFallback(options.ingestionPreflight)) {
-    return buildTranscriptFallbackResult();
-  }
-
-  let multimodal;
-  try {
-    multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
-  } catch (error) {
-    if (
-      config.transcriptFallbackEnabled &&
-      error instanceof GeminiApiError &&
-      (error as GeminiApiError & { code?: string }).code === "FALLBACK_FAILED"
-    ) {
-      return buildTranscriptFallbackResult();
-    }
-    throw error;
-  }
+  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
 
   const voiceProfile = multimodal.profiles.voice;
   const languageProfile = multimodal.profiles.language;
@@ -227,7 +146,7 @@ export async function analyzeVideo(
   const unobservedCounts = multimodal.diagnostics.unobservedCounts;
   const coverage = multimodal.diagnostics.coverage;
   const salvage = multimodal.diagnostics.salvage;
-  const multimodalFallbackUsed = Boolean(multimodal.diagnostics.fromFallback);
+  const passMetrics = multimodal.diagnostics.passMetrics;
 
   const perDomain: FingerprintPerDomain = {
     voiceProfile,
@@ -252,11 +171,6 @@ export async function analyzeVideo(
       ? "Advanced metrics disabled via ENABLE_ADVANCED_METRICS=false."
       : "Advanced metrics unavailable from Gemini; using defaults.";
   const advancedMetrics = advancedMetricsFromAnalysis ?? buildDefaultAdvancedMetrics();
-  const lowerConfidence = multimodalFallbackUsed;
-  const lowerConfidenceReason = multimodalFallbackUsed
-    ? "Gemini used inline fallback upload; measurements may be lower confidence."
-    : undefined;
-
   let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
     overallArchetype,
@@ -284,13 +198,10 @@ export async function analyzeVideo(
       analysisPath: "gemini-v2-multimodal",
       analysisErrorMessage: undefined,
       analysisVersion: "v2",
-      multimodalFallbackUsed,
-      transcriptFallbackUsed: false,
-      lowerConfidence,
-      lowerConfidenceReason,
       unobservedCounts,
       coverage,
       salvage,
+      passMetrics,
       advancedMetricsDefaulted,
       advancedMetricsObserved,
       advancedMetricsDefaultReason,

@@ -19,4 +19,4 @@ We are choosing **Option B** (refresh seeds with a one-time Gemini run) to popul
 ## Notes
 - Seeds remain mock-generated until the refresh is executed with real keys.
 - Reference video IDs should point to stable, public YouTube videos; adjust `prisma/seed.ts` accordingly before running.
-- If Gemini blocks `file_data`, the refresh will surface fallback/diagnostic flags; re-run after resolving entitlement issues.
+- If Gemini URL ingestion is blocked, the refresh will surface an error; re-run after resolving key/model/entitlement issues.

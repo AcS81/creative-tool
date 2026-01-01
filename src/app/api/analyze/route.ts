@@ -16,15 +16,26 @@ type AnalyzeRequestBody = {
   creatorDisplayName?: string;
   title?: string;
   durationSeconds?: number;
+  passMode?: "core" | "full";
 };
 
 export async function POST(request: Request) {
   let videoAnalysisId: string | null = null;
 
   try {
-    const config = getAppConfig();
     const body = (await request.json()) as AnalyzeRequestBody;
+    const config = getAppConfig();
     const youtubeUrl = body?.url;
+    const requestedPassMode = body?.passMode;
+    const normalizedPassMode =
+      requestedPassMode === "core" || requestedPassMode === "full" ? requestedPassMode : undefined;
+    const requestConfig = normalizedPassMode
+      ? {
+          ...config,
+          multimodalPassMode: normalizedPassMode,
+          advancedMetricsEnabled: normalizedPassMode === "full",
+        }
+      : config;
 
     if (!youtubeUrl) {
       return NextResponse.json(
@@ -44,7 +55,7 @@ export async function POST(request: Request) {
     const cookieHeader = request.headers.get("cookie");
     const { sessionId, isNew } = ensureSessionId(cookieHeader);
 
-    const metadata = await fetchYoutubeMetadata(videoId, { config });
+    const metadata = await fetchYoutubeMetadata(videoId, { config: requestConfig });
     const creatorDisplayName = body.creatorDisplayName || metadata.channelTitle || "Local Anonymous";
     const title = metadata.title || body.title || "Untitled video";
     const durationSeconds = Number.isFinite(metadata.durationSeconds)
@@ -82,19 +93,11 @@ export async function POST(request: Request) {
     videoAnalysisId = videoAnalysis.id;
 
     const ingestionPreflight =
-      config.analysisMode === "gemini" && config.analysisV2MultimodalEnabled
-        ? await preflightGeminiIngestion({ youtubeUrl, config, logger: console })
+      requestConfig.analysisMode === "gemini" && requestConfig.analysisV2MultimodalEnabled
+        ? await preflightGeminiIngestion({ youtubeUrl, config: requestConfig })
         : undefined;
 
-    const allowTranscriptFallback = Boolean(
-      ingestionPreflight &&
-        config.transcriptFallbackEnabled &&
-        ingestionPreflight.fileData.status === "blocked" &&
-        ingestionPreflight.fallback.checked &&
-        ingestionPreflight.fallback.viable === false,
-    );
-
-    if (ingestionPreflight && !ingestionPreflight.ok && !allowTranscriptFallback) {
+    if (ingestionPreflight && !ingestionPreflight.ok) {
       const message = ingestionPreflight.failureMessage ?? "Video ingestion preflight failed.";
       await prisma.videoAnalysis.update({
         where: { id: videoAnalysis.id },
@@ -114,7 +117,7 @@ export async function POST(request: Request) {
 
     const analysisResult = await analyzeVideo(
       { videoId, title, durationSeconds, creatorDisplayName, channelId: metadata.channelId },
-      { config, auth: authContext ?? undefined, ingestionPreflight },
+      { config: requestConfig, auth: authContext ?? undefined, ingestionPreflight },
     );
 
     await prisma.videoFingerprint.create({

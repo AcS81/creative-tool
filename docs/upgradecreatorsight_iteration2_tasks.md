@@ -16,7 +16,7 @@
 
 This iteration assumes **Iteration 1 of the upgrade track** (see `docs/upgradecreatorsight_iteration1_tasks.md`) has delivered:
 
-- A working `callGeminiMultimodalJson` client with `file_data` + fallback.  
+- A working `callGeminiMultimodalJson` client with URL ingestion (no download/upload fallback).  
 - A `GeminiMultimodalResponse` schema + validator.  
 - A v2 `VideoFingerprintJson` builder wired into a feature-flagged analysis path.  
 - A basic debug view for multimodal diagnostics.
@@ -34,21 +34,15 @@ If any of those are missing, treat the relevant Iteration 1 tasks as prerequisit
 **Context**
 
 - PRD FR-5–FR-11 assume Gemini has genuine multimodal access (audio + frames).  
-- `src/lib/gemini/client.ts` currently:  
-  - Tries `file_data.file_uri = youtubeUrl`.  
-  - Falls back to `inline_data` by `fetch(youtubeUrl)` with a byte range.  
-- In practice, a plain watch URL (`https://www.youtube.com/watch?v=...`) often returns HTML, not media bytes.
+- `src/lib/gemini/client.ts` currently uses URL ingestion (YouTube URL input only).  
 
 **Goals**
 
 - [ ] Create a **small internal script or test harness** (can live next to the debug view) that:
-  - [ ] Calls `callGeminiMultimodalJson` for a *real* public video using the **primary `file_data` path** and inspects whether Gemini returns believable video-derived metrics (e.g., detects obvious music or visual setup changes).
-  - [ ] Forces the **fallback** and inspects whether the inline data actually looks like audio/video, not HTML (size, sniffed headers, Gemini output quality).  
+  - [ ] Calls `callGeminiMultimodalJson` for a *real* public video using URL ingestion and inspects whether Gemini returns believable video-derived metrics (e.g., detects obvious music or visual setup changes).
 - [ ] From these experiments, document in `docs/analysis_functionality_plan.md`:
-  - [ ] Whether `file_data.file_uri = youtubeUrl` is truly supported for your account, or always rejected / partial.  
-  - [ ] Whether the current fallback (`fetch(youtubeUrl)` directly) yields valid media samples or just HTML.  
-  - [ ] A recommendation:  
-    - If direct YouTube URLs are not workable, explicitly state that we must **stream or download** media bytes (ephemeral, not stored long-term) before sending them to Gemini.
+  - [ ] Whether URL ingestion is supported for your account/model, or consistently rejected.  
+  - [ ] Any entitlement or quota notes that affect reliability.
 
 **Constraints**
 
@@ -58,8 +52,8 @@ If any of those are missing, treat the relevant Iteration 1 tasks as prerequisit
 **Acceptance Criteria**
 
 - [ ] A short “Multimodal Reality” subsection added to `docs/analysis_functionality_plan.md` summarising:
-  - What actually works today (file_data vs fallback).  
-  - Any required relaxation of the PRD non-goal (“no download”) to allow ephemeral streaming.  
+  - What actually works today (URL ingestion + entitlement notes).  
+  - Confirmation that download/upload fallbacks are not used.  
 - [ ] At least one **golden test video** (see Phase 2) shows clearly better transcript / scene / music detection when the real multimodal path is used, compared with the old text-only URL prompt.  
 
 ---
@@ -381,8 +375,8 @@ If any of those are missing, treat the relevant Iteration 1 tasks as prerequisit
 Use this to decide when Iteration 2 of the **upgrade track** is done and you’re ready to plan Iteration 3 (deeper archetypes, performance overlays, or scaling).
 
 ### ✅ Phase 0 – Reality Check
-- [ ] Multimodal path behaviour (file_data vs fallback) is documented with real observations.  
-- [ ] PRD/plan explicitly reflects any need for ephemeral media streaming.
+- [ ] URL ingestion behaviour is documented with real observations.  
+- [ ] PRD/plan confirms no download/upload fallback is used.
 
 ### ✅ Phase 1 – Metric Semantics
 - [ ] `axisMetadata.ts` is the single source of truth for axis labels and descriptions.  
@@ -407,4 +401,3 @@ When all of the above are ticked, creators should no longer experience:
 - “I don’t know what any of these axes mean or how they’re computed.”
 
 Instead, they should feel like the app is **watching with them**, then explaining what it saw in a way they can verify and use.
-

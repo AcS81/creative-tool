@@ -23,6 +23,8 @@ import { LanguageTimingMiniChart, VoicePaceMiniChart } from "../components/Voice
 import { AdvancedSignalsStrip } from "../components/AdvancedSignalsStrip";
 import { DomainBadges } from "../components/DomainBadges";
 import { AdvancedCoaching } from "../components/AdvancedCoaching";
+import { ObservationStatus } from "../components/ObservationStatus";
+import { AnalysisLoadingState } from "../components/AnalysisLoadingState";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeResponse = {
@@ -193,6 +195,8 @@ function HomeContent() {
     null,
   );
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [lastSubmittedUrl, setLastSubmittedUrl] = useState<string | null>(null);
+  const [lastPassMode, setLastPassMode] = useState<"core" | "full" | undefined>(undefined);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -309,6 +313,8 @@ function HomeContent() {
   const loadSample = () => {
     setError(null);
     setLoading(false);
+    setLastSubmittedUrl(null);
+    setLastPassMode(undefined);
     setResult({
       videoAnalysisId: "sample-analysis",
       fingerprint: {
@@ -336,23 +342,29 @@ function HomeContent() {
     });
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const runAnalysis = async (targetUrl: string, passMode?: "core" | "full") => {
     setError(null);
     setResult(null);
     setYoutubeMessage(null);
 
-    if (!isValidYouTubeUrl(url)) {
+    if (!isValidYouTubeUrl(targetUrl)) {
       setError("Please enter a valid YouTube URL.");
       return;
     }
 
     try {
       setLoading(true);
+      setLastSubmittedUrl(targetUrl);
+      setLastPassMode(passMode);
+      setUrl(targetUrl);
+      const payload: { url: string; passMode?: "core" | "full" } = { url: targetUrl };
+      if (passMode) {
+        payload.passMode = passMode;
+      }
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify(payload),
       });
 
       if (!res.ok) {
@@ -378,6 +390,29 @@ function HomeContent() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    void runAnalysis(url);
+  };
+
+  const handleTryAgain = () => {
+    const targetUrl = lastSubmittedUrl ?? url;
+    if (!targetUrl) {
+      setError("Please enter a valid YouTube URL.");
+      return;
+    }
+    void runAnalysis(targetUrl, lastPassMode);
+  };
+
+  const handleRunAdvanced = () => {
+    const targetUrl = lastSubmittedUrl ?? url;
+    if (!targetUrl) {
+      setError("Please enter a valid YouTube URL.");
+      return;
+    }
+    void runAnalysis(targetUrl, "full");
   };
 
   const handleDisconnect = async () => {
@@ -411,6 +446,8 @@ function HomeContent() {
     setLoading(true);
     setError(null);
     setActiveTab("overview");
+    setLastSubmittedUrl(null);
+    setLastPassMode(undefined);
     try {
       const res = await fetch(`/api/history/${id}`);
       if (!res.ok) {
@@ -481,9 +518,7 @@ function HomeContent() {
   const showDiagnostics =
     diagnostics &&
     (diagnostics.source !== "mock" ||
-      diagnostics.multimodalFallbackUsed ||
       diagnostics.advancedMetricsDefaulted ||
-      diagnostics.lowerConfidence ||
       diagnostics.advancedMetricsObserved === false);
   const diagnosticChips = showDiagnostics
     ? [
@@ -499,17 +534,6 @@ function HomeContent() {
                 ? `Defaulted: ${diagnostics.advancedMetricsDefaultReason}`
                 : "Defaulted metrics",
               tone: "warn" as const,
-            }
-          : null,
-        diagnostics?.multimodalFallbackUsed
-          ? { label: "Fallback ingest used", tone: "warn" as const }
-          : null,
-        diagnostics?.lowerConfidence
-          ? {
-              label: diagnostics.lowerConfidenceReason
-                ? `Lower confidence: ${diagnostics.lowerConfidenceReason}`
-                : "Lower confidence",
-              tone: "alert" as const,
             }
           : null,
       ].filter(Boolean)
@@ -640,19 +664,7 @@ function HomeContent() {
         </div>
       )}
 
-      {loading && (
-        <div className="cs-card space-y-4 p-6" role="status" aria-live="polite">
-          <p className="text-sm font-semibold text-muted">Loading your analysis…</p>
-          <div className="grid gap-3">
-            <div className="h-4 w-1/2 animate-pulse rounded bg-surface-strong" />
-            <div className="h-4 w-1/3 animate-pulse rounded bg-surface-strong" />
-            <div className="h-40 animate-pulse rounded bg-surface-strong" />
-          </div>
-          <p className="text-xs text-muted">
-            New analyses may take a couple of minutes; loading saved ones is quicker.
-          </p>
-        </div>
-      )}
+      {loading && <AnalysisLoadingState active={loading} passMode={lastPassMode} />}
 
       {!loading && error && !result && (
         <div className="cs-card space-y-2 p-6 border-red-200 bg-red-50" role="alert" aria-live="assertive">
@@ -728,6 +740,12 @@ function HomeContent() {
       {result && (
         <div className="cs-card w-full space-y-6 p-8">
           <AnalysisLayout activeTab={activeTab} onTabChange={handleTabChange}>
+            <ObservationStatus
+              diagnostics={result.diagnostics}
+              onTryAgain={lastSubmittedUrl || url ? handleTryAgain : undefined}
+              onRunAdvanced={lastSubmittedUrl || url ? handleRunAdvanced : undefined}
+              disabled={loading}
+            />
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-[1.4fr,1fr]">
@@ -822,7 +840,7 @@ function HomeContent() {
 
                 <AdvancedSignalsStrip fingerprint={result.fingerprint} />
 
-                <AdvancedCoaching fingerprint={result.fingerprint} />
+                <AdvancedCoaching fingerprint={result.fingerprint} diagnostics={result.diagnostics} />
 
                 <div className="grid gap-4 md:grid-cols-[2fr,1.2fr]">
                   <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">

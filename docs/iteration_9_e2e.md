@@ -4,7 +4,7 @@ Use this quick run-through to validate the Iteration 9 upgrades in Gemini mode (
 
 ## Pre-reqs
 - ENV: `ANALYSIS_MODE=gemini`, `ENABLE_ANALYSIS_V2_MULTIMODAL=true`, `ENABLE_ADVANCED_METRICS=true`, `GEMINI_API_KEY`, `YOUTUBE_API_KEY`.
-- Optional: `GOLDEN_SET_PATH` pointing to your golden clips, or edit `scripts/run-multimodal-golden.ts` URLs.
+- Optional: `GOLDEN_SET_PATH` pointing to your golden clips, or create `scripts/golden-set.json` from the sample file.
 
 ## Flow
 1) Run a full analysis on a known clip (ideally one golden video).
@@ -15,7 +15,6 @@ Use this quick run-through to validate the Iteration 9 upgrades in Gemini mode (
    - Visual entropy and cut refinement timelines populated (not empty).
    - Second-order scores present (alignment/drift/decay/balance/timing) with `diagnostics.advancedMetricsObservedBySection` showing observed=true for each section when data is present.
 3) Confirm diagnostics callouts:
-   - `diagnostics.multimodalFallbackUsed` false in normal runs; lowerConfidenceReason set if true.
    - `diagnostics.advancedMetricsDefaulted` false when advanced metrics returned; default reason present when disabled.
 4) UI checks (desktop + mobile):
    - Silence spans overlay renders; audience-address badge appears with counts.
@@ -25,4 +24,4 @@ Use this quick run-through to validate the Iteration 9 upgrades in Gemini mode (
 
 ## Troubleshooting
 - If advanced metrics are unobserved, check GEMINI_API_KEY/YOUTUBE_API_KEY and ensure `ENABLE_ADVANCED_METRICS` is not false.
-- If golden checks fail, confirm clip URLs are set (no `REPLACE_...` placeholders) and rerun; review reported failure reasons (e.g., missing entropy timeline, too few silence spans).
+- If golden checks fail, confirm clip URLs are set (no `REPLACE_...` placeholders) in your golden set file and rerun; review reported failure reasons (e.g., missing entropy timeline, too few silence spans).

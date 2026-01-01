@@ -1,4 +1,5 @@
 import type { VideoFingerprintJson } from "../types";
+import type { GeminiRequestMetrics, GeminiUsage } from "../gemini/client";
 
 export interface AnalyzeVideoInput {
   videoId: string;
@@ -12,18 +13,14 @@ export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   diagnostics?: {
-    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal" | "gemini-v2-transcript";
+    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal";
     hashSeed?: number;
     performanceAttached?: boolean;
     performanceErrorType?: string;
     performanceErrorMessage?: string;
     analysisVersion?: "v1" | "v2";
-    multimodalFallbackUsed?: boolean;
-    transcriptFallbackUsed?: boolean;
-    lowerConfidence?: boolean;
-    lowerConfidenceReason?: string;
     unobservedCounts?: Record<string, number>;
-    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock" | "gemini-v2-transcript";
+    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
     analysisErrorMessage?: string;
     advancedMetricsDefaulted?: boolean;
     advancedMetricsObserved?: boolean;
@@ -47,6 +44,19 @@ export interface AnalyzeVideoResult {
       sections?: string[];
       reason?: string;
     };
+    passMetrics?: {
+      core?: GeminiRequestMetrics;
+      advancedAudioText?: GeminiRequestMetrics;
+      advancedVisualCross?: GeminiRequestMetrics;
+      salvage?: Record<string, GeminiRequestMetrics>;
+      totals?: {
+        durationMs: number;
+        attempts: number;
+        retries: number;
+        usage?: GeminiUsage;
+        estimatedCostUsd?: number;
+      };
+    };
     ingestionPreflight?: IngestionPreflight;
   };
 }
@@ -55,18 +65,8 @@ export type IngestionPreflight = {
   ok: boolean;
   failureMessage?: string;
   validUrl: boolean;
-  fileData: {
+  urlIngestion: {
     eligible: boolean;
-    status: "unknown" | "allowed" | "blocked";
-    reason?: string;
-  };
-  fallback: {
-    checked: boolean;
-    viable?: boolean;
-    status?: number;
-    contentType?: string;
-    looksLikeHtml?: boolean;
-    reason?: string;
   };
 };
 

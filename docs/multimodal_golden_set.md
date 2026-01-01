@@ -14,10 +14,16 @@ npm run golden:multimodal [-- --dry-run]
 - Without `--dry-run`, the script runs the multimodal analyzer for each video in `scripts/run-multimodal-golden.ts`.
 - If you don’t have keys handy, add `--dry-run` and it will exit early after checking envs.
 
+## Golden set config
+- Create `scripts/golden-set.json` from `scripts/golden-set.sample.json` and replace the placeholder URLs with your canonical clips.
+- Keep `scripts/golden-set.json` private (it’s gitignored) and use `GOLDEN_SET_PATH` if you want to point to a different file.
+- Each entry can encode expectations: hook timing, music coverage bucket, pacing bucket (speaking rate), story presence, silence spans, audience addresses, and required timelines.
+
 ## What to look for
-- Logs include fallback usage, unobserved metric counts, and key metrics: music coverage/changes, cut rate, story presence, and now alignment/load snapshots (alignmentScore, loadHighlights).
-- Compare the printed metrics to the expected notes in the script (story/music/pacing). Large mismatches are a signal to revisit prompts or parsers.
-- `fallback=yes` means the inline upload path was used; rerun when possible to confirm primary `file_data` entitlement.
+- Logs include unobserved metric counts and key metrics: music coverage/changes, cut rate, story presence, and alignment/load snapshots (alignmentScore, loadHighlights).
+- Compare the printed metrics to the expected notes (story/music/pacing). Large mismatches are a signal to revisit prompts or parsers.
+- Coverage lines show observed/total per section, plus an average summary at the end.
+- If a run fails, check Gemini availability and retry; the runner uses URL-only ingestion (no uploads).
 
 ## CI guidance
 - Do not enable real golden runs in CI. If you add a CI-friendly variant, mock Gemini responses and gate it behind an env (not provided here).

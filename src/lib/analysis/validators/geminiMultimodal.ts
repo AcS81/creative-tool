@@ -31,13 +31,40 @@ const segmentDeltaSchema = z.object({
   label: z.string().optional(),
 });
 
-const observedMetricSchema: z.ZodType<GeminiObservedMetric> = z.object({
+const coerceObservedMetricInput = (input: unknown): unknown => {
+  if (typeof input === "string") {
+    const trimmed = input.trim();
+    if (!trimmed) {
+      return { score: 0, value: "unobserved", explanation: "" };
+    }
+    const lower = trimmed.toLowerCase();
+    const isUnobserved = ["unobserved", "n/a", "na", "unknown"].some((token) =>
+      lower.includes(token),
+    );
+    return {
+      score: 0,
+      value: isUnobserved ? "unobserved" : trimmed,
+      explanation: "",
+    };
+  }
+  if (typeof input === "number") {
+    return { score: 0, value: input, explanation: "" };
+  }
+  return input;
+};
+
+const observedMetricObjectSchema = z.object({
   score: z.number().min(0).max(100),
-  value: z.string().min(1),
-  explanation: z.string().min(1),
+  value: z.union([z.string(), z.number(), z.record(z.string(), z.any())]),
+  explanation: z.string().optional(),
 });
 
-const richMetricSchema: z.ZodType<GeminiRichMetric> = observedMetricSchema.extend({
+const observedMetricSchema: z.ZodType<GeminiObservedMetric> = z.preprocess(
+  coerceObservedMetricInput,
+  observedMetricObjectSchema,
+);
+
+const richMetricObjectSchema = observedMetricObjectSchema.extend({
   observed: z.boolean().optional(),
   timeline: z.array(timelinePointSchema).optional(),
   spans: z.array(spanSchema).optional(),
@@ -47,6 +74,11 @@ const richMetricSchema: z.ZodType<GeminiRichMetric> = observedMetricSchema.exten
   counts: z.record(z.string(), z.number()).optional(),
   trend: z.number().optional(),
 });
+
+const richMetricSchema: z.ZodType<GeminiRichMetric> = z.preprocess(
+  coerceObservedMetricInput,
+  richMetricObjectSchema,
+);
 
 const beatSchema: z.ZodType<GeminiBeat> = z
   .object({
@@ -76,6 +108,17 @@ const voiceSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.voice
 
 const languageSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.language)).passthrough();
 
+const coerceSeconds = (input: unknown): unknown => {
+  if (typeof input === "number") return input;
+  if (typeof input === "string") {
+    const match = input.match(/-?\d+(\.\d+)?/);
+    if (!match) return input;
+    const value = Number(match[0]);
+    return Number.isFinite(value) ? value : input;
+  }
+  return input;
+};
+
 const narrativeSchema = z
   .object({
     beats: z.array(beatSchema).min(1, "beats must contain at least one segment"),
@@ -84,7 +127,7 @@ const narrativeSchema = z
       .array(
         z.object({
           type: z.string().min(1),
-          timestamp: z.number().min(0),
+          timestamp: z.preprocess(coerceSeconds, z.number().min(0)),
         }),
       )
       .optional(),

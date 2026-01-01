@@ -80,7 +80,6 @@ const setDefaultMultimodal = () => {
     beats: [{ startSeconds: 0, endSeconds: 10, label: "hook", devices: [] }],
     axisDetails: {},
     diagnostics: {
-      fromFallback: false,
       unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
     },
   });

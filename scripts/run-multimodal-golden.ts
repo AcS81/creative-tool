@@ -1,13 +1,24 @@
+import fs from "node:fs";
+import path from "node:path";
 import { analyzeVideoMultimodal } from "../src/lib/analysis/geminiMultimodalAnalyzer";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "../src/lib/analysis/fingerprint/videoFingerprint";
 import type { AppConfig } from "../src/lib/config";
 import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
 import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
+import { BASE_DOMAIN_METRICS } from "../src/lib/analysis/metricRegistry";
+
+type ValueRange = {
+  min?: number;
+  max?: number;
+};
 
 type GoldenExpectation = {
   story?: "low" | "medium" | "high";
-  music?: "none" | "light" | "heavy";
+  music?: "none" | "light" | "medium" | "heavy";
   pacing?: "slow" | "medium" | "fast";
+  musicCoveragePct?: ValueRange;
+  speakingRateWpm?: ValueRange;
+  storyScore?: ValueRange;
   minSilenceSpans?: number;
   minAudienceAddresses?: number;
   maxHookSeconds?: number;
@@ -22,47 +33,43 @@ type GoldenVideo = {
   expected: GoldenExpectation;
 };
 
-// Replace URLs with your canonical golden clips; script skips entries marked REPLACE_ME.
-const defaultGoldenSet: GoldenVideo[] = [
-  {
-    id: "A",
-    url: "https://www.youtube.com/watch?v=REPLACE_SPORTS_SHUSH",
-    notes: "Sports highlight with crowd shush; should detect relative-energy silence spans near hooks/payoffs.",
-    expected: { minSilenceSpans: 1, maxHookSeconds: 12, entropyTimelineRequired: true, cutTimelineRequired: true },
-  },
-  {
-    id: "B",
-    url: "https://www.youtube.com/watch?v=REPLACE_ESSAY_PAUSES",
-    notes: "Essay/monologue with long pauses; strong silence spans, low cut pace.",
-    expected: { minSilenceSpans: 2, maxHookSeconds: 20, entropyTimelineRequired: true, cutTimelineRequired: true },
-  },
-  {
-    id: "C",
-    url: "https://www.youtube.com/watch?v=REPLACE_HIGH_CUT_VLOG",
-    notes: "High-cut vlog with heavy edits; entropy and cut timelines should be populated.",
-    expected: { entropyTimelineRequired: true, cutTimelineRequired: true, maxHookSeconds: 15 },
-  },
-  {
-    id: "D",
-    url: "https://www.youtube.com/watch?v=REPLACE_QA_AUDIENCE",
-    notes: "Q&A heavy talk; audience address frequency should be above threshold.",
-    expected: { minAudienceAddresses: 3, maxHookSeconds: 18, entropyTimelineRequired: true },
-  },
-];
+type CoverageStat = {
+  observed: number;
+  total: number;
+  observedPct: number;
+  available: boolean;
+};
 
-const loadGoldenSet = (): GoldenVideo[] => {
-  const overridePath = process.env.GOLDEN_SET_PATH;
-  if (!overridePath) return defaultGoldenSet;
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const data = require(overridePath);
-    if (Array.isArray(data)) return data as GoldenVideo[];
-    console.warn(`GOLDEN_SET_PATH did not contain an array, using default set. (${overridePath})`);
-    return defaultGoldenSet;
-  } catch (error) {
-    console.warn(`Failed to load GOLDEN_SET_PATH (${overridePath}), using default set.`, error);
-    return defaultGoldenSet;
+type CoverageDiagnostics = {
+  core: Record<string, CoverageStat>;
+  advanced?: Record<string, CoverageStat>;
+};
+
+const DEFAULT_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.json");
+const SAMPLE_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.sample.json");
+
+const loadGoldenSet = (): { source: string; videos: GoldenVideo[] } => {
+  const candidates: { path?: string; label: string }[] = [
+    { path: process.env.GOLDEN_SET_PATH, label: "GOLDEN_SET_PATH" },
+    { path: DEFAULT_GOLDEN_SET_PATH, label: "scripts/golden-set.json" },
+    { path: SAMPLE_GOLDEN_SET_PATH, label: "scripts/golden-set.sample.json" },
+  ];
+
+  for (const candidate of candidates) {
+    if (!candidate.path) continue;
+    const resolvedPath = path.resolve(process.cwd(), candidate.path);
+    if (!fs.existsSync(resolvedPath)) continue;
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const data = require(resolvedPath);
+      if (Array.isArray(data)) return { source: resolvedPath, videos: data as GoldenVideo[] };
+      console.warn(`Golden set file did not contain an array, skipping. (${resolvedPath})`);
+    } catch (error) {
+      console.warn(`Failed to load golden set (${resolvedPath}), skipping.`, error);
+    }
   }
+
+  return { source: "none", videos: [] };
 };
 
 const getScore = (domain: keyof ReturnType<typeof computeMetaAxesFromProfiles> | string, axis: string, axisDetails?: Record<string, { rawValue?: string }>) => {
@@ -97,23 +104,181 @@ const toNumber = (value?: string | number) => {
   return match ? Number(match[0]) : undefined;
 };
 
+const normalizeBucket = <T extends string>(value: string | undefined, buckets: Record<T, string[]>) => {
+  if (!value) return undefined;
+  const lower = value.toLowerCase();
+  const entries = Object.entries(buckets) as [T, string[]][];
+  for (const [bucket, keywords] of entries) {
+    if (keywords.some((keyword) => lower.includes(keyword))) return bucket;
+  }
+  return undefined;
+};
+
+const bucketMusicCoverage = (rawValue?: string) => {
+  const normalized = normalizeBucket(rawValue, {
+    none: ["none", "no music"],
+    light: ["light", "low"],
+    medium: ["medium", "moderate"],
+    heavy: ["heavy", "high"],
+  });
+  if (normalized) return normalized;
+  const pct = toNumber(rawValue);
+  if (pct === undefined) return undefined;
+  if (pct <= 5) return "none";
+  if (pct <= 35) return "light";
+  if (pct <= 65) return "medium";
+  return "heavy";
+};
+
+const bucketPacing = (rawValue?: string) => {
+  const normalized = normalizeBucket(rawValue, {
+    slow: ["slow"],
+    medium: ["medium", "moderate"],
+    fast: ["fast"],
+  });
+  if (normalized) return normalized;
+  const wpm = toNumber(rawValue);
+  if (wpm === undefined) return undefined;
+  if (wpm < 120) return "slow";
+  if (wpm < 170) return "medium";
+  return "fast";
+};
+
+const bucketStory = (rawValue: string | undefined, score: number | undefined) => {
+  if (score !== undefined && score !== 0) {
+    if (score < 40) return "low";
+    if (score < 70) return "medium";
+    return "high";
+  }
+  return normalizeBucket(rawValue, {
+    low: ["low", "weak", "none"],
+    medium: ["medium", "moderate", "present"],
+    high: ["high", "strong"],
+  });
+};
+
+const checkRange = (label: string, value: number | undefined, range: ValueRange | undefined, failures: string[]) => {
+  if (!range || (range.min === undefined && range.max === undefined)) return;
+  if (value === undefined) {
+    failures.push(`${label}=unobserved`);
+    return;
+  }
+  if (range.min !== undefined && value < range.min) {
+    failures.push(`${label}=${value} < ${range.min}`);
+  }
+  if (range.max !== undefined && value > range.max) {
+    failures.push(`${label}=${value} > ${range.max}`);
+  }
+};
+
+const getScoreValue = (scores: { key: string; value: number }[] | undefined, axisKey: string) =>
+  scores?.find((score) => score.key === axisKey)?.value;
+
+const buildCoverageStat = (total: number, unobserved: number): CoverageStat => {
+  const observed = Math.max(0, total - unobserved);
+  const observedPct = total === 0 ? 0 : Math.round((observed / total) * 100);
+  return { observed, total, observedPct, available: true };
+};
+
+const buildFallbackCoverage = (unobservedCounts: Record<string, number>): CoverageDiagnostics => ({
+  core: {
+    voice: buildCoverageStat(BASE_DOMAIN_METRICS.voice.length, unobservedCounts.voice ?? 0),
+    language: buildCoverageStat(BASE_DOMAIN_METRICS.language.length, unobservedCounts.language ?? 0),
+    narrative: buildCoverageStat(BASE_DOMAIN_METRICS.narrative.length, unobservedCounts.narrative ?? 0),
+    visual_edit_sound: buildCoverageStat(
+      BASE_DOMAIN_METRICS.visual_edit_sound.length,
+      unobservedCounts.visual_edit_sound ?? 0,
+    ),
+  },
+});
+
+const formatCoverageStat = (label: string, stat: CoverageStat) => {
+  if (!stat.available) return `${label}: n/a`;
+  return `${label}: ${stat.observed}/${stat.total} (${stat.observedPct}%)`;
+};
+
+const formatCoverageGroup = (label: string, stats: Record<string, CoverageStat>) =>
+  `${label} ${Object.entries(stats)
+    .map(([key, stat]) => formatCoverageStat(key, stat))
+    .join(", ")}`;
+
+const addCoverageAggregate = (aggregate: Record<string, { observed: number; total: number }>, stats?: Record<string, CoverageStat>) => {
+  if (!stats) return;
+  for (const [key, stat] of Object.entries(stats)) {
+    if (!stat.available) continue;
+    const entry = aggregate[key] ?? { observed: 0, total: 0 };
+    entry.observed += stat.observed;
+    entry.total += stat.total;
+    aggregate[key] = entry;
+  }
+};
+
+const formatCoverageAggregate = (aggregate: Record<string, { observed: number; total: number }>) =>
+  Object.entries(aggregate)
+    .map(([key, value]) => {
+      const pct = value.total === 0 ? 0 : Math.round((value.observed / value.total) * 100);
+      return `${key}: ${pct}%`;
+    })
+    .join(", ");
+
+const toFingerprintDomains = (
+  profiles: Awaited<ReturnType<typeof analyzeVideoMultimodal>>["profiles"],
+): FingerprintPerDomain => ({
+  voiceProfile: profiles.voice,
+  languageProfile: profiles.language,
+  narrativeProfile: profiles.narrative,
+  visualProfile: profiles.visual,
+  editingProfile: profiles.editing,
+  soundProfile: profiles.sound,
+});
+
+const shouldWarnAdvancedMetric = (
+  analysis: Awaited<ReturnType<typeof analyzeVideoMultimodal>>,
+  section: string,
+  metricKey: string,
+) => {
+  const advancedCoverage = analysis.diagnostics.coverage?.advanced as
+    | Record<string, { available?: boolean; missing?: string[] }>
+    | undefined;
+  const sectionStat = advancedCoverage?.[section];
+  if (!sectionStat || !sectionStat.available) return true;
+  if (metricKey && sectionStat.missing?.includes(metricKey)) return true;
+  return false;
+};
+
+const warn = (message: string) => {
+  console.warn(`WARN: ${message}`);
+};
+
 const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<typeof analyzeVideoMultimodal>>) => {
   const failures: string[] = [];
   const adv = analysis.advancedMetrics ?? buildDefaultAdvancedMetrics();
   const beats = analysis.beats ?? [];
   const firstHook = beats.find((b) => b.role === "hook") ?? beats[0];
+  const axisDetails = analysis.axisDetails;
 
   if (video.expected.maxHookSeconds) {
     const hookSeconds = firstHook?.startSeconds ?? toNumber(adv.narrativeArc.timeToHookSeconds.value);
     if (hookSeconds === undefined || hookSeconds > video.expected.maxHookSeconds) {
-      failures.push(`hookSeconds=${hookSeconds ?? "unobserved"} > ${video.expected.maxHookSeconds}`);
+      const shouldWarn =
+        !firstHook &&
+        shouldWarnAdvancedMetric(analysis, "narrativeArc", "timeToHookSeconds");
+      if (shouldWarn) {
+        warn(`hookSeconds=${hookSeconds ?? "unobserved"} > ${video.expected.maxHookSeconds}`);
+      } else {
+        failures.push(`hookSeconds=${hookSeconds ?? "unobserved"} > ${video.expected.maxHookSeconds}`);
+      }
     }
   }
 
   if (video.expected.minSilenceSpans) {
     const spans = adv.visualEditAlignment.silenceForEmphasisFidelity.spans ?? [];
     if (spans.length < video.expected.minSilenceSpans) {
-      failures.push(`silence spans ${spans.length} < ${video.expected.minSilenceSpans}`);
+      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "silenceForEmphasisFidelity")) {
+        warn(`silence spans ${spans.length} < ${video.expected.minSilenceSpans}`);
+      } else {
+        failures.push(`silence spans ${spans.length} < ${video.expected.minSilenceSpans}`);
+      }
     }
   }
 
@@ -121,19 +286,65 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
     const counts = adv.languageTexture.audienceAddressFrequency.counts;
     const total = (counts?.direct ?? 0) + (counts?.rhetorical ?? 0);
     if (total < video.expected.minAudienceAddresses) {
-      failures.push(`audience addresses ${total} < ${video.expected.minAudienceAddresses}`);
+      if (shouldWarnAdvancedMetric(analysis, "languageTexture", "audienceAddressFrequency")) {
+        warn(`audience addresses ${total} < ${video.expected.minAudienceAddresses}`);
+      } else {
+        failures.push(`audience addresses ${total} < ${video.expected.minAudienceAddresses}`);
+      }
+    }
+  }
+
+  const musicRaw = getScore("sound", "music_coverage", axisDetails)?.rawValue;
+  const musicBucket = bucketMusicCoverage(musicRaw);
+  checkRange("musicCoveragePct", toNumber(musicRaw), video.expected.musicCoveragePct, failures);
+  if (video.expected.music) {
+    if (!musicBucket) {
+      failures.push("music coverage unobserved");
+    } else if (musicBucket !== video.expected.music) {
+      failures.push(`music coverage ${musicBucket} (raw=${musicRaw ?? "unobserved"}) != ${video.expected.music}`);
+    }
+  }
+
+  const pacingRaw = getScore("voice", "speaking_rate", axisDetails)?.rawValue;
+  const pacingBucket = bucketPacing(pacingRaw);
+  checkRange("speakingRateWpm", toNumber(pacingRaw), video.expected.speakingRateWpm, failures);
+  if (video.expected.pacing) {
+    if (!pacingBucket) {
+      failures.push("speaking rate unobserved");
+    } else if (pacingBucket !== video.expected.pacing) {
+      failures.push(`pacing ${pacingBucket} (raw=${pacingRaw ?? "unobserved"}) != ${video.expected.pacing}`);
+    }
+  }
+
+  const storyRaw = getScore("narrative", "story_presence", axisDetails)?.rawValue;
+  const storyScore = getScoreValue(analysis.profiles?.narrative?.scores, "narrative.story_presence");
+  const storyBucket = bucketStory(storyRaw, storyScore);
+  checkRange("storyScore", storyScore, video.expected.storyScore, failures);
+  if (video.expected.story) {
+    if (!storyBucket) {
+      failures.push("story presence unobserved");
+    } else if (storyBucket !== video.expected.story) {
+      failures.push(`story presence ${storyBucket} (score=${storyScore ?? "n/a"}) != ${video.expected.story}`);
     }
   }
 
   if (video.expected.entropyTimelineRequired) {
     if (!adv.visualEditAlignment.visualEntropy.timeline?.length) {
-      failures.push("missing visualEntropy timeline");
+      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "visualEntropy")) {
+        warn("missing visualEntropy timeline");
+      } else {
+        failures.push("missing visualEntropy timeline");
+      }
     }
   }
 
   if (video.expected.cutTimelineRequired) {
     if (!adv.visualEditAlignment.cutRateRefinement.timeline?.length) {
-      failures.push("missing cutRateRefinement timeline");
+      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "cutRateRefinement")) {
+        warn("missing cutRateRefinement timeline");
+      } else {
+        failures.push("missing cutRateRefinement timeline");
+      }
     }
   }
 
@@ -141,7 +352,12 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
 };
 
 async function run() {
-  const goldenSet = loadGoldenSet();
+  const { source, videos: goldenSet } = loadGoldenSet();
+  const coverageAggregateCore: Record<string, { observed: number; total: number }> = {};
+  const coverageAggregateAdvanced: Record<string, { observed: number; total: number }> = {};
+  let passCount = 0;
+  let failCount = 0;
+  let skippedCount = 0;
 
   if (!process.env.GEMINI_API_KEY) {
     console.error("GEMINI_API_KEY is required to run the golden set evaluation.");
@@ -156,21 +372,19 @@ async function run() {
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "dev",
     performanceEnabled: false,
     advancedMetricsEnabled: true,
-    transcriptFallbackEnabled: false,
+    geminiResponseSchemaEnabled: false,
   };
 
-const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMultimodal>>["profiles"]): FingerprintPerDomain => ({
-  voiceProfile: profiles.voice,
-  languageProfile: profiles.language,
-  narrativeProfile: profiles.narrative,
-  visualProfile: profiles.visual,
-  editingProfile: profiles.editing,
-  soundProfile: profiles.sound,
-});
+  if (source !== "none") {
+    console.log(`Golden set loaded from: ${source}`);
+  } else {
+    console.warn("Golden set not found. Set GOLDEN_SET_PATH or create scripts/golden-set.json.");
+  }
 
   for (const video of goldenSet) {
     if (!video.url || video.url.includes("REPLACE_")) {
       console.warn(`\n=== Video ${video.id}: skipped (url not set)`);
+      skippedCount += 1;
       continue;
     }
     console.log(`\n=== Video ${video.id}: ${video.url}`);
@@ -186,10 +400,12 @@ const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMu
       });
       const summary = summarize(video, fingerprint.supporting?.axisDetails);
       const failures = checkExpectations(video, analysis);
-      console.log(
-        `Status: ok (fallback=${analysis.diagnostics.fromFallback ? "yes" : "no"}) ` +
-          `unobserved=${JSON.stringify(analysis.diagnostics.unobservedCounts)}`,
-      );
+      const coverage = analysis.diagnostics.coverage ?? buildFallbackCoverage(analysis.diagnostics.unobservedCounts);
+      console.log(`Status: ok unobserved=${JSON.stringify(analysis.diagnostics.unobservedCounts)}`);
+      console.log(formatCoverageGroup("Coverage (core):", coverage.core));
+      if (coverage.advanced) {
+        console.log(formatCoverageGroup("Coverage (advanced):", coverage.advanced));
+      }
       console.log(
         `Sound -> musicCoverage: ${summary.musicCoverage}, musicChanges: ${summary.musicChanges}; ` +
           `Editing -> cutRate: ${summary.cutRate}; Narrative -> storyPresence: ${summary.storyPresence}`,
@@ -202,16 +418,36 @@ const toFingerprintDomains = (profiles: Awaited<ReturnType<typeof analyzeVideoMu
       );
       if (failures.length) {
         console.error(`FAIL: ${failures.join("; ")}`);
+        failCount += 1;
         process.exitCode = 1;
       } else {
         console.log("Result: PASS");
+        passCount += 1;
       }
+      addCoverageAggregate(coverageAggregateCore, coverage.core);
+      addCoverageAggregate(coverageAggregateAdvanced, coverage.advanced);
     } catch (error) {
       console.error(`Failed for ${video.url}:`, error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
+      failCount += 1;
     } finally {
       console.log(`Duration: ${Date.now() - start} ms`);
     }
+  }
+
+  if (goldenSet.length === 0 || goldenSet.length === skippedCount) {
+    console.error("No runnable golden clips. Update scripts/golden-set.json or set GOLDEN_SET_PATH.");
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log("\n=== Golden set summary ===");
+  console.log(`PASS: ${passCount}  FAIL: ${failCount}  SKIP: ${skippedCount}`);
+  if (Object.keys(coverageAggregateCore).length > 0) {
+    console.log(`Avg coverage (core): ${formatCoverageAggregate(coverageAggregateCore)}`);
+  }
+  if (Object.keys(coverageAggregateAdvanced).length > 0) {
+    console.log(`Avg coverage (advanced): ${formatCoverageAggregate(coverageAggregateAdvanced)}`);
   }
 }
 

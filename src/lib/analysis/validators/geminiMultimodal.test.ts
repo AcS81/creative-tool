@@ -163,4 +163,15 @@ describe("GeminiMultimodalResponseSchema", () => {
     delete response.advanced_metrics;
     expect(() => parseGeminiMultimodalJson(response)).not.toThrow();
   });
+
+  it("coerces shorthand metrics and device timestamps", () => {
+    const response: any = buildResponse();
+    response.voice.speaking_rate = "160 wpm";
+    response.narrative.devices = [{ type: "callback", timestamp: "10s" }];
+
+    const parsed = parseGeminiMultimodalJson(response);
+    expect(parsed.voice.speaking_rate.value).toBe("160 wpm");
+    expect(parsed.voice.speaking_rate.score).toBe(0);
+    expect(parsed.narrative.devices?.[0]?.timestamp).toBe(10);
+  });
 });

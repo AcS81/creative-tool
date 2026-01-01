@@ -8,7 +8,7 @@
 - **Created**: 7 Dec 2025  
 - **Status**: Ready for AI-Driven Implementation  
 
-> **Scope of this iteration**: Implement the new **multimodal Gemini pipeline** (YouTube URL via `file_data` + unified JSON schema) and wire it into the existing analysis architecture behind a feature flag. This iteration delivers a **working, testable end-to-end path** from YouTube URL → Gemini multimodal call → validated JSON → updated fingerprint, with a minimal developer-facing UI for verification. Further UX polish, archetype UX, and performance overlays will land in later iterations.
+> **Scope of this iteration**: Implement the new **multimodal Gemini pipeline** (YouTube URL ingestion + unified JSON schema) and wire it into the existing analysis architecture behind a feature flag. This iteration delivers a **working, testable end-to-end path** from YouTube URL → Gemini multimodal call → validated JSON → updated fingerprint, with a minimal developer-facing UI for verification. Further UX polish, archetype UX, and performance overlays will land in later iterations.
 
 ---
 
@@ -18,7 +18,7 @@ This document breaks the **Native Multimodal Analysis Plan** and relevant parts 
 
 Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, you will:
 
-- Call Gemini 1.5 Pro multimodally using `file_data` for YouTube URLs with a structured JSON response.
+- Call Gemini 1.5 Pro multimodally using URL ingestion for YouTube URLs with a structured JSON response.
 - Validate and parse the returned JSON into existing domain models and a `VideoFingerprintJson`.
 - Expose a minimal internal UI to trigger the new pipeline and inspect diagnostics.
 
@@ -32,7 +32,7 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
 
 ## Phase 0: Multimodal Core & Entitlement Handling
 
-### Task 0.1: Gemini Multimodal Client Rewrite (`file_data` + Fallback)
+### Task 0.1: Gemini Multimodal Client Rewrite (URL Ingestion)
 
 **Context**
 
@@ -40,25 +40,21 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
 - PRD Section: 5.3 Gemini-based Analysis (FR-5–FR-11) – same domains, new call style.
 - Current State: Existing Gemini client makes **multiple text-only calls** per domain using YouTube URL as plain text (higher hallucination risk).  
 - Goal: Replace with a **single multimodal client** that:
-  - Uses `file_data` with the YouTube URL for native video ingestion.
-  - Detects entitlement/403 and falls back to a temp-upload flow without persisting media.  
+  - Uses URL ingestion with the YouTube URL for native video ingestion.
+  - Surfaces entitlement/403 errors explicitly (no download/upload fallback).  
 
 **Goals**
 
 - [ ] Implement `src/lib/gemini/client.ts` v2 that:
   - [ ] Accepts `{ youtubeUrl, prompt, jsonSchema }`.
   - [ ] Builds a `contents` payload with:
-    - `file_data`: `{ mime_type: "video/mp4", file_uri: youtubeUrl }`
+    - Video input: YouTube URL + `mime_type` (`video/*`) via URL ingestion.
     - `text`: combined system + user instructions.  
   - [ ] Sets `responseMimeType: "application/json"`, `temperature: 0.2`.  
-- [ ] Implement entitlement detection:
-  - [ ] If Gemini rejects `file_data` (403/unsupported) **once**, fall back to a **temp upload path**:
-    - [ ] Stream audio + sparse frames for the URL.
-    - [ ] Upload via a signed URL as a `FilePart`.
-    - [ ] Re-call Gemini with that FilePart.  
-  - [ ] Ensure temp media is deleted immediately after the call completes or fails.
+- [ ] Implement entitlement/error handling:
+  - [ ] If Gemini rejects URL ingestion (403/unsupported), return a clear error with status and message.
 - [ ] Return a structured result type:
-  - [ ] `{ ok: true, fromFallback: boolean, rawJson: unknown }` or `{ ok: false, errorCode, errorMessage }`.
+  - [ ] `{ ok: true, rawJson: unknown }` or `{ ok: false, errorCode, errorMessage }`.
 - [ ] Add **feature flag** support (e.g. `analysis_v2_multimodal`) so consumers can opt into this client.
 
 **Constraints**
@@ -71,21 +67,17 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
 
 **Acceptance Criteria**
 
-- [ ] A call with a valid, publicly reachable YouTube URL succeeds using `file_data` and returns JSON.  
-- [ ] A call where `file_data` is forbidden triggers the fallback path exactly once, then:
-  - [ ] Uses temp upload and returns JSON if successful.
-  - [ ] Marks `fromFallback: true`.  
+- [ ] A call with a valid, publicly reachable YouTube URL succeeds using URL ingestion and returns JSON.  
+- [ ] A call where URL ingestion is forbidden returns a clear error (status + message).  
 - [ ] On any fatal error, the client returns `{ ok: false, errorCode, errorMessage }` without throwing uncaught exceptions.
-- [ ] No temp media files remain on disk or in storage after the request completes (success or error).
 - [ ] Feature flag can disable the new path, restoring the old analysis client behaviour.
 
 **Manual Test**
 
 1. Call the client with a normal public YouTube URL (staging/dev key) and verify:
-   - Response `ok: true`, `fromFallback: false`, `rawJson` present.
-2. Force a `file_data` entitlement failure (e.g., by using a test project without YouTube entitlement or stubbing the response):
-   - Confirm the temp-upload fallback runs once.
-   - Confirm `fromFallback: true` is surfaced to caller.
+   - Response `ok: true`, `rawJson` present.
+2. Force a URL ingestion entitlement failure (e.g., by using a test project without YouTube entitlement or stubbing the response):
+   - Confirm the client returns a clear error (status + message).
 3. Intentionally break the YouTube URL (404 or invalid format):
    - Confirm the client returns `ok: false` with a meaningful `errorCode` (`INVALID_URL` or `UNREACHABLE_VIDEO`).
 4. Inspect logs:
@@ -330,7 +322,7 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
 
 - Plan Section: 2) Architecture (post-process diagnostics), 6.5 Implementation Step 5, 7) Validation Plan.  
 - PRD Section: 5.2 Reliability – partial results + clear flags when domains are missing or low confidence.  
-- Current State: No dedicated UI to inspect raw multimodal outputs, fallback usage, or “unobserved” metrics.
+- Current State: No dedicated UI to inspect raw multimodal outputs or “unobserved” metrics.
 
 **Goals**
 
@@ -338,13 +330,11 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
   - [ ] Accepts a YouTube URL input.
   - [ ] Lets you toggle `analysis_v2_multimodal` flag.
   - [ ] Shows:
-    - Whether the analysis used **primary `file_data`** or **fallback**.
+    - Whether URL ingestion succeeded.
     - High-level timing info (client call duration).
     - Count of `unobserved` metrics per domain.
     - A collapsible JSON view of the validated `GeminiMultimodalResponse` and resulting `VideoFingerprintJson` (redacted of sensitive info).
-- [ ] Ensure diagnostics include a “lower confidence” banner if:
-  - [ ] Fallback path was used, or
-  - [ ] More than a configurable % of metrics are `unobserved`.
+- [ ] Ensure diagnostics include a “lower confidence” banner if more than a configurable % of metrics are `unobserved`.
 - [ ] Reuse axis metadata for human-friendly labels in this view.
 
 **Constraints**
@@ -362,9 +352,9 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
   - [ ] Feature flag toggle.
 - [ ] Running a valid URL:
   - [ ] Triggers the v2 pipeline.
-  - [ ] Renders a summary: used fallback or not, call duration, number of `unobserved` metrics.
+  - [ ] Renders a summary: URL ingestion status, call duration, number of `unobserved` metrics.
   - [ ] Renders collapsible JSON panes for response and fingerprint.
-- [ ] When fallback is used OR `unobserved` metrics exceed threshold:
+- [ ] When `unobserved` metrics exceed threshold:
   - [ ] A “lower confidence” diagnostic message appears.
 - [ ] Page is hidden or guarded in production as per your security policy.
 
@@ -372,12 +362,10 @@ Each task is a **vertical slice**: if you complete Tasks 0.1 → 2.2 in order, y
 
 1. In dev, open `/dev/multimodal`:
    - Enter a valid YouTube URL and run analysis.
-   - Verify the primary `file_data` path is used (no fallback) and metrics counts look sane.
-2. Force fallback (using the same technique as Task 0.1 test):
-   - Confirm the debug view shows `fromFallback: true` and a “lower confidence” message.
-3. Modify the mock response to set many metrics to `unobserved`:
-   - Confirm the “lower confidence” message appears even without fallback.
-4. Try accessing `/dev/multimodal` in a prod-like environment:
+   - Verify URL ingestion succeeds and metrics counts look sane.
+2. Modify the mock response to set many metrics to `unobserved`:
+   - Confirm the “lower confidence” message appears.
+3. Try accessing `/dev/multimodal` in a prod-like environment:
    - Confirm access is blocked or appropriately guarded.
 
 **Task Complete When**
@@ -394,7 +382,7 @@ Use this to confirm Iteration 1 is **done** before moving to Iteration 2 (which 
 
 ### ✅ Phase 0: Multimodal Core
 
-- [ ] Gemini client supports `file_data` + fallback without persisting media.  
+- [ ] Gemini client supports URL ingestion without persisting media.  
 - [ ] `GeminiMultimodalResponseSchema` + validator correctly parse/validate model JSON.
 
 ### ✅ Phase 1: Domain & Fingerprint

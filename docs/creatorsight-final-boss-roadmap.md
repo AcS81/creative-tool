@@ -36,7 +36,7 @@
 ### 1.1 Quality & Coverage
 - **Core coverage**: On the golden set, at least **80%** of *base-domain* metrics are `observed` (not `"unobserved"` and not `score=0`).
 - **Advanced coverage**: On the golden set, at least **60%** of advanced metrics are `observed` *in paid/full mode*, with per-section diagnostics.
-- **No silent emptiness**: If a metric is unobserved, the UI must show “Not observed” and the diagnostics must indicate *why* (capacity, entitlement fallback, safety block, etc.).
+- **No silent emptiness**: If a metric is unobserved, the UI must show “Not observed” and the diagnostics must indicate *why* (capacity, ingestion failure, safety block, etc.).
 
 ### 1.2 Reliability & Performance
 - **Latency budgets (target)**:
@@ -63,7 +63,7 @@
   - `unobservedCounts` for base domains,
   - advanced metrics defaulting + observed detection in `src/lib/analysis/service.ts`.
 - **Dev tools**:
-  - `/dev/multimodal`: `src/app/dev/multimodal/page.tsx` (shows fallback + unobserved counts),
+- `/dev/multimodal`: `src/app/dev/multimodal/page.tsx` (shows coverage + unobserved counts),
   - `scripts/probe-multimodal-ingestion.ts` (ingestion + unobserved summaries),
   - `scripts/run-multimodal-golden.ts` + `docs/multimodal_golden_set.md` (manual regression helper).
 
@@ -75,15 +75,12 @@
 
 ## 3) Key Decisions (Make These Explicit)
 
-### Decision A — Media ingestion fallback when `file_data` fails
-Choose (and document) one:
-- **A1. Require `file_data` entitlement** and fail fast with a clear message if unavailable (simplest; lowest compliance risk; highest product friction).
-- **A2. Text-only fallback** (captions/transcript only) that returns a *partial* fingerprint (voice/language/narrative) and explicitly marks visual/edit/sound metrics as not observed.
-- **A3. Ephemeral media download + temp upload** (most reliable, highest complexity/compliance risk; must be vetted against YouTube terms and internal policies).
-- **A4. User upload fallback** (adds UX complexity; avoids YouTube download but changes product).
+### Decision A — URL-only ingestion (no uploads)
+- Use Gemini URL ingestion only; do not download or upload media.
+- Fail fast with a clear message when URL ingestion is unavailable.
 
-**Decision**: A2 as the “always works” baseline + A1 primary.
-**Notes**: Keep a clear, user-facing error when entitlement is missing; avoid partial confusion.
+**Decision**: URL-only, fail-fast. No upload fallback.
+**Notes**: Keep a clear, user-facing error when ingestion fails; avoid partial confusion.
 
 ### Decision B — Tiering (cost control)
 - **Free**: core pass only (fast, meaningful).
@@ -176,22 +173,18 @@ Choose (and document) one:
 
 ## Phase 2 — Ingestion Reliability (So Videos Actually Get Seen)
 
-### Task 2.1: Preflight entitlement & content-type checks
+### Task 2.1: Preflight URL ingestion checks
 **Goals**
 - [x] Preflight the YouTube URL for:
   - validity,
-  - whether `file_data` path is available,
-  - whether fallback (if chosen) is viable.
+  - Gemini URL ingestion eligibility.
 
 **Acceptance Criteria**
 - [x] No confusing runs where “media wasn’t actually ingested” but the UI blames the model.
 
-### Task 2.2: Implement chosen fallback strategy (Decision A)
-Pick one path and execute it fully with diagnostics:
-- [x] A1 entitlement-required (clear error UX)
-- [x] A2 transcript-only partial analysis
-- [ ] A3 ephemeral media download + temp upload (compliance reviewed)
-- [ ] A4 user upload fallback
+### Task 2.2: Enforce URL-only ingestion (Decision A)
+Execute the chosen path fully with diagnostics:
+- [x] URL-only ingestion with clear failure messaging
 
 **Acceptance Criteria**
 - [x] If multimodal ingestion fails, we still return *something* valuable or a crisp failure message.
@@ -202,29 +195,29 @@ Pick one path and execute it fully with diagnostics:
 
 ### Task 3.1: Expand and formalize the golden set
 **Goals**
-- [ ] Replace `REPLACE_*` placeholders with real canonical clips (private list allowed).
-- [ ] Encode expectations per clip (hook time, music coverage, entropy timeline presence, etc.).
+- [x] Replace `REPLACE_*` placeholders with real canonical clips (private list allowed).
+- [x] Encode expectations per clip (hook time, music coverage, entropy timeline presence, etc.).
 
 **Acceptance Criteria**
-- [ ] Running the golden set produces a clear pass/fail summary with coverage deltas.
+- [x] Running the golden set produces a clear pass/fail summary with coverage deltas.
 
 ### Task 3.2: Add CI-friendly “mocked golden” regressions
 **Goals**
-- [ ] Add tests that validate parsing, merging, and coverage math with mocked Gemini payloads.
+- [x] Add tests that validate parsing, merging, and coverage math with mocked Gemini payloads.
 
 **Acceptance Criteria**
-- [ ] Multi-pass merge logic has unit tests that prevent regressions.
+- [x] Multi-pass merge logic has unit tests that prevent regressions.
 
 ### Task 3.3: Track coverage, latency, and cost per pass
 **Goals**
-- [ ] Capture:
+- [x] Capture:
   - wall time per pass,
   - retries,
   - token usage (if available),
   - estimated cost per run.
 
 **Acceptance Criteria**
-- [ ] We can answer “what did this analysis cost and why” for any run.
+- [x] We can answer “what did this analysis cost and why” for any run.
 
 ---
 
@@ -232,29 +225,29 @@ Pick one path and execute it fully with diagnostics:
 
 ### Task 4.1: Make emptiness impossible to misinterpret
 **Goals**
-- [ ] When metrics are unobserved, show:
+- [x] When metrics are unobserved, show:
   - “Not observed” chips,
-  - a short reason (insufficient signal, ingestion fallback, safety block, etc.),
+  - a short reason (insufficient signal, ingestion failure, safety block, etc.),
   - and a “try again / run advanced” action when relevant.
 
 **Acceptance Criteria**
-- [ ] Users never confuse “unobserved” with “broken,” and they know what to do next.
+- [x] Users never confuse “unobserved” with “broken,” and they know what to do next.
 
 ### Task 4.2: Progressive results & loading states
 **Goals**
-- [ ] If async mode exists, stream core results first and append advanced results.
-- [ ] If sync mode remains, show meaningful progress states.
+- [x] If async mode exists, stream core results first and append advanced results. (N/A until async mode exists)
+- [x] If sync mode remains, show meaningful progress states.
 
 **Acceptance Criteria**
-- [ ] A user sees value quickly even when advanced passes take longer.
+- [x] A user sees value quickly even when advanced passes take longer.
 
 ### Task 4.3: Coaching that never references missing data
 **Goals**
-- [ ] Coaching rules only fire when underlying metrics are observed.
-- [ ] When not observed, show alternate guidance (“capture better audio”, “video too static”, etc.).
+- [x] Coaching rules only fire when underlying metrics are observed.
+- [x] When not observed, show alternate guidance (“capture better audio”, “video too static”, etc.).
 
 **Acceptance Criteria**
-- [ ] No advice bullets derived from placeholder defaults or unobserved metrics.
+- [x] No advice bullets derived from placeholder defaults or unobserved metrics.
 
 ---
 
@@ -322,7 +315,6 @@ These are optional until Phases 0–6 are solid.
 - [ ] **Channel-level profile**: aggregate last N videos into a stable creator fingerprint.
 - [ ] **Export/share**: shareable report links; PDF export for paid tier.
 - [ ] **Experiments**: “Try this next video” A/B suggestions tied to observed weaknesses.
-- [ ] **Uploads**: user-provided video upload for non-YouTube sources or restricted videos.
 - [ ] **Teams**: agencies, shared libraries, multi-seat collaboration.
 
 ---
@@ -333,7 +325,7 @@ These are optional until Phases 0–6 are solid.
 - [ ] Unobserved-heavy runs always explain themselves (UI + diagnostics).
 - [ ] End-to-end flows documented in `docs/iteration_*_e2e.md` and up to date.
 - [ ] Cost and latency budgets measured and within targets.
-- [ ] Clear fallback behavior for ingestion entitlement failures.
+- [ ] Clear behavior for URL ingestion failures.
 - [ ] No schema drift: `validateFingerprint` passes for all new analyses.
 
 ---
@@ -344,3 +336,4 @@ These are optional until Phases 0–6 are solid.
 - `docs/iteration_9_gap_matrix.md` (advanced metric semantics + acceptance thresholds)
 - `docs/multimodal_golden_set.md` (regression runner expectations)
 - `docs/axes_and_domains.md` (glossary; “unobserved” semantics)
+- `docs/gemini_pricing.md` (model pricing + cost estimation)

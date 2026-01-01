@@ -1,7 +1,7 @@
 export type GeminiObservedMetric = {
   score: number; // 0–100 normalized score
-  value: string; // raw measurement or "unobserved"
-  explanation: string; // short description
+  value: string | number | Record<string, unknown>; // raw measurement or "unobserved"
+  explanation?: string; // short description
 };
 
 export type GeminiTimelinePoint = {

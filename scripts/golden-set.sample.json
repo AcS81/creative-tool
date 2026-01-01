@@ -1,0 +1,56 @@
+[
+  {
+    "id": "A",
+    "url": "https://www.youtube.com/watch?v=REPLACE_SPORTS_SHUSH",
+    "notes": "Sports highlight with crowd shush; should detect relative-energy silence spans near hooks/payoffs.",
+    "expected": {
+      "story": "low",
+      "music": "light",
+      "pacing": "fast",
+      "minSilenceSpans": 1,
+      "maxHookSeconds": 12,
+      "entropyTimelineRequired": true,
+      "cutTimelineRequired": true
+    }
+  },
+  {
+    "id": "B",
+    "url": "https://www.youtube.com/watch?v=REPLACE_ESSAY_PAUSES",
+    "notes": "Essay/monologue with long pauses; strong silence spans, low cut pace.",
+    "expected": {
+      "story": "high",
+      "music": "none",
+      "pacing": "slow",
+      "minSilenceSpans": 2,
+      "maxHookSeconds": 20,
+      "entropyTimelineRequired": true,
+      "cutTimelineRequired": true
+    }
+  },
+  {
+    "id": "C",
+    "url": "https://www.youtube.com/watch?v=REPLACE_HIGH_CUT_VLOG",
+    "notes": "High-cut vlog with heavy edits; entropy and cut timelines should be populated.",
+    "expected": {
+      "story": "medium",
+      "music": "medium",
+      "pacing": "fast",
+      "maxHookSeconds": 15,
+      "entropyTimelineRequired": true,
+      "cutTimelineRequired": true
+    }
+  },
+  {
+    "id": "D",
+    "url": "https://www.youtube.com/watch?v=REPLACE_QA_AUDIENCE",
+    "notes": "Q&A heavy talk; audience address frequency should be above threshold.",
+    "expected": {
+      "story": "low",
+      "music": "none",
+      "pacing": "medium",
+      "minAudienceAddresses": 3,
+      "maxHookSeconds": 18,
+      "entropyTimelineRequired": true
+    }
+  }
+]

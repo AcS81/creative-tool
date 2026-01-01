@@ -1,4 +1,5 @@
-import type { VideoFingerprintJson } from "../lib/types";
+import type { AnalyzeVideoResult } from "../lib/analysis/types";
+import type { ScoredMetric, VideoFingerprintJson } from "../lib/types";
 
 const scoreValue = (value?: string | number | null) => {
   if (value === undefined || value === null) return undefined;
@@ -8,24 +9,49 @@ const scoreValue = (value?: string | number | null) => {
   return Number.isFinite(numeric) ? numeric : undefined;
 };
 
-const buildInsight = (label: string, body: string, observed?: boolean) => {
-  if (observed === false) return `${label}: Not observed`;
-  return `${label}: ${body}`;
+const isObservedMetric = (metric?: ScoredMetric) => {
+  if (!metric) return false;
+  if (metric.observed === false) return false;
+  const value = typeof metric.value === "string" ? metric.value.trim().toLowerCase() : "";
+  const hasValue = value !== "" && value !== "unobserved";
+  const hasScore = typeof metric.score === "number" && metric.score > 0;
+  return metric.observed === true || hasValue || hasScore;
 };
 
-export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerprintJson | null }) => {
+const sectionObserved = (section?: Record<string, ScoredMetric>) =>
+  !!section && Object.values(section).some((metric) => isObservedMetric(metric));
+
+const buildInsight = (label: string, body: string) => `${label}: ${body}`;
+
+export const AdvancedCoaching = ({
+  fingerprint,
+  diagnostics,
+}: {
+  fingerprint?: VideoFingerprintJson | null;
+  diagnostics?: AnalyzeVideoResult["diagnostics"];
+}) => {
   if (!fingerprint) return null;
   const secondOrder = fingerprint.secondOrder;
   const visual = fingerprint.visualEditAlignment;
   const language = fingerprint.languageTexture;
   const prosody = fingerprint.prosodyArc;
   const balance = fingerprint.modalityBalance;
+  const narrative = fingerprint.narrativeArc;
+  const load = fingerprint.cognitiveLoad;
+  const advancedDefaulted = diagnostics?.advancedMetricsDefaulted === true;
+  const advancedDefaultReason = diagnostics?.advancedMetricsDefaultReason;
 
-  const alignmentScore = scoreValue(secondOrder.alignmentScore.value);
-  const balanceScore = scoreValue(secondOrder.balanceScore.value);
-  const driftScore = scoreValue(secondOrder.driftScore.value);
-  const decayScore = scoreValue(secondOrder.decayScore.value);
-  const timingScore = scoreValue(secondOrder.timingScore.value);
+  const alignmentObserved = isObservedMetric(secondOrder.alignmentScore);
+  const balanceObserved = isObservedMetric(secondOrder.balanceScore);
+  const driftObserved = isObservedMetric(secondOrder.driftScore);
+  const decayObserved = isObservedMetric(secondOrder.decayScore);
+  const timingObserved = isObservedMetric(secondOrder.timingScore);
+
+  const alignmentScore = alignmentObserved ? scoreValue(secondOrder.alignmentScore.value) : undefined;
+  const balanceScore = balanceObserved ? scoreValue(secondOrder.balanceScore.value) : undefined;
+  const driftScore = driftObserved ? scoreValue(secondOrder.driftScore.value) : undefined;
+  const decayScore = decayObserved ? scoreValue(secondOrder.decayScore.value) : undefined;
+  const timingScore = timingObserved ? scoreValue(secondOrder.timingScore.value) : undefined;
 
   const insights: string[] = [];
 
@@ -36,7 +62,6 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
         alignmentScore > 70
           ? "Audio emphasis, edits, and beats are working together—keep pairing cuts/zooms with stressed phrases."
           : "Tighten alignment: pair stressed phrases with purposeful cuts/zooms and support beats with edits.",
-        secondOrder.alignmentScore.observed,
       ),
     );
   }
@@ -48,7 +73,6 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
         timingScore > 70
           ? "Hooks and silences are landing at effective times; keep using pauses near payoffs."
           : "Improve timing: move the first hook earlier, and place silences near punchlines or beat changes.",
-        secondOrder.timingScore.observed,
       ),
     );
   }
@@ -60,7 +84,6 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
         balanceScore > 70
           ? "Modalities are complementary; continue mixing visuals and voice rather than repeating."
           : "Reduce redundancy: add visuals that add new info and avoid one modality carrying all meaning.",
-        secondOrder.balanceScore.observed,
       ),
     );
   }
@@ -72,7 +95,6 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
         driftScore > 70
           ? "Pace/energy stay steady with cohesive segments."
           : "Curb drift: smooth big cohesion drops and avoid erratic pace swings.",
-        secondOrder.driftScore.observed,
       ),
     );
   }
@@ -84,17 +106,58 @@ export const AdvancedCoaching = ({ fingerprint }: { fingerprint?: VideoFingerpri
         decayScore > 70
           ? "Energy holds through the back half; keep resets to avoid fatigue."
           : "Watch late fatigue: use resets and pauses to prevent pace/energy fade in the back half.",
-        secondOrder.decayScore.observed,
       ),
     );
   }
 
-  if (visual?.visualEntropy.timeline?.length === 0 || visual?.cutRateRefinement.timeline?.length === 0) {
-    insights.push("Visual/edit: Entropy or cut timeline missing—surface diagnostics to explain missing visuals.");
+  const missingSections = {
+    prosody: !sectionObserved(prosody),
+    language: !sectionObserved(language),
+    narrative: !sectionObserved(narrative),
+    visual: !sectionObserved(visual),
+    balance: !sectionObserved(balance),
+    load: !sectionObserved(load),
+  };
+
+  const allMissing = Object.values(missingSections).every(Boolean);
+  const fallbackInsights: string[] = [];
+
+  if (advancedDefaulted) {
+    fallbackInsights.push(
+      advancedDefaultReason
+        ? `Advanced signals not observed; ${advancedDefaultReason}`
+        : "Advanced signals not observed; run advanced analysis to unlock deeper coaching.",
+    );
+  } else {
+    if (allMissing) {
+      fallbackInsights.push("Advanced signals not observed; rerun analysis or try a different clip.");
+    }
+
+    if (missingSections.prosody) {
+      fallbackInsights.push("Audio signal not observed; record with a closer mic and reduce background music.");
+    }
+
+    if (missingSections.visual) {
+      fallbackInsights.push("Visual signal not observed; improve lighting and include clear motion or edits.");
+    }
+
+    if (missingSections.language) {
+      fallbackInsights.push("Speech signal not observed; speak clearly and avoid heavy music over narration.");
+    }
+
+    if (missingSections.narrative) {
+      fallbackInsights.push("Narrative beats not observed; add explicit hooks and transitions in the script.");
+    }
+
+    if (!missingSections.language && language?.audienceAddressFrequency.observed === false) {
+      fallbackInsights.push("Audience address: Not observed; add direct you/we phrasing for engagement.");
+    }
   }
 
-  if (language?.audienceAddressFrequency.observed === false) {
-    insights.push("Audience address: Not observed; add direct/you-we phrasing for engagement.");
+  if (fallbackInsights.length > 0) {
+    const maxFallbacks = insights.length === 0 ? 4 : 2;
+    const uniqueFallbacks = Array.from(new Set(fallbackInsights));
+    insights.push(...uniqueFallbacks.slice(0, maxFallbacks));
   }
 
   if (insights.length === 0) {

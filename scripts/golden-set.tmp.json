@@ -1,0 +1,14 @@
+[
+  {
+    "id": "C",
+    "url": "https://www.youtube.com/watch?v=7gtc1DW2Tgo&t=426s",
+    "notes": "MKBHD fast-cut segment with frequent edits; cut/entropy timelines should populate.",
+    "expected": {
+      "pacing": "fast",
+      "music": "medium",
+      "maxHookSeconds": 15,
+      "entropyTimelineRequired": true,
+      "cutTimelineRequired": true
+    }
+  }
+]

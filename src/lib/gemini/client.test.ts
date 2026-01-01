@@ -90,11 +90,12 @@ describe("callGeminiMultimodalJson", () => {
     performanceEnabled: false,
     analysisV2MultimodalEnabled: true,
     advancedMetricsEnabled: true,
-    transcriptFallbackEnabled: false,
   };
 
-  const sampleCandidate = (data: unknown) =>
-    samplePayload(JSON.stringify(data ?? { ok: true, marker: "yes" }));
+  const sampleCandidate = (data: unknown, usageMetadata?: Record<string, unknown>) => ({
+    ...samplePayload(JSON.stringify(data ?? { ok: true, marker: "yes" })),
+    ...(usageMetadata ? { usageMetadata } : {}),
+  });
 
   afterEach(() => {
     vi.restoreAllMocks();
@@ -143,87 +144,32 @@ describe("callGeminiMultimodalJson", () => {
 
     expect(result).toMatchObject({
       ok: true,
-      fromFallback: false,
       status: 200,
     });
     expect((result as GeminiMultimodalResult & { rawJson: any }).rawJson.hello).toBe("world");
   });
 
-  it("returns success via fallback when file_data rejected", async () => {
-    let call = 0;
+  it("records usage and estimated cost when usage metadata is present", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async (...args: any[]) => {
-        call += 1;
-        if (call === 1) {
-          // primary Gemini call rejected
-          return {
-            ok: false,
-            status: 403,
-            json: async () => ({ error: { message: "file_data not allowed" } }),
-          } as Response;
-        }
-        if (call === 2) {
-          // fallback download sample
-          return {
-            ok: true,
-            status: 200,
-            arrayBuffer: async () => Buffer.from([1, 2, 3]),
-          } as Response;
-        }
-        // fallback Gemini call success
-        return {
-          ok: true,
-          status: 200,
-          json: async () => sampleCandidate({ via: "fallback" }),
-        } as Response;
-      }) as unknown as typeof fetch,
+      mockFetch(
+        200,
+        sampleCandidate({ hello: "world" }, { promptTokenCount: 1000, candidatesTokenCount: 500 }),
+      ) as unknown as typeof fetch,
     );
 
     const result = await callGeminiMultimodalJson({
       youtubeUrl: "https://youtu.be/abc",
       prompt: "test",
       config: baseConfig,
-      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
+      model: "gemini-2.5-flash",
     });
 
-    expect(result).toMatchObject({
-      ok: true,
-      fromFallback: true,
-      status: 200,
-    });
-    expect((result as GeminiMultimodalResult & { rawJson: any }).rawJson.via).toBe("fallback");
-  });
-
-  it("returns fallback error when download fails", async () => {
-    let call = 0;
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => {
-        call += 1;
-        if (call === 1) {
-          return {
-            ok: false,
-            status: 403,
-            json: async () => ({ error: { message: "file_data not allowed" } }),
-          } as Response;
-        }
-        return {
-          ok: false,
-          status: 404,
-          arrayBuffer: async () => Buffer.from([]),
-        } as Response;
-      }) as unknown as typeof fetch,
-    );
-
-    const result = await callGeminiMultimodalJson({
-      youtubeUrl: "https://youtu.be/abc",
-      prompt: "test",
-      config: baseConfig,
-      logger: { warn: vi.fn(), error: vi.fn(), info: vi.fn() },
-    });
-
-    expect(result).toMatchObject({ ok: false, errorCode: "FALLBACK_FAILED" });
+    expect(result.ok).toBe(true);
+    const metrics = (result as GeminiMultimodalResult & { metrics?: any }).metrics;
+    expect(metrics?.usage?.promptTokens).toBe(1000);
+    expect(metrics?.usage?.candidateTokens).toBe(500);
+    expect(metrics?.estimatedCostUsd).toBeCloseTo(0.00155, 6);
   });
 
   it("returns invalid response when JSON cannot be parsed", async () => {
