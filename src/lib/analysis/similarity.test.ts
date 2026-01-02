@@ -50,10 +50,13 @@ describe("similarity helpers", () => {
   it("lightly weights second-order alignment when available", () => {
     const base = fp(60, "base");
     base.secondOrder.alignmentScore.score = 80;
+    base.secondOrder.alignmentScore.observed = true;
     const aligned = fp(60, "aligned");
     aligned.secondOrder.alignmentScore.score = 90;
+    aligned.secondOrder.alignmentScore.observed = true;
     const misaligned = fp(60, "misaligned");
     misaligned.secondOrder.alignmentScore.score = 10;
+    misaligned.secondOrder.alignmentScore.observed = true;
 
     const nearest = findNearestReferences(base, [
       { creatorId: "aligned", displayName: "Aligned Ref", fingerprint: aligned },

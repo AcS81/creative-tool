@@ -44,8 +44,32 @@ export interface AnalyzeVideoResult {
       sections?: string[];
       reason?: string;
     };
+    advancedParse?: {
+      audioText?: {
+        strictError?: string;
+        lenientError?: string;
+        keys?: string[];
+        preview?: string;
+      };
+      visualCross?: {
+        strictError?: string;
+        lenientError?: string;
+        keys?: string[];
+        preview?: string;
+      };
+      salvage?: Record<
+        string,
+        {
+          strictError?: string;
+          lenientError?: string;
+          keys?: string[];
+          preview?: string;
+        }
+      >;
+    };
     passMetrics?: {
       core?: GeminiRequestMetrics;
+      coreRetry?: GeminiRequestMetrics;
       advancedAudioText?: GeminiRequestMetrics;
       advancedVisualCross?: GeminiRequestMetrics;
       salvage?: Record<string, GeminiRequestMetrics>;

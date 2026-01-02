@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { isValidYouTubeUrl } from "../lib/youtube";
 import type { DomainProfile, VideoFingerprintJson } from "../lib/types";
 import type { AnalyzeVideoResult } from "../lib/analysis/types";
@@ -27,11 +27,14 @@ import { ObservationStatus } from "../components/ObservationStatus";
 import { AnalysisLoadingState } from "../components/AnalysisLoadingState";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
+type AnalyzeJobStatus = "pending" | "running" | "complete" | "failed";
+
 type AnalyzeResponse = {
   videoAnalysisId: string;
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
   nearestReferences: NearestReference[];
+  status?: AnalyzeJobStatus;
   nicheAverageMetaAxes?: VideoFingerprintJson["metaAxes"] | null;
   insights?: string[];
   insightDetails?: {
@@ -55,6 +58,13 @@ type AnalyzeResponse = {
     durationSeconds?: number;
     thumbnailUrl?: string;
   };
+  diagnostics?: AnalyzeVideoResult["diagnostics"];
+};
+
+type AnalyzeJobResponse = {
+  videoAnalysisId: string;
+  status: AnalyzeJobStatus;
+  failureReason?: string;
   diagnostics?: AnalyzeVideoResult["diagnostics"];
 };
 
@@ -197,6 +207,7 @@ function HomeContent() {
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [lastSubmittedUrl, setLastSubmittedUrl] = useState<string | null>(null);
   const [lastPassMode, setLastPassMode] = useState<"core" | "full" | undefined>(undefined);
+  const activeJobRef = useRef<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
@@ -315,6 +326,7 @@ function HomeContent() {
     setLoading(false);
     setLastSubmittedUrl(null);
     setLastPassMode(undefined);
+    activeJobRef.current = null;
     setResult({
       videoAnalysisId: "sample-analysis",
       fingerprint: {
@@ -342,6 +354,67 @@ function HomeContent() {
     });
   };
 
+  const refreshHistory = useCallback(async () => {
+    try {
+      const historyRes = await fetch("/api/history");
+      if (historyRes.ok) {
+        const historyBody = (await historyRes.json()) as { items: RecentAnalysisSummary[] };
+        setRecentAnalyses(historyBody.items ?? []);
+      }
+    } catch {
+      // Ignore history refresh errors; main analysis already succeeded.
+    }
+  }, []);
+
+  const pollAnalysisJob = useCallback(async (jobId: string) => {
+    activeJobRef.current = jobId;
+    const startedAt = Date.now();
+    const timeoutMs = 180000;
+
+    while (activeJobRef.current === jobId) {
+      try {
+        const res = await fetch(`/api/analyze/${jobId}`);
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          setError(body?.message ?? "Could not fetch analysis status. Please try again.");
+          setLoading(false);
+          activeJobRef.current = null;
+          return;
+        }
+
+        const body = (await res.json()) as AnalyzeResponse | AnalyzeJobResponse;
+        if ("fingerprint" in body && body.fingerprint) {
+          setResult(body as AnalyzeResponse);
+          void refreshHistory();
+          setLoading(false);
+          activeJobRef.current = null;
+          return;
+        }
+
+        if ("status" in body && body.status === "failed") {
+          setError(body.failureReason ?? "Analysis failed. Please try again.");
+          setLoading(false);
+          activeJobRef.current = null;
+          return;
+        }
+      } catch {
+        setError("Could not fetch analysis status. Please try again.");
+        setLoading(false);
+        activeJobRef.current = null;
+        return;
+      }
+
+      if (Date.now() - startedAt > timeoutMs) {
+        setError("Analysis is taking longer than expected. Please check back soon.");
+        setLoading(false);
+        activeJobRef.current = null;
+        return;
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }, [refreshHistory]);
+
   const runAnalysis = async (targetUrl: string, passMode?: "core" | "full") => {
     setError(null);
     setResult(null);
@@ -351,6 +424,8 @@ function HomeContent() {
       setError("Please enter a valid YouTube URL.");
       return;
     }
+
+    activeJobRef.current = null;
 
     try {
       setLoading(true);
@@ -370,24 +445,33 @@ function HomeContent() {
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         setError(body?.message ?? "Could not analyze this URL. Please try again.");
+        setLoading(false);
         return;
       }
 
-      const body = (await res.json()) as AnalyzeResponse;
-      setResult(body);
-      // Refresh recent analyses to include the new result.
-      try {
-        const historyRes = await fetch("/api/history");
-        if (historyRes.ok) {
-          const historyBody = (await historyRes.json()) as { items: RecentAnalysisSummary[] };
-          setRecentAnalyses(historyBody.items ?? []);
-        }
-      } catch {
-        // Ignore history refresh errors; main analysis already succeeded.
+      const body = (await res.json()) as AnalyzeResponse | AnalyzeJobResponse;
+      if ("fingerprint" in body && body.fingerprint) {
+        setResult(body as AnalyzeResponse);
+        void refreshHistory();
+        setLoading(false);
+        return;
       }
+
+      if ("status" in body && body.status === "failed") {
+        setError(body.failureReason ?? "Analysis failed. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      if (!("videoAnalysisId" in body)) {
+        setError("Could not analyze this URL. Please try again.");
+        setLoading(false);
+        return;
+      }
+
+      void pollAnalysisJob(body.videoAnalysisId);
     } catch {
       setError("Could not analyze this URL. Please try again.");
-    } finally {
       setLoading(false);
     }
   };
@@ -443,6 +527,7 @@ function HomeContent() {
   };
 
   const handleLoadHistoryAnalysis = async (id: string) => {
+    activeJobRef.current = null;
     setLoading(true);
     setError(null);
     setActiveTab("overview");

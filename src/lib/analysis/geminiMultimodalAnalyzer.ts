@@ -21,7 +21,12 @@ import type {
   GeminiObservedMetric,
   GeminiRichMetric,
 } from "./types/multimodal";
-import { parseGeminiAdvancedMetricsJson, parseGeminiMultimodalJson } from "./validators/geminiMultimodal";
+import {
+  InvalidGeminiResponseError,
+  parseGeminiAdvancedMetricsJson,
+  parseGeminiAdvancedMetricsJsonLenient,
+  parseGeminiMultimodalJson,
+} from "./validators/geminiMultimodal";
 import type { DomainKey } from "../archetypes/descriptions";
 import { resolveAxisMetadata } from "./axisMetadata";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
@@ -51,6 +56,7 @@ export type MultimodalAnalysisResult = {
     unobservedCounts: Record<string, number>;
     coverage?: CoverageDiagnostics;
     salvage?: SalvageDiagnostics;
+    advancedParse?: AdvancedParseDiagnosticsByPass;
     rawStatus?: number;
     passMetrics?: PassMetricsDiagnostics;
   };
@@ -66,6 +72,7 @@ type PassMetricsTotals = {
 
 type PassMetricsDiagnostics = {
   core?: GeminiRequestMetrics;
+  coreRetry?: GeminiRequestMetrics;
   advancedAudioText?: GeminiRequestMetrics;
   advancedVisualCross?: GeminiRequestMetrics;
   salvage?: Record<string, GeminiRequestMetrics>;
@@ -102,6 +109,19 @@ type SalvageDiagnostics = {
   attempted: boolean;
   sections?: string[];
   reason?: string;
+};
+
+type AdvancedParseDiagnostics = {
+  strictError?: string;
+  lenientError?: string;
+  keys?: string[];
+  preview?: string;
+};
+
+type AdvancedParseDiagnosticsByPass = {
+  audioText?: AdvancedParseDiagnostics;
+  visualCross?: AdvancedParseDiagnostics;
+  salvage?: Record<string, AdvancedParseDiagnostics>;
 };
 
 const timelinePointSchema = {
@@ -188,12 +208,31 @@ const metricSchema = {
   required: ["score", "value", "explanation"],
 };
 
+const metricSchemaLite = {
+  type: "object",
+  properties: {
+    score: { type: "number" },
+    value: { type: "string" },
+    explanation: { type: "string" },
+  },
+  required: ["score", "value", "explanation"],
+};
+
 const buildMetricProperties = (keys: readonly string[]) =>
   Object.fromEntries(keys.map((key) => [key, metricSchema]));
+
+const buildMetricPropertiesLite = (keys: readonly string[]) =>
+  Object.fromEntries(keys.map((key) => [key, metricSchemaLite]));
 
 const buildMetricObjectSchema = (keys: readonly string[]) => ({
   type: "object",
   properties: buildMetricProperties(keys),
+  required: [...keys],
+});
+
+const buildMetricObjectSchemaLite = (keys: readonly string[]) => ({
+  type: "object",
+  properties: buildMetricPropertiesLite(keys),
   required: [...keys],
 });
 
@@ -218,6 +257,14 @@ const buildAdvancedMetricsJsonSchema = (sections: AdvancedSectionKey[]) => ({
   type: "object",
   properties: Object.fromEntries(
     sections.map((section) => [section, buildMetricObjectSchema(ADVANCED_METRIC_SECTIONS[section])]),
+  ),
+  required: [...sections],
+});
+
+const buildAdvancedMetricsJsonSchemaLite = (sections: AdvancedSectionKey[]) => ({
+  type: "object",
+  properties: Object.fromEntries(
+    sections.map((section) => [section, buildMetricObjectSchemaLite(ADVANCED_METRIC_SECTIONS[section])]),
   ),
   required: [...sections],
 });
@@ -264,6 +311,48 @@ const coreResponseJsonSchema = {
   required: ["voice", "language", "narrative", "visual_edit_sound"],
 };
 
+const coreResponseJsonSchemaLite = {
+  type: "object",
+  properties: {
+    voice: buildMetricObjectSchemaLite(BASE_DOMAIN_METRICS.voice),
+    language: buildMetricObjectSchemaLite(BASE_DOMAIN_METRICS.language),
+    narrative: {
+      type: "object",
+      properties: {
+        beats: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              label: { type: "string" },
+              start: { type: "number" },
+              end: { type: "number" },
+              role: { type: "string" },
+            },
+            required: ["label", "start", "end"],
+          },
+          minItems: 1,
+        },
+        ...buildMetricPropertiesLite(narrativeMetricKeys),
+        devices: {
+          type: "array",
+          items: {
+            type: "object",
+            properties: {
+              type: { type: "string" },
+              timestamp: { type: "number" },
+            },
+            required: ["type", "timestamp"],
+          },
+        },
+      },
+      required: ["beats", ...narrativeMetricKeys],
+    },
+    visual_edit_sound: buildMetricObjectSchemaLite(BASE_DOMAIN_METRICS.visual_edit_sound),
+  },
+  required: ["voice", "language", "narrative", "visual_edit_sound"],
+};
+
 const advancedAudioTextResponseJsonSchema = {
   type: "object",
   properties: {
@@ -272,10 +361,26 @@ const advancedAudioTextResponseJsonSchema = {
   required: ["advanced_metrics"],
 };
 
+const advancedAudioTextResponseJsonSchemaLite = {
+  type: "object",
+  properties: {
+    advanced_metrics: buildAdvancedMetricsJsonSchemaLite(ADVANCED_AUDIO_TEXT_SECTIONS),
+  },
+  required: ["advanced_metrics"],
+};
+
 const advancedVisualCrossResponseJsonSchema = {
   type: "object",
   properties: {
     advanced_metrics: buildAdvancedMetricsJsonSchema(ADVANCED_VISUAL_CROSS_SECTIONS),
+  },
+  required: ["advanced_metrics"],
+};
+
+const advancedVisualCrossResponseJsonSchemaLite = {
+  type: "object",
+  properties: {
+    advanced_metrics: buildAdvancedMetricsJsonSchemaLite(ADVANCED_VISUAL_CROSS_SECTIONS),
   },
   required: ["advanced_metrics"],
 };
@@ -305,6 +410,8 @@ const ADVANCED_SECTION_LINES: Record<AdvancedSectionKey, string> = {
 
 const COMMON_ADVANCED_RULES = [
   "- Provide timelines/spans/items for the metrics noted above; keep arrays non-empty when observable.",
+  "- Top-level JSON must be {\"advanced_metrics\": {...}} with no other keys.",
+  "- For videos >6 min, use 10-20s windows and cap each timeline to <=120 points; >15 min use 30s windows and cap to <=80 points.",
   "- JSON only; no prose.",
   "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ];
@@ -828,6 +935,14 @@ type AdvancedPassOutcome = {
   metrics?: GeminiAdvancedMetricsPartial;
   status?: number;
   passMetrics?: GeminiRequestMetrics;
+  parseDiagnostics?: AdvancedParseDiagnostics;
+};
+
+type CorePassOutcome = {
+  parsed: GeminiMultimodalResponse;
+  status?: number;
+  passMetrics?: GeminiRequestMetrics;
+  retryMetrics?: GeminiRequestMetrics;
 };
 
 const addUsageTotals = (acc: GeminiUsage, usage?: GeminiUsage) => {
@@ -841,6 +956,7 @@ const addUsageTotals = (acc: GeminiUsage, usage?: GeminiUsage) => {
 const buildPassTotals = (metrics: PassMetricsDiagnostics): PassMetricsTotals | undefined => {
   const allMetrics: GeminiRequestMetrics[] = [];
   if (metrics.core) allMetrics.push(metrics.core);
+  if (metrics.coreRetry) allMetrics.push(metrics.coreRetry);
   if (metrics.advancedAudioText) allMetrics.push(metrics.advancedAudioText);
   if (metrics.advancedVisualCross) allMetrics.push(metrics.advancedVisualCross);
   if (metrics.salvage) {
@@ -927,37 +1043,189 @@ const applySalvageMetrics = (
   return Object.keys(merged).length > 0 ? merged : undefined;
 };
 
+const MAX_PARSE_PREVIEW_CHARS = 2000;
+
+const truncatePreview = (value: string) =>
+  value.length > MAX_PARSE_PREVIEW_CHARS ? `${value.slice(0, MAX_PARSE_PREVIEW_CHARS)}…` : value;
+
+const summarizeAdvancedMetricsPayload = (
+  raw: unknown,
+  sections: AdvancedSectionKey[],
+): Pick<AdvancedParseDiagnostics, "keys" | "preview"> => {
+  const normalized = normalizeAdvancedMetricsPayload(raw, sections);
+  if (!normalized || typeof normalized !== "object") {
+    return { preview: truncatePreview(String(normalized)) };
+  }
+  const record = normalized as Record<string, unknown>;
+  const advanced =
+    record.advanced_metrics && typeof record.advanced_metrics === "object"
+      ? (record.advanced_metrics as Record<string, unknown>)
+      : record;
+  let preview: string;
+  try {
+    preview = JSON.stringify(normalized);
+  } catch {
+    preview = String(normalized);
+  }
+  return {
+    keys: Object.keys(advanced).slice(0, 25),
+    preview: truncatePreview(preview),
+  };
+};
+
+const normalizeAdvancedMetricsPayload = (raw: unknown, sections: AdvancedSectionKey[]) => {
+  if (!raw || typeof raw !== "object") return raw;
+  const record = raw as Record<string, unknown>;
+  const advancedMetrics = record.advanced_metrics;
+  if (advancedMetrics && typeof advancedMetrics === "object") {
+    return raw;
+  }
+  const altKeys = ["advancedMetrics", "advanced"];
+  for (const key of altKeys) {
+    const value = record[key];
+    if (value && typeof value === "object") {
+      return { advanced_metrics: value };
+    }
+  }
+  const hasSectionKey = sections.some((section) => Object.prototype.hasOwnProperty.call(record, section));
+  if (hasSectionKey) {
+    return { advanced_metrics: record };
+  }
+  return raw;
+};
+
 const runAdvancedPass = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
   prompt: string;
   jsonSchema: unknown;
+  jsonSchemaFallback?: unknown;
   sections: AdvancedSectionKey[];
   model?: string;
+  timeoutMs?: number;
 }): Promise<AdvancedPassOutcome> => {
   const result = await callGeminiMultimodalJson({
     youtubeUrl: input.youtubeUrl,
     prompt: input.prompt,
     systemInstruction,
     jsonSchema: input.jsonSchema,
+    jsonSchemaFallback: input.jsonSchemaFallback,
     config: input.config,
     model: input.model,
+    forceResponseSchema: true,
+    timeoutMs: input.timeoutMs,
   });
 
   if (!result.ok) {
     return { status: result.status, passMetrics: result.metrics };
   }
 
+  const normalized = normalizeAdvancedMetricsPayload(result.rawJson, input.sections);
+
+  let strictError: string | undefined;
   try {
-    const parsed = parseGeminiAdvancedMetricsJson(result.rawJson, input.sections);
+    const parsed = parseGeminiAdvancedMetricsJson(normalized, input.sections);
     return {
       metrics: parsed,
       status: result.status,
       passMetrics: result.metrics,
     };
-  } catch {
-    return { status: result.status, passMetrics: result.metrics };
+  } catch (error) {
+    if (!(error instanceof InvalidGeminiResponseError)) {
+      return { status: result.status, passMetrics: result.metrics };
+    }
+    strictError = error.message;
   }
+
+  let lenientError: string | undefined;
+  try {
+    const parsed = parseGeminiAdvancedMetricsJsonLenient(normalized, input.sections);
+    if (Object.keys(parsed).length === 0) {
+      return {
+        status: result.status,
+        passMetrics: result.metrics,
+        parseDiagnostics: {
+          strictError,
+          lenientError: "Lenient parse returned no sections.",
+          ...summarizeAdvancedMetricsPayload(normalized, input.sections),
+        },
+      };
+    }
+    return {
+      metrics: parsed,
+      status: result.status,
+      passMetrics: result.metrics,
+    };
+  } catch (error) {
+    if (error instanceof InvalidGeminiResponseError) {
+      lenientError = error.message;
+    }
+  }
+
+  return {
+    status: result.status,
+    passMetrics: result.metrics,
+    parseDiagnostics: {
+      strictError,
+      lenientError,
+      ...summarizeAdvancedMetricsPayload(normalized, input.sections),
+    },
+  };
+};
+
+const runCorePass = async (input: {
+  youtubeUrl: string;
+  config?: AppConfig;
+  model?: string;
+  timeoutMs?: number;
+}): Promise<CorePassOutcome> => {
+  const primary = await callGeminiMultimodalJson({
+    youtubeUrl: input.youtubeUrl,
+    prompt: corePrompt,
+    systemInstruction,
+    jsonSchema: coreResponseJsonSchema,
+    jsonSchemaFallback: coreResponseJsonSchemaLite,
+    config: input.config,
+    model: input.model,
+    timeoutMs: input.timeoutMs,
+  });
+
+  if (!primary.ok) {
+    throw toError(primary);
+  }
+
+  try {
+    const parsed = parseGeminiMultimodalJson(primary.rawJson);
+    return { parsed, status: primary.status, passMetrics: primary.metrics };
+  } catch (error) {
+    if (!(error instanceof InvalidGeminiResponseError)) {
+      throw error;
+    }
+  }
+
+  const retry = await callGeminiMultimodalJson({
+    youtubeUrl: input.youtubeUrl,
+    prompt: corePrompt,
+    systemInstruction,
+    jsonSchema: coreResponseJsonSchema,
+    jsonSchemaFallback: coreResponseJsonSchemaLite,
+    config: input.config,
+    model: input.model,
+    forceResponseSchema: true,
+    timeoutMs: input.timeoutMs,
+  });
+
+  if (!retry.ok) {
+    throw toError(retry);
+  }
+
+  const parsed = parseGeminiMultimodalJson(retry.rawJson);
+  return {
+    parsed,
+    status: retry.status,
+    passMetrics: retry.metrics,
+    retryMetrics: primary.metrics,
+  };
 };
 
 export const analyzeVideoMultimodal = async (input: {
@@ -970,22 +1238,21 @@ export const analyzeVideoMultimodal = async (input: {
   const advancedAudioModel = input.config?.geminiMultimodalAdvancedAudioModel;
   const advancedVisualModel = input.config?.geminiMultimodalAdvancedVisualModel;
   const salvageModel = input.config?.geminiMultimodalSalvageModel;
+  const baseTimeoutMs = input.config?.geminiMultimodalTimeoutMs;
+  const coreTimeoutMs = input.config?.geminiMultimodalTimeoutMsCore ?? baseTimeoutMs;
+  const advancedTimeoutMs = input.config?.geminiMultimodalTimeoutMsAdvanced ?? baseTimeoutMs;
+  const salvageTimeoutMs = input.config?.geminiMultimodalTimeoutMsSalvage ?? advancedTimeoutMs ?? baseTimeoutMs;
 
-  const result = await callGeminiMultimodalJson({
+  const coreOutcome = await runCorePass({
     youtubeUrl: input.youtubeUrl,
-    prompt: corePrompt,
-    systemInstruction,
-    jsonSchema: coreResponseJsonSchema,
     config: input.config,
     model: coreModel,
+    timeoutMs: coreTimeoutMs,
   });
 
-  if (!result.ok) {
-    throw toError(result);
-  }
-
-  const corePassMetrics = result.metrics;
-  const parsed = parseGeminiMultimodalJson(result.rawJson);
+  const corePassMetrics = coreOutcome.passMetrics;
+  const coreRetryMetrics = coreOutcome.retryMetrics;
+  const parsed = coreOutcome.parsed;
   const axisDetails: Record<string, AxisDetail> = {};
   const profiles = buildProfiles(parsed, axisDetails);
   const audioTextPass = advancedMetricsEnabled
@@ -993,9 +1260,11 @@ export const analyzeVideoMultimodal = async (input: {
         youtubeUrl: input.youtubeUrl,
         prompt: advancedAudioTextPrompt,
         jsonSchema: advancedAudioTextResponseJsonSchema,
+        jsonSchemaFallback: advancedAudioTextResponseJsonSchemaLite,
         sections: ADVANCED_AUDIO_TEXT_SECTIONS,
         config: input.config,
         model: advancedAudioModel,
+        timeoutMs: advancedTimeoutMs,
       })
     : undefined;
   const visualCrossPass = advancedMetricsEnabled
@@ -1003,13 +1272,16 @@ export const analyzeVideoMultimodal = async (input: {
         youtubeUrl: input.youtubeUrl,
         prompt: advancedVisualCrossPrompt,
         jsonSchema: advancedVisualCrossResponseJsonSchema,
+        jsonSchemaFallback: advancedVisualCrossResponseJsonSchemaLite,
         sections: ADVANCED_VISUAL_CROSS_SECTIONS,
         config: input.config,
         model: advancedVisualModel,
+        timeoutMs: advancedTimeoutMs,
       })
     : undefined;
   const passMetrics: PassMetricsDiagnostics = {
     core: corePassMetrics,
+    coreRetry: coreRetryMetrics,
     advancedAudioText: audioTextPass?.passMetrics,
     advancedVisualCross: visualCrossPass?.passMetrics,
   };
@@ -1018,6 +1290,7 @@ export const analyzeVideoMultimodal = async (input: {
   const coverageBeforeSalvage = buildCoverageDiagnostics(parsed, mergedAdvanced);
   const salvageSections: AdvancedSectionKey[] = [];
   const salvagePassMetrics: Record<string, GeminiRequestMetrics> = {};
+  const salvageParseDiagnostics: Record<string, AdvancedParseDiagnostics> = {};
 
   if (advancedMetricsEnabled && coverageBeforeSalvage.advanced) {
     for (const section of ADVANCED_GEMINI_SECTIONS) {
@@ -1042,12 +1315,23 @@ export const analyzeVideoMultimodal = async (input: {
           },
           required: ["advanced_metrics"],
         },
+        jsonSchemaFallback: {
+          type: "object",
+          properties: {
+            advanced_metrics: buildAdvancedMetricsJsonSchemaLite([section]),
+          },
+          required: ["advanced_metrics"],
+        },
         sections: [section],
         config: input.config,
         model: salvageModel ?? sectionModel,
+        timeoutMs: salvageTimeoutMs,
       });
       if (salvagePass.passMetrics) {
         salvagePassMetrics[section] = salvagePass.passMetrics;
+      }
+      if (salvagePass.parseDiagnostics) {
+        salvageParseDiagnostics[section] = salvagePass.parseDiagnostics;
       }
       mergedAdvanced = applySalvageMetrics(
         mergedAdvanced,
@@ -1061,6 +1345,18 @@ export const analyzeVideoMultimodal = async (input: {
     passMetrics.salvage = salvagePassMetrics;
   }
   passMetrics.totals = buildPassTotals(passMetrics);
+  const advancedParse: AdvancedParseDiagnosticsByPass = {};
+  if (audioTextPass?.parseDiagnostics) {
+    advancedParse.audioText = audioTextPass.parseDiagnostics;
+  }
+  if (visualCrossPass?.parseDiagnostics) {
+    advancedParse.visualCross = visualCrossPass.parseDiagnostics;
+  }
+  if (Object.keys(salvageParseDiagnostics).length > 0) {
+    advancedParse.salvage = salvageParseDiagnostics;
+  }
+  const advancedParseDiagnostics =
+    Object.keys(advancedParse).length > 0 ? advancedParse : undefined;
 
   return {
     profiles,
@@ -1077,7 +1373,8 @@ export const analyzeVideoMultimodal = async (input: {
             ? `unobserved >= ${SALVAGE_UNOBSERVED_THRESHOLD_PCT}%`
             : undefined,
       },
-      rawStatus: result.status,
+      advancedParse: advancedParseDiagnostics,
+      rawStatus: coreOutcome.status,
       passMetrics,
     },
     advancedMetrics,

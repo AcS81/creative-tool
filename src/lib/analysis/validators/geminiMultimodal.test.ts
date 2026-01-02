@@ -174,4 +174,18 @@ describe("GeminiMultimodalResponseSchema", () => {
     expect(parsed.voice.speaking_rate.score).toBe(0);
     expect(parsed.narrative.devices?.[0]?.timestamp).toBe(10);
   });
+
+  it("coerces beat start/end seconds when returned as strings", () => {
+    const response: any = buildResponse();
+    response.narrative.beats = [
+      { label: "hook", role: "hook", start: "0s", end: "15.5" },
+      { label: "setup", role: "setup", start: "15.5", end: "45s" },
+    ];
+
+    const parsed = parseGeminiMultimodalJson(response);
+    expect(parsed.narrative.beats[0]?.start).toBe(0);
+    expect(parsed.narrative.beats[0]?.end).toBe(15.5);
+    expect(parsed.narrative.beats[1]?.start).toBe(15.5);
+    expect(parsed.narrative.beats[1]?.end).toBe(45);
+  });
 });

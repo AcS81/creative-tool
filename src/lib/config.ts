@@ -19,6 +19,10 @@ export type AppConfig = {
   geminiMultimodalAdvancedAudioModel?: string;
   geminiMultimodalAdvancedVisualModel?: string;
   geminiMultimodalSalvageModel?: string;
+  geminiMultimodalTimeoutMs?: number;
+  geminiMultimodalTimeoutMsCore?: number;
+  geminiMultimodalTimeoutMsAdvanced?: number;
+  geminiMultimodalTimeoutMsSalvage?: number;
   geminiResponseSchemaEnabled?: boolean;
 };
 
@@ -61,6 +65,12 @@ const parseBoolean = (raw?: string | null) => {
   return normalized === "true" || normalized === "1" || normalized === "yes";
 };
 
+const parseOptionalInt = (raw?: string | null) => {
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
 export const getAppConfig = (): AppConfig => {
   const analysisMode = normalizeAnalysisMode(process.env.ANALYSIS_MODE);
   const analysisVersionFromEnv = normalizeAnalysisVersion(process.env.ANALYSIS_VERSION);
@@ -82,6 +92,14 @@ export const getAppConfig = (): AppConfig => {
   const geminiMultimodalAdvancedAudioModel = process.env.GEMINI_MULTIMODAL_ADV_AUDIO_MODEL;
   const geminiMultimodalAdvancedVisualModel = process.env.GEMINI_MULTIMODAL_ADV_VISUAL_MODEL;
   const geminiMultimodalSalvageModel = process.env.GEMINI_MULTIMODAL_SALVAGE_MODEL;
+  const geminiMultimodalTimeoutMs = parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS);
+  const geminiMultimodalTimeoutMsCore = parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_CORE);
+  const geminiMultimodalTimeoutMsAdvanced = parseOptionalInt(
+    process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_ADVANCED,
+  );
+  const geminiMultimodalTimeoutMsSalvage = parseOptionalInt(
+    process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_SALVAGE,
+  );
   const rawResponseSchemaFlag = process.env.GEMINI_RESPONSE_SCHEMA_ENABLED;
   const geminiResponseSchemaEnabled =
     typeof rawResponseSchemaFlag === "string" ? parseBoolean(rawResponseSchemaFlag) : false;
@@ -153,6 +171,10 @@ export const getAppConfig = (): AppConfig => {
     geminiMultimodalAdvancedAudioModel,
     geminiMultimodalAdvancedVisualModel,
     geminiMultimodalSalvageModel,
+    geminiMultimodalTimeoutMs,
+    geminiMultimodalTimeoutMsCore,
+    geminiMultimodalTimeoutMsAdvanced,
+    geminiMultimodalTimeoutMsSalvage,
     geminiResponseSchemaEnabled,
   };
 };

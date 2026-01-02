@@ -1,6 +1,5 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { validateFingerprint } from "../../../lib/schemas/fingerprint";
-import type { VideoFingerprintJson } from "../../../lib/types";
 import { buildDefaultAdvancedMetrics } from "../../../lib/analysis/fingerprint/defaults";
 
 const mockPrisma = vi.hoisted(() => ({
@@ -14,6 +13,8 @@ const mockPrisma = vi.hoisted(() => ({
   videoAnalysis: {
     create: vi.fn(),
     update: vi.fn(),
+    findFirst: vi.fn(),
+    count: vi.fn(),
     findMany: vi.fn(),
   },
   videoFingerprint: {
@@ -23,6 +24,12 @@ const mockPrisma = vi.hoisted(() => ({
 
 vi.mock("../../../lib/db", () => ({
   default: mockPrisma,
+}));
+
+const mockEnqueueAnalysisJob = vi.fn();
+
+vi.mock("../../../lib/analysis/jobs", () => ({
+  enqueueAnalysisJob: (...args: any[]) => mockEnqueueAnalysisJob(...args),
 }));
 
 import { POST } from "./route";
@@ -99,6 +106,8 @@ describe("POST /api/analyze", () => {
       status: "pending",
       sessionId: "sess",
     });
+    mockPrisma.videoAnalysis.findFirst.mockResolvedValue(null);
+    mockPrisma.videoAnalysis.count.mockResolvedValue(0);
     mockPrisma.videoAnalysis.update.mockResolvedValue({
       id: `${refId}-analysis-new`,
       status: "complete",
@@ -134,7 +143,7 @@ describe("POST /api/analyze", () => {
     vi.clearAllMocks();
   });
 
-  it("returns analysis result with nearest references", async () => {
+  it("queues an analysis job and returns a job id", async () => {
     const body = {
       url: "https://youtu.be/testvideo123",
       creatorDisplayName: "Route Test User",
@@ -150,19 +159,10 @@ describe("POST /api/analyze", () => {
       }),
     );
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(202);
     const json = await res.json();
     expect(json.videoAnalysisId).toBeTruthy();
-    expect(json.fingerprint?.version).toBe("1.3.0");
-    expect(Array.isArray(json.nearestReferences)).toBe(true);
-    expect(json.nearestReferences.length).toBeGreaterThan(0);
-    expect(json.nicheAverageMetaAxes).toBeDefined();
-    expect((json.fingerprint as VideoFingerprintJson).metaAxes.voiceIntensity).toBeGreaterThanOrEqual(0);
-    expect((json.fingerprint as VideoFingerprintJson).cognitiveLoad.loadPerSecond.timeline?.length).toBeGreaterThan(0);
-    expect((json.fingerprint as VideoFingerprintJson).secondOrder.alignmentScore.score).toBeGreaterThanOrEqual(0);
-    expect(json.metadata?.title).toBe("Sample Test Video");
-    expect(json.metadata?.durationSeconds).toBe(120);
-    expect(json.metadata?.thumbnailUrl).toBe("http://thumb");
-    expect(json.diagnostics?.source).toBe("mock");
+    expect(json.status).toBe("pending");
+    expect(mockEnqueueAnalysisJob).toHaveBeenCalledWith(json.videoAnalysisId);
   });
 });

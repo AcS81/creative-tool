@@ -7,6 +7,28 @@ import { getAxesForDomain, resolveAxisMetadata } from "../src/lib/analysis/axisM
 const prisma = new PrismaClient();
 // Seeds default to deterministic mocks; run the refresh script with Gemini keys (see docs/reference_seed_refresh.md) to replace them with observed metrics.
 
+const args = process.argv.slice(2);
+const DRY_RUN = args.includes("--dry-run");
+
+const getArgValue = (flag: string) => {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return undefined;
+  return args[idx + 1];
+};
+
+const parseListArg = (flag: string) => {
+  const value = getArgValue(flag);
+  if (!value) return [] as string[];
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+};
+
+const ONLY_FILTERS = parseListArg("--only").map((value) => value.toLowerCase());
+const limitArg = getArgValue("--limit");
+const LIMIT = limitArg ? Number.parseInt(limitArg, 10) : undefined;
+
 type DomainConfig = {
   base: number;
   archetype: string;
@@ -233,8 +255,21 @@ const makeFingerprint = (seed: SeedCreator) => {
   return validateFingerprint(fingerprint);
 };
 
-async function seedReferenceCreator(seed: SeedCreator, index: number) {
+const matchesFilter = (seed: SeedCreator, filters: string[]) => {
+  if (!filters.length) return true;
+  const candidates = [seed.key, seed.displayName, seed.channelId, seed.youtubeVideoId]
+    .filter(Boolean)
+    .map((value) => value.toLowerCase());
+  return candidates.some((candidate) => filters.includes(candidate));
+};
+
+async function seedReferenceCreator(seed: SeedCreator) {
   const fingerprint = makeFingerprint(seed);
+
+  if (DRY_RUN) {
+    console.log(`DRY RUN: would upsert ${seed.displayName} (${seed.youtubeVideoId}).`);
+    return;
+  }
 
   const creator = await prisma.creatorProfile.upsert({
     where: { channelId: seed.channelId },
@@ -282,10 +317,27 @@ async function seedReferenceCreator(seed: SeedCreator, index: number) {
 }
 
 async function main() {
-  for (const [index, seed] of referenceCreators.entries()) {
-    await seedReferenceCreator(seed, index);
+  let seeds = referenceCreators.filter((seed) => matchesFilter(seed, ONLY_FILTERS));
+  if (Number.isFinite(LIMIT)) {
+    seeds = seeds.slice(0, LIMIT);
   }
-  console.log(`Seeded ${referenceCreators.length} reference creators with fingerprints.`);
+
+  if (!seeds.length) {
+    console.log("No reference creators matched the current filters.");
+    return;
+  }
+
+  console.log(
+    `Seeding ${seeds.length} reference creator${seeds.length === 1 ? "" : "s"}${DRY_RUN ? " (dry run)" : ""}.`,
+  );
+
+  for (const seed of seeds) {
+    await seedReferenceCreator(seed);
+  }
+
+  if (!DRY_RUN) {
+    console.log(`Seeded ${seeds.length} reference creator${seeds.length === 1 ? "" : "s"} with fingerprints.`);
+  }
 }
 
 main()

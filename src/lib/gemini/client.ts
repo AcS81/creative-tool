@@ -255,11 +255,18 @@ export type GeminiMultimodalRequest = {
   youtubeUrl: string;
   prompt: string;
   jsonSchema?: unknown;
+  jsonSchemaFallback?: unknown;
   systemInstruction?: string;
   signal?: AbortSignal;
   config?: AppConfig;
   logger?: Logger;
   model?: string;
+  timeoutMs?: number;
+  /**
+   * Forces response_schema usage even if GEMINI_RESPONSE_SCHEMA_ENABLED is off.
+   * Useful for salvage retries when we need strict JSON shape.
+   */
+  forceResponseSchema?: boolean;
   /**
    * Forces the client on even if ANALYSIS_MODE is mock or the feature flag is off.
    * Useful for tests and local development when you want to exercise the request builder.
@@ -707,14 +714,18 @@ export const callGeminiMultimodalJson = async (
 ): Promise<GeminiMultimodalResult> => {
   const config = request.config ?? getAppConfig();
   const logger = request.logger ?? console;
-  const responseSchemaEnabled = config.geminiResponseSchemaEnabled === true;
+  const responseSchemaEnabled =
+    config.geminiResponseSchemaEnabled === true || request.forceResponseSchema === true;
   const jsonSchema = responseSchemaEnabled ? request.jsonSchema : undefined;
+  const jsonSchemaFallback = responseSchemaEnabled ? request.jsonSchemaFallback : undefined;
+  const timeoutMs =
+    request.timeoutMs ?? config.geminiMultimodalTimeoutMs ?? MULTIMODAL_TIMEOUT_MS;
   const startTime = Date.now();
   let attemptCount = 0;
   let lastUsage: GeminiUsage | undefined;
   const { signal: requestSignal, cleanup: cleanupRequestTimeout } = withTimeoutSignal(
     request.signal,
-    MULTIMODAL_TIMEOUT_MS,
+    timeoutMs,
   );
 
   try {
@@ -781,11 +792,21 @@ export const callGeminiMultimodalJson = async (
     const callWithSchemaFallback = async (
       label: string,
       schema: unknown | undefined,
+      fallback: unknown | undefined,
       buildCall: (schemaOverride: unknown | undefined) => Promise<GeminiCallOutcome>,
     ): Promise<GeminiCallOutcome> => {
       const outcome = await callWithRetries(label, () => buildCall(schema));
       if (outcome.ok || !schema || !shouldRetryWithoutSchema(outcome.errorMessage)) {
         return outcome;
+      }
+      if (fallback && fallback !== schema) {
+        logger.warn("Gemini response_schema rejected; retrying with fallback schema.");
+        const fallbackOutcome = await callWithRetries(`${label} (fallback schema)`, () =>
+          buildCall(fallback),
+        );
+        if (fallbackOutcome.ok || !shouldRetryWithoutSchema(fallbackOutcome.errorMessage)) {
+          return fallbackOutcome;
+        }
       }
       logger.warn("Gemini response_schema rejected; retrying without responseSchema.");
       return callWithRetries(`${label} (no schema)`, () => buildCall(undefined));
@@ -794,6 +815,7 @@ export const callGeminiMultimodalJson = async (
     const primaryOutcome = await callWithSchemaFallback(
       "primary url ingestion",
       jsonSchema,
+      jsonSchemaFallback,
       (schemaOverride) =>
         withGeminiSlot(() =>
           callGeminiWithVideoPart({

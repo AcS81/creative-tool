@@ -12,6 +12,8 @@
     "prisma:migrate": "CACHE_DIR=.prisma/cache prisma migrate dev",
     "prisma:studio": "CACHE_DIR=.prisma/cache prisma studio",
     "seed": "CACHE_DIR=.prisma/cache tsx prisma/seed.ts",
+    "reference:refresh": "tsx scripts/refresh-reference-library.ts",
+    "reference:drift": "tsx scripts/reference-drift-check.ts",
     "test": "vitest run",
     "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts",
     "eval:golden": "tsx scripts/run-multimodal-golden.ts",

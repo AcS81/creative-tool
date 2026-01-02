@@ -255,23 +255,23 @@ Execute the chosen path fully with diagnostics:
 
 ### Task 5.1: Scale reference ingestion and refresh
 **Goals**
-- [ ] Add a repeatable pipeline to:
+- [x] Add a repeatable pipeline to:
   - seed reference creators,
   - refresh fingerprints periodically,
   - detect drift between model versions.
 
 **Acceptance Criteria**
-- [ ] Reference results remain stable and explainable across upgrades.
+- [x] Reference results remain stable and explainable across upgrades.
 
 ### Task 5.2: Similarity quality improvements
 **Goals**
-- [ ] Improve similarity using:
+- [x] Improve similarity using:
   - normalized axes,
   - per-domain weighting,
   - confidence-aware similarity (don’t compare missing signals).
 
 **Acceptance Criteria**
-- [ ] “Closest neighbours” feels consistent on the golden set and internal spot checks.
+- [x] “Closest neighbours” feels consistent on the golden set and internal spot checks.
 
 ---
 
@@ -279,24 +279,24 @@ Execute the chosen path fully with diagnostics:
 
 ### Task 6.1: Async analysis jobs with retries and idempotency
 **Goals**
-- [ ] `/api/analyze` returns a job ID quickly.
-- [ ] Background worker runs staged passes with retry policies.
-- [ ] Job status visible to client (pending/running/complete/failed).
+- [x] `/api/analyze` returns a job ID quickly.
+- [x] Background worker runs staged passes with retry policies.
+- [x] Job status visible to client (pending/running/complete/failed).
 
 **Acceptance Criteria**
-- [ ] No request timeouts for long videos; retries don’t duplicate DB rows.
+- [x] No request timeouts for long videos; retries don’t duplicate DB rows.
 
 ### Task 6.2: Caching + rate limiting + quotas
 **Goals**
-- [ ] Cache results by video ID + analysis version + config flags.
-- [ ] Add basic abuse protection (rate limits, per-session quotas).
+- [x] Cache results by video ID + analysis version + config flags.
+- [x] Add basic abuse protection (rate limits, per-session quotas).
 
 **Acceptance Criteria**
-- [ ] Re-analyzing the same URL is fast and cheap.
+- [x] Re-analyzing the same URL is fast and cheap.
 
 ### Task 6.3: Observability (logs, traces, alerts)
 **Goals**
-- [ ] Emit structured logs for:
+- [x] Emit structured logs for:
   - ingestion path,
   - pass outcomes,
   - coverage,
@@ -304,7 +304,7 @@ Execute the chosen path fully with diagnostics:
   - safety blocks.
 
 **Acceptance Criteria**
-- [ ] You can debug “why this run was empty” from logs alone.
+- [x] You can debug “why this run was empty” from logs alone.
 
 ---
 

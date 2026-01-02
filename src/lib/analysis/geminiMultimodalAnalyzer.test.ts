@@ -237,6 +237,30 @@ describe("analyzeVideoMultimodal", () => {
     expect(result.advancedMetrics?.prosodyArc.paceMeanWpm.score).toBe(70);
   });
 
+  it("accepts advanced payloads without the advanced_metrics wrapper", async () => {
+    vi.mocked(callGeminiMultimodalJson).mockReset();
+    vi.mocked(callGeminiMultimodalJson)
+      .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw))
+      .mockResolvedValueOnce(
+        mockGeminiOk({
+          prosodyArc: sampleRaw.advanced_metrics.prosodyArc,
+          languageTexture: sampleRaw.advanced_metrics.languageTexture,
+          narrativeArc: sampleRaw.advanced_metrics.narrativeArc,
+        }),
+      )
+      .mockResolvedValueOnce(
+        mockGeminiOk({
+          visualEditAlignment: sampleRaw.advanced_metrics.visualEditAlignment,
+          modalityBalance: sampleRaw.advanced_metrics.modalityBalance,
+          cognitiveLoad: sampleRaw.advanced_metrics.cognitiveLoad,
+        }),
+      );
+
+    const result = await analyzeVideoMultimodal({ youtubeUrl: "https://youtu.be/abc" });
+    expect(result.advancedMetrics?.prosodyArc.paceMeanWpm.score).toBe(70);
+    expect(result.advancedMetrics?.visualEditAlignment.visualEntropy.timeline?.length).toBeGreaterThan(0);
+  });
+
   it("reports coverage and unobserved counts from core payloads", async () => {
     vi.mocked(callGeminiMultimodalJson).mockReset();
     vi.mocked(callGeminiMultimodalJson)
@@ -248,6 +272,30 @@ describe("analyzeVideoMultimodal", () => {
     expect(result.diagnostics.unobservedCounts.voice).toBe(1);
     expect(result.diagnostics.coverage?.core.voice.observed).toBe(4);
     expect(result.diagnostics.coverage?.core.voice.missing).toContain("speaking_rate");
+  });
+
+  it("retries the core pass with response schema when required fields are missing", async () => {
+    vi.mocked(callGeminiMultimodalJson).mockReset();
+    vi.mocked(callGeminiMultimodalJson)
+      .mockResolvedValueOnce(mockGeminiOk({}, { durationMs: 100, attempts: 1, retries: 0 }))
+      .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw, { durationMs: 120, attempts: 1, retries: 0 }));
+
+    const result = await analyzeVideoMultimodal({
+      youtubeUrl: "https://youtu.be/abc",
+      config: {
+        analysisMode: "gemini",
+        analysisVersion: "v2",
+        analysisV2MultimodalEnabled: true,
+        performanceEnabled: false,
+        advancedMetricsEnabled: false,
+        multimodalPassMode: "core",
+      },
+    });
+
+    expect(result.profiles.voice.scores.length).toBeGreaterThan(0);
+    expect(result.diagnostics.passMetrics?.core?.durationMs).toBe(120);
+    expect(result.diagnostics.passMetrics?.coreRetry?.durationMs).toBe(100);
+    expect(vi.mocked(callGeminiMultimodalJson).mock.calls[1]?.[0]?.forceResponseSchema).toBe(true);
   });
 
   it("captures per-pass metrics and aggregates totals", async () => {

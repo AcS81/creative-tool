@@ -17,8 +17,32 @@ type AnalysisResponse = {
     attempted?: boolean;
     sections?: string[];
   };
+  advancedParse?: {
+    audioText?: {
+      strictError?: string;
+      lenientError?: string;
+      keys?: string[];
+      preview?: string;
+    };
+    visualCross?: {
+      strictError?: string;
+      lenientError?: string;
+      keys?: string[];
+      preview?: string;
+    };
+    salvage?: Record<
+      string,
+      {
+        strictError?: string;
+        lenientError?: string;
+        keys?: string[];
+        preview?: string;
+      }
+    >;
+  };
   passMetrics?: {
     core?: PassMetrics;
+    coreRetry?: PassMetrics;
     advancedAudioText?: PassMetrics;
     advancedVisualCross?: PassMetrics;
     salvage?: Record<string, PassMetrics>;
@@ -233,6 +257,7 @@ export default function MultimodalDevPage() {
               <p className="font-semibold text-foreground">Pass metrics</p>
               <div className="grid gap-2 md:grid-cols-2">
                 {renderPass("core", result.passMetrics.core)}
+                {renderPass("core retry", result.passMetrics.coreRetry)}
                 {renderPass("advanced audio/text", result.passMetrics.advancedAudioText)}
                 {renderPass("advanced visual/cross", result.passMetrics.advancedVisualCross)}
                 {result.passMetrics.salvage
@@ -259,6 +284,7 @@ export default function MultimodalDevPage() {
                   ? {
                       fingerprint: result.fingerprint,
                       unobservedCounts: result.unobservedCounts,
+                      advancedParse: result.advancedParse,
                       passMetrics: result.passMetrics,
                     }
                   : { error: result.error },

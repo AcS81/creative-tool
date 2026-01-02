@@ -80,11 +80,22 @@ const richMetricSchema: z.ZodType<GeminiRichMetric> = z.preprocess(
   richMetricObjectSchema,
 );
 
+const coerceSeconds = (input: unknown): unknown => {
+  if (typeof input === "number") return input;
+  if (typeof input === "string") {
+    const match = input.match(/-?\d+(\.\d+)?/);
+    if (!match) return input;
+    const value = Number(match[0]);
+    return Number.isFinite(value) ? value : input;
+  }
+  return input;
+};
+
 const beatSchema: z.ZodType<GeminiBeat> = z
   .object({
     label: z.string().min(1),
-    start: z.number().min(0),
-    end: z.number().min(0),
+    start: z.preprocess(coerceSeconds, z.number().min(0)),
+    end: z.preprocess(coerceSeconds, z.number().min(0)),
     role: z.string().min(1).optional(),
   })
   .refine((val) => val.end >= val.start, {
@@ -107,17 +118,6 @@ const buildRichMetricFields = (keys: readonly string[]) =>
 const voiceSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.voice)).passthrough();
 
 const languageSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.language)).passthrough();
-
-const coerceSeconds = (input: unknown): unknown => {
-  if (typeof input === "number") return input;
-  if (typeof input === "string") {
-    const match = input.match(/-?\d+(\.\d+)?/);
-    if (!match) return input;
-    const value = Number(match[0]);
-    return Number.isFinite(value) ? value : input;
-  }
-  return input;
-};
 
 const narrativeSchema = z
   .object({
@@ -218,11 +218,30 @@ const buildAdvancedMetricsResponseSchema = (sections: AdvancedSectionKey[]) =>
     })
     .passthrough();
 
+const buildAdvancedMetricsResponseSchemaLenient = (sections: AdvancedSectionKey[]) =>
+  z
+    .object({
+      advanced_metrics: buildAdvancedMetricsSchemaForSections(sections).partial(),
+    })
+    .passthrough();
+
 export const parseGeminiAdvancedMetricsJson = (
   raw: unknown,
   sections: AdvancedSectionKey[],
 ): GeminiAdvancedMetricsPartial => {
   const schema = buildAdvancedMetricsResponseSchema(sections);
+  const result = schema.safeParse(raw);
+  if (!result.success) {
+    throw new InvalidGeminiResponseError(formatIssues(result.error));
+  }
+  return result.data.advanced_metrics;
+};
+
+export const parseGeminiAdvancedMetricsJsonLenient = (
+  raw: unknown,
+  sections: AdvancedSectionKey[],
+): GeminiAdvancedMetricsPartial => {
+  const schema = buildAdvancedMetricsResponseSchemaLenient(sections);
   const result = schema.safeParse(raw);
   if (!result.success) {
     throw new InvalidGeminiResponseError(formatIssues(result.error));

@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       unobservedCounts: analysis.diagnostics.unobservedCounts,
       coverage: analysis.diagnostics.coverage,
       salvage: analysis.diagnostics.salvage,
+      advancedParse: analysis.diagnostics.advancedParse,
       passMetrics: analysis.diagnostics.passMetrics,
       fingerprint,
       diagnostics: {

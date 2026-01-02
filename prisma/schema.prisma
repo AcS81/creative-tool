@@ -28,6 +28,17 @@ model VideoAnalysis {
   status           String
   failureReason    String?
   sessionId        String?
+  passMode         String?
+  analysisVersion  String?
+  analysisConfigHash String?
+  analysisConfigJson String?
+  idempotencyKey   String?         @unique
+  attemptCount     Int             @default(0)
+  maxAttempts      Int             @default(3)
+  nextAttemptAt    DateTime?
+  startedAt        DateTime?
+  completedAt      DateTime?
+  diagnosticsJson  String?
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
   creator          CreatorProfile  @relation(fields: [creatorId], references: [id], onDelete: Cascade)
@@ -36,6 +47,9 @@ model VideoAnalysis {
   @@index([creatorId])
   @@index([youtubeVideoId])
   @@index([sessionId])
+  @@index([status])
+  @@index([nextAttemptAt])
+  @@index([youtubeVideoId, analysisConfigHash, status])
 }
 
 model VideoFingerprint {
