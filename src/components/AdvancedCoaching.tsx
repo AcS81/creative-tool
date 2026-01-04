@@ -149,7 +149,7 @@ export const AdvancedCoaching = ({
       fallbackInsights.push("Narrative beats not observed; add explicit hooks and transitions in the script.");
     }
 
-    if (!missingSections.language && language?.audienceAddressFrequency.observed === false) {
+    if (!missingSections.language && language?.audienceAddressFrequency?.observed === false) {
       fallbackInsights.push("Audience address: Not observed; add direct you/we phrasing for engagement.");
     }
   }

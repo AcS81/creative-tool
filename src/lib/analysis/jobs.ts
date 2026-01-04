@@ -33,6 +33,29 @@ const buildRequestConfig = (config: AppConfig, passMode?: string | null): AppCon
     : config;
 };
 
+const applyDurationTimeouts = (config: AppConfig, durationSeconds?: number): AppConfig => {
+  if (!durationSeconds || durationSeconds <= 0) return config;
+  if (
+    config.geminiMultimodalTimeoutMs ||
+    config.geminiMultimodalTimeoutMsCore ||
+    config.geminiMultimodalTimeoutMsAdvanced ||
+    config.geminiMultimodalTimeoutMsSalvage
+  ) {
+    return config;
+  }
+
+  let timeoutMs: number | undefined;
+  if (durationSeconds >= 3600) {
+    timeoutMs = 540000;
+  } else if (durationSeconds >= 2400) {
+    timeoutMs = 420000;
+  } else if (durationSeconds >= 1200) {
+    timeoutMs = 300000;
+  }
+
+  return timeoutMs ? { ...config, geminiMultimodalTimeoutMs: timeoutMs } : config;
+};
+
 const resolveFailureMessage = (error: unknown) => {
   if (error instanceof YoutubeApiError || error instanceof GeminiApiError || error instanceof ConfigError) {
     return error.message;
@@ -94,7 +117,7 @@ export const runAnalysisJob = async (videoAnalysisId: string) => {
     let configSignature: ReturnType<typeof buildAnalysisConfigSignature> | undefined;
     try {
       const config = getAppConfig();
-      requestConfig = buildRequestConfig(config, analysis.passMode);
+      requestConfig = applyDurationTimeouts(buildRequestConfig(config, analysis.passMode), analysis.durationSeconds);
       configSignature = buildAnalysisConfigSignature(requestConfig);
       const youtubeUrl = buildVideoUrl(analysis.youtubeVideoId);
       logEvent("info", "analysis_job_started", {

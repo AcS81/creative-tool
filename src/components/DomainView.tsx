@@ -1,9 +1,20 @@
 import type { ReactNode } from "react";
-import type { DomainProfile } from "../lib/types";
+import type { DomainProfile, ScoredMetric } from "../lib/types";
 import { Chip } from "./Chip";
 import { DomainScoreBars } from "./DomainScoreBars";
 import { describeArchetype, type DomainKey } from "../lib/archetypes/descriptions";
 import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
+
+type AdvancedDetailItem = {
+  label: string;
+  metric?: ScoredMetric;
+  detail?: string;
+};
+
+type AdvancedDetailSection = {
+  title: string;
+  items: AdvancedDetailItem[];
+};
 
 type Props = {
   name: string;
@@ -14,9 +25,49 @@ type Props = {
   insights?: string[];
   extra?: ReactNode;
   detailOverride?: ReactNode;
+  advancedSections?: AdvancedDetailSection[];
 };
 
-export function DomainView({ name, domain, profile, visual, tags, insights, extra, detailOverride }: Props) {
+const formatMetricValue = (metric?: ScoredMetric) => {
+  if (!metric) return { observed: false, text: "Not observed" };
+  const rawValue =
+    typeof metric.value === "string"
+      ? metric.value.trim()
+      : typeof metric.value === "number"
+        ? `${metric.value}`
+        : "";
+  const hasValue = rawValue !== "" && rawValue.toLowerCase() !== "unobserved";
+  const observedFlag = metric.observed === true;
+  if (metric.observed === false) return { observed: false, text: "Not observed" };
+  if (hasValue) return { observed: true, text: rawValue };
+  if (observedFlag) return { observed: true, text: `${Math.round(metric.score)}` };
+  if (metric.score > 0) return { observed: true, text: `${Math.round(metric.score)}` };
+  return { observed: false, text: "Not observed" };
+};
+
+const buildMetricDetail = (metric?: ScoredMetric) => {
+  if (!metric) return undefined;
+  const parts: string[] = [];
+  if (metric.timeline?.length) parts.push(`timeline ${metric.timeline.length}`);
+  if (metric.spans?.length) parts.push(`spans ${metric.spans.length}`);
+  if (metric.segments?.length) parts.push(`segments ${metric.segments.length}`);
+  if (metric.items?.length) parts.push(`items ${metric.items.length}`);
+  if (metric.counts) parts.push(`counts ${Object.keys(metric.counts).length}`);
+  if (metric.proportions) parts.push(`proportions ${Object.keys(metric.proportions).length}`);
+  return parts.length > 0 ? parts.slice(0, 2).join(" • ") : undefined;
+};
+
+export function DomainView({
+  name,
+  domain,
+  profile,
+  visual,
+  tags,
+  insights,
+  extra,
+  detailOverride,
+  advancedSections,
+}: Props) {
   const derivedTags = profile.scores
     .sort((a, b) => b.value - a.value)
     .slice(0, 3)
@@ -29,6 +80,9 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
   const tagList = tags && tags.length > 0 ? tags : [...derivedTags, ...(profile.highlights ?? [])];
   const archetypeDescription = describeArchetype(domain, profile.primaryArchetype);
   const secondaryDescription = describeArchetype(domain, profile.secondaryArchetype);
+  const advancedItems = advancedSections?.flatMap((section) => section.items) ?? [];
+  const advancedObserved = advancedItems.filter((item) => formatMetricValue(item.metric).observed).length;
+  const advancedTotal = advancedItems.length;
   return (
     <div className="cs-card p-6 space-y-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -111,6 +165,48 @@ export function DomainView({ name, domain, profile, visual, tags, insights, extr
           </div>
         </div>
       )}
+
+      {advancedSections?.length ? (
+        <details className="rounded-lg border border-border/60 bg-surface-strong p-4 shadow-sm">
+          <summary className="flex cursor-pointer items-center justify-between gap-2 text-sm font-semibold text-foreground">
+            <span>Advanced details</span>
+            <span className="text-[11px] font-semibold text-muted">
+              {advancedObserved}/{advancedTotal} observed
+            </span>
+          </summary>
+          <div className="mt-3 space-y-4">
+            {advancedSections.map((section) => (
+              <div key={section.title} className="space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+                  {section.title}
+                </p>
+                <div className="grid gap-2 md:grid-cols-2">
+                  {section.items.map((item) => {
+                    const display = formatMetricValue(item.metric);
+                    const detail = item.detail ?? buildMetricDetail(item.metric);
+                    return (
+                      <div
+                        key={item.label}
+                        className="rounded border border-border/50 bg-white/60 px-3 py-2 text-xs"
+                      >
+                        <p className="font-semibold text-muted">{item.label}</p>
+                        {display.observed ? (
+                          <p className="font-semibold text-foreground">{display.text}</p>
+                        ) : (
+                          <span className="cs-badge bg-amber-100 text-[10px] text-amber-800">
+                            {display.text}
+                          </span>
+                        )}
+                        {detail ? <p className="text-[11px] text-muted">{detail}</p> : null}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
 
       {tagList?.length ? (
         <div className="space-y-2">

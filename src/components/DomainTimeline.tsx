@@ -90,9 +90,9 @@ export function DomainTimeline({
               </div>
               <div className="flex flex-1 items-center gap-2">
                 <span className="line-clamp-1 w-32 text-foreground">{item.role ?? item.label}</span>
-                {item.devices?.slice(0, 3).map((device) => (
+                {item.devices?.slice(0, 3).map((device, deviceIdx) => (
                   <span
-                    key={`${device}-${idx}`}
+                    key={`${device}-${idx}-${deviceIdx}`}
                     className="rounded-full bg-slate-100 px-2 py-[2px] text-[10px] text-foreground"
                   >
                     {deviceLabel(device)}

@@ -205,6 +205,7 @@ function HomeContent() {
     null,
   );
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [passMode, setPassMode] = useState<"core" | "full">("core");
   const [lastSubmittedUrl, setLastSubmittedUrl] = useState<string | null>(null);
   const [lastPassMode, setLastPassMode] = useState<"core" | "full" | undefined>(undefined);
   const activeJobRef = useRef<string | null>(null);
@@ -366,10 +367,10 @@ function HomeContent() {
     }
   }, []);
 
-  const pollAnalysisJob = useCallback(async (jobId: string) => {
+  const pollAnalysisJob = useCallback(async (jobId: string, passMode?: "core" | "full") => {
     activeJobRef.current = jobId;
     const startedAt = Date.now();
-    const timeoutMs = 180000;
+    const timeoutMs = passMode === "full" ? 600000 : 420000;
 
     while (activeJobRef.current === jobId) {
       try {
@@ -405,7 +406,7 @@ function HomeContent() {
       }
 
       if (Date.now() - startedAt > timeoutMs) {
-        setError("Analysis is taking longer than expected. Please check back soon.");
+        setError("Analysis is taking longer than expected. Long videos can take a few extra minutes.");
         setLoading(false);
         activeJobRef.current = null;
         return;
@@ -469,7 +470,7 @@ function HomeContent() {
         return;
       }
 
-      void pollAnalysisJob(body.videoAnalysisId);
+      void pollAnalysisJob(body.videoAnalysisId, passMode);
     } catch {
       setError("Could not analyze this URL. Please try again.");
       setLoading(false);
@@ -478,7 +479,7 @@ function HomeContent() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    void runAnalysis(url);
+    void runAnalysis(url, passMode);
   };
 
   const handleTryAgain = () => {
@@ -487,7 +488,7 @@ function HomeContent() {
       setError("Please enter a valid YouTube URL.");
       return;
     }
-    void runAnalysis(targetUrl, lastPassMode);
+    void runAnalysis(targetUrl, passMode);
   };
 
   const handleRunAdvanced = () => {
@@ -496,6 +497,7 @@ function HomeContent() {
       setError("Please enter a valid YouTube URL.");
       return;
     }
+    setPassMode("full");
     void runAnalysis(targetUrl, "full");
   };
 
@@ -692,6 +694,42 @@ function HomeContent() {
                     {error}
                   </p>
                 ) : null}
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-border bg-surface-strong/70 p-3">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-foreground">Analysis depth</p>
+                  <p className="text-[11px] text-muted">
+                    Core is faster and more reliable for longer videos. Full unlocks advanced signals.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      passMode === "core"
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border bg-white/80 text-muted hover:border-accent/60 hover:text-foreground"
+                    }`}
+                    onClick={() => setPassMode("core")}
+                    aria-pressed={passMode === "core"}
+                    disabled={loading}
+                  >
+                    Core (fast)
+                  </button>
+                  <button
+                    type="button"
+                    className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                      passMode === "full"
+                        ? "border-accent bg-accent/10 text-accent"
+                        : "border-border bg-white/80 text-muted hover:border-accent/60 hover:text-foreground"
+                    }`}
+                    onClick={() => setPassMode("full")}
+                    aria-pressed={passMode === "full"}
+                    disabled={loading}
+                  >
+                    Full (advanced)
+                  </button>
+                </div>
               </div>
               <button type="submit" className="cs-button justify-center" disabled={loading}>
                 {loading ? "Analyzing..." : "Analyze video"}
@@ -1002,6 +1040,33 @@ function HomeContent() {
                     profile={domainProfiles.voiceProfile}
                     visual={<DomainRadar profile={domainProfiles.voiceProfile} />}
                     insights={result.domainInsights?.voiceProfile}
+                    advancedSections={[
+                      {
+                        title: "Prosody arc",
+                        items: [
+                          {
+                            label: "Mean pace (WPM)",
+                            metric: result.fingerprint.prosodyArc.paceMeanWpm,
+                          },
+                          {
+                            label: "Pace variability %",
+                            metric: result.fingerprint.prosodyArc.paceVariabilityPct,
+                          },
+                          {
+                            label: "Within-segment pace change %",
+                            metric: result.fingerprint.prosodyArc.withinSegmentPaceChangePct,
+                          },
+                          {
+                            label: "Emphasis alignment",
+                            metric: result.fingerprint.prosodyArc.emphasisAlignmentScore,
+                          },
+                          {
+                            label: "Energy drift (dB/min)",
+                            metric: result.fingerprint.prosodyArc.energyDriftDbPerMin,
+                          },
+                        ],
+                      },
+                    ]}
                     extra={
                       <div className={`grid gap-3 ${voiceCallout ? "md:grid-cols-2" : ""}`}>
                         <VoicePaceMiniChart prosodyArc={result.fingerprint.prosodyArc} />
@@ -1022,7 +1087,7 @@ function HomeContent() {
                               },
                               {
                                 label: "Audience address",
-                                value: result.fingerprint.languageTexture.audienceAddressFrequency.value,
+                                value: result.fingerprint.languageTexture.audienceAddressFrequency?.value,
                               },
                             ]}
                           />
@@ -1038,6 +1103,37 @@ function HomeContent() {
                     profile={domainProfiles.languageProfile}
                     visual={<DomainRadar profile={domainProfiles.languageProfile} />}
                     insights={result.domainInsights?.languageProfile}
+                    advancedSections={[
+                      {
+                        title: "Language texture",
+                        items: [
+                          {
+                            label: "Analogy / example / definition",
+                            metric: result.fingerprint.languageTexture.analogyExampleDefinitionRatio,
+                          },
+                          {
+                            label: "Sentence compression",
+                            metric: result.fingerprint.languageTexture.sentenceCompressionRatio,
+                          },
+                          {
+                            label: "Humor timing",
+                            metric: result.fingerprint.languageTexture.humorTimingScore,
+                          },
+                          {
+                            label: "Reference density / min",
+                            metric: result.fingerprint.languageTexture.referenceDensityPerMin,
+                          },
+                          {
+                            label: "Question rate",
+                            metric: result.fingerprint.languageTexture.questionRate,
+                          },
+                          {
+                            label: "Audience address frequency",
+                            metric: result.fingerprint.languageTexture.audienceAddressFrequency,
+                          },
+                        ],
+                      },
+                    ]}
                     detailOverride={
                       <div className="grid gap-4 lg:grid-cols-[1.1fr,0.9fr]">
                         <DeliveryRelationalSection
@@ -1095,6 +1191,33 @@ function HomeContent() {
                     profile={domainProfiles.narrativeProfile}
                     visual={<DomainRadar profile={domainProfiles.narrativeProfile} />}
                     insights={result.domainInsights?.narrativeProfile}
+                    advancedSections={[
+                      {
+                        title: "Narrative arc",
+                        items: [
+                          {
+                            label: "Time to hook (s)",
+                            metric: result.fingerprint.narrativeArc.timeToHookSeconds,
+                          },
+                          {
+                            label: "Hook strength",
+                            metric: result.fingerprint.narrativeArc.hookStrengthScore,
+                          },
+                          {
+                            label: "Segment cohesion drift",
+                            metric: result.fingerprint.narrativeArc.segmentCohesionDrift,
+                          },
+                          {
+                            label: "Open loops unresolved",
+                            metric: result.fingerprint.narrativeArc.openLoopsUnresolvedRatio,
+                          },
+                          {
+                            label: "Ending resolution",
+                            metric: result.fingerprint.narrativeArc.endingResolutionScore,
+                          },
+                        ],
+                      },
+                    ]}
                     extra={
                       <div className="grid gap-3 md:grid-cols-2">
                         {narrativeCallout}
@@ -1140,6 +1263,25 @@ function HomeContent() {
                     profile={domainProfiles.visualProfile}
                     visual={<DomainRadar profile={domainProfiles.visualProfile} />}
                     insights={result.domainInsights?.visualProfile}
+                    advancedSections={[
+                      {
+                        title: "Visual edit alignment",
+                        items: [
+                          {
+                            label: "Visual entropy",
+                            metric: result.fingerprint.visualEditAlignment.visualEntropy,
+                          },
+                          {
+                            label: "Beats vs edits alignment",
+                            metric: result.fingerprint.visualEditAlignment.beatsVsEditsAlignment,
+                          },
+                          {
+                            label: "Audio-visual emphasis alignment",
+                            metric: result.fingerprint.visualEditAlignment.audioVisualEmphasisAlignment,
+                          },
+                        ],
+                      },
+                    ]}
                     extra={
                       <div className="grid gap-3 md:grid-cols-2">
                         <DomainTimeline
@@ -1193,6 +1335,25 @@ function HomeContent() {
                     profile={domainProfiles.editingProfile}
                     visual={<DomainRadar profile={domainProfiles.editingProfile} />}
                     insights={result.domainInsights?.editingProfile}
+                    advancedSections={[
+                      {
+                        title: "Editing alignment",
+                        items: [
+                          {
+                            label: "Cut rate refinement",
+                            metric: result.fingerprint.visualEditAlignment.cutRateRefinement,
+                          },
+                          {
+                            label: "Silence for emphasis fidelity",
+                            metric: result.fingerprint.visualEditAlignment.silenceForEmphasisFidelity,
+                          },
+                          {
+                            label: "Prosody vs semantic importance",
+                            metric: result.fingerprint.visualEditAlignment.prosodyVsSemanticImportanceAlignment,
+                          },
+                        ],
+                      },
+                    ]}
                     extra={
                       <div className="grid gap-3 md:grid-cols-2">
                         <div className="space-y-2">
@@ -1231,6 +1392,59 @@ function HomeContent() {
                     profile={domainProfiles.soundProfile}
                     visual={<DomainRadar profile={domainProfiles.soundProfile} />}
                     insights={result.domainInsights?.soundProfile}
+                    advancedSections={[
+                      {
+                        title: "Modality balance",
+                        items: [
+                          {
+                            label: "Redundancy vs complementarity",
+                            metric: result.fingerprint.modalityBalance.redundancyVsComplementarity,
+                          },
+                          {
+                            label: "Modality over-reliance",
+                            metric: result.fingerprint.modalityBalance.modalityOverReliance,
+                          },
+                        ],
+                      },
+                      {
+                        title: "Cognitive load",
+                        items: [
+                          {
+                            label: "Load per second",
+                            metric: result.fingerprint.cognitiveLoad.loadPerSecond,
+                          },
+                          {
+                            label: "Load highlights",
+                            metric: result.fingerprint.cognitiveLoad.loadHighlights,
+                          },
+                        ],
+                      },
+                      {
+                        title: "Second-order summary",
+                        items: [
+                          {
+                            label: "Alignment score",
+                            metric: result.fingerprint.secondOrder.alignmentScore,
+                          },
+                          {
+                            label: "Drift score",
+                            metric: result.fingerprint.secondOrder.driftScore,
+                          },
+                          {
+                            label: "Decay score",
+                            metric: result.fingerprint.secondOrder.decayScore,
+                          },
+                          {
+                            label: "Balance score",
+                            metric: result.fingerprint.secondOrder.balanceScore,
+                          },
+                          {
+                            label: "Timing score",
+                            metric: result.fingerprint.secondOrder.timingScore,
+                          },
+                        ],
+                      },
+                    ]}
                     extra={
                       <div className="space-y-2">
                         {soundCallout}
