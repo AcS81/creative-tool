@@ -194,7 +194,9 @@ const MULTIMODAL_TIMEOUT_MS = parsePositiveInt(process.env.GEMINI_MULTIMODAL_TIM
 
 const withTimeoutSignal = (parent: AbortSignal | undefined, timeoutMs: number) => {
   const controller = new AbortController();
+  let timedOut = false;
   const timer = setTimeout(() => {
+    timedOut = true;
     controller.abort();
   }, timeoutMs);
 
@@ -214,7 +216,7 @@ const withTimeoutSignal = (parent: AbortSignal | undefined, timeoutMs: number) =
     }
   };
 
-  return { signal: controller.signal, cleanup };
+  return { signal: controller.signal, cleanup, didTimeout: () => timedOut };
 };
 
 export type GeminiMultimodalErrorCode =
@@ -723,7 +725,7 @@ export const callGeminiMultimodalJson = async (
   const startTime = Date.now();
   let attemptCount = 0;
   let lastUsage: GeminiUsage | undefined;
-  const { signal: requestSignal, cleanup: cleanupRequestTimeout } = withTimeoutSignal(
+  const { signal: requestSignal, cleanup: cleanupRequestTimeout, didTimeout } = withTimeoutSignal(
     request.signal,
     timeoutMs,
   );
@@ -854,17 +856,19 @@ export const callGeminiMultimodalJson = async (
       };
     }
 
-    const message =
-      primaryOutcome.errorMessage || "Gemini returned an error while ingesting the URL.";
+    const message = primaryOutcome.errorMessage || "Gemini returned an error while ingesting the URL.";
+    const resolvedMessage = didTimeout()
+      ? `Timed out after ${Math.round(timeoutMs / 1000)}s while waiting for Gemini.`
+      : message;
 
     if (primaryOutcome.status && primaryOutcome.status >= 200 && primaryOutcome.status < 300) {
       return {
-        ...toInvalidResponse(message, primaryOutcome.status),
+        ...toInvalidResponse(resolvedMessage, primaryOutcome.status),
         metrics: buildMetrics(primaryOutcome.status),
       };
     }
     return {
-      ...toUpstreamError(message, primaryOutcome.status),
+      ...toUpstreamError(resolvedMessage, primaryOutcome.status),
       metrics: buildMetrics(primaryOutcome.status),
     };
   } finally {

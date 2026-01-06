@@ -72,7 +72,7 @@ The current app covers the PRD MVP features:
 3) Paste a public YouTube URL and run analysis. If Gemini returns 404, try a different `GEMINI_MODEL` your key can access.
 
 ### Latency and cost expectations
-- Gemini + YouTube mode may take up to 5–10 minutes for a long video; calls are synchronous in this iteration.
+- Gemini + YouTube mode is variable: core runs are often a few minutes, but full runs (advanced signals + salvage) can take 20–40+ minutes on longer videos.
 - API usage incurs Gemini and YouTube quotas/billing; pick a lighter model (e.g., `gemini-2.5-flash`) if you want lower cost/latency.
 - Pricing reference + cost estimation: see `docs/gemini_pricing.md` (uses Gemini usageMetadata; excludes caching/grounding/storage).
 

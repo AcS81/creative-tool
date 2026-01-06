@@ -44,16 +44,39 @@ const applyDurationTimeouts = (config: AppConfig, durationSeconds?: number): App
     return config;
   }
 
-  let timeoutMs: number | undefined;
+  const passMode = config.multimodalPassMode ?? "full";
+
+  let coreTimeoutMs: number | undefined;
+  let advancedTimeoutMs: number | undefined;
+  let salvageTimeoutMs: number | undefined;
+
   if (durationSeconds >= 3600) {
-    timeoutMs = 540000;
+    coreTimeoutMs = 900000;
+    advancedTimeoutMs = 2400000;
+    salvageTimeoutMs = 1800000;
   } else if (durationSeconds >= 2400) {
-    timeoutMs = 420000;
+    coreTimeoutMs = 720000;
+    advancedTimeoutMs = 1800000;
+    salvageTimeoutMs = 1200000;
   } else if (durationSeconds >= 1200) {
-    timeoutMs = 300000;
+    coreTimeoutMs = 600000;
+    advancedTimeoutMs = 1500000;
+    salvageTimeoutMs = 900000;
+  } else if (durationSeconds >= 600) {
+    coreTimeoutMs = 360000;
+    advancedTimeoutMs = 900000;
+    salvageTimeoutMs = 600000;
   }
 
-  return timeoutMs ? { ...config, geminiMultimodalTimeoutMs: timeoutMs } : config;
+  if (!coreTimeoutMs) return config;
+
+  return {
+    ...config,
+    geminiMultimodalTimeoutMs: passMode === "core" ? coreTimeoutMs : (advancedTimeoutMs ?? coreTimeoutMs),
+    geminiMultimodalTimeoutMsCore: coreTimeoutMs,
+    geminiMultimodalTimeoutMsAdvanced: passMode === "core" ? undefined : advancedTimeoutMs ?? coreTimeoutMs,
+    geminiMultimodalTimeoutMsSalvage: passMode === "core" ? undefined : salvageTimeoutMs ?? advancedTimeoutMs ?? coreTimeoutMs,
+  };
 };
 
 const resolveFailureMessage = (error: unknown) => {
@@ -126,7 +149,14 @@ export const runAnalysisJob = async (videoAnalysisId: string) => {
         attemptCount: analysis.attemptCount,
         maxAttempts: analysis.maxAttempts ?? DEFAULT_MAX_ATTEMPTS,
         passMode: analysis.passMode ?? null,
+        durationSeconds: analysis.durationSeconds,
         analysisConfigHash: configSignature?.hash,
+        geminiTimeouts: {
+          baseMs: requestConfig.geminiMultimodalTimeoutMs ?? null,
+          coreMs: requestConfig.geminiMultimodalTimeoutMsCore ?? null,
+          advancedMs: requestConfig.geminiMultimodalTimeoutMsAdvanced ?? null,
+          salvageMs: requestConfig.geminiMultimodalTimeoutMsSalvage ?? null,
+        },
       });
       const configUpdate = configSignature
         ? {

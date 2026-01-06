@@ -197,6 +197,7 @@ function HomeContent() {
 
   const [url, setUrl] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [analysisNotice, setAnalysisNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [youtubeStatus, setYoutubeStatus] = useState<YoutubeConnectionStatus | null>(null);
@@ -370,7 +371,10 @@ function HomeContent() {
   const pollAnalysisJob = useCallback(async (jobId: string, passMode?: "core" | "full") => {
     activeJobRef.current = jobId;
     const startedAt = Date.now();
-    const timeoutMs = passMode === "full" ? 600000 : 420000;
+    const noticeAfterMs = passMode === "full" ? 600000 : 420000;
+    const hardTimeoutMs = passMode === "full" ? 3600000 : 1800000;
+    let noticeShown = false;
+    let pollDelayMs = 2000;
 
     while (activeJobRef.current === jobId) {
       try {
@@ -378,6 +382,7 @@ function HomeContent() {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
           setError(body?.message ?? "Could not fetch analysis status. Please try again.");
+          setAnalysisNotice(null);
           setLoading(false);
           activeJobRef.current = null;
           return;
@@ -387,6 +392,7 @@ function HomeContent() {
         if ("fingerprint" in body && body.fingerprint) {
           setResult(body as AnalyzeResponse);
           void refreshHistory();
+          setAnalysisNotice(null);
           setLoading(false);
           activeJobRef.current = null;
           return;
@@ -394,30 +400,45 @@ function HomeContent() {
 
         if ("status" in body && body.status === "failed") {
           setError(body.failureReason ?? "Analysis failed. Please try again.");
+          setAnalysisNotice(null);
           setLoading(false);
           activeJobRef.current = null;
           return;
         }
       } catch {
         setError("Could not fetch analysis status. Please try again.");
+        setAnalysisNotice(null);
         setLoading(false);
         activeJobRef.current = null;
         return;
       }
 
-      if (Date.now() - startedAt > timeoutMs) {
-        setError("Analysis is taking longer than expected. Long videos can take a few extra minutes.");
+      const elapsedMs = Date.now() - startedAt;
+      if (!noticeShown && elapsedMs > noticeAfterMs) {
+        setAnalysisNotice(
+          passMode === "full"
+            ? "Still running… Full mode on longer videos can take 20–40 minutes. Keep this tab open; results will appear automatically."
+            : "Still running… Longer videos can take several minutes. Keep this tab open; results will appear automatically.",
+        );
+        noticeShown = true;
+        pollDelayMs = 8000;
+      }
+
+      if (elapsedMs > hardTimeoutMs) {
+        setError("Analysis is taking longer than expected. You can keep waiting or check History to see if it completed.");
+        setAnalysisNotice(null);
         setLoading(false);
         activeJobRef.current = null;
         return;
       }
 
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
     }
   }, [refreshHistory]);
 
   const runAnalysis = async (targetUrl: string, passMode?: "core" | "full") => {
     setError(null);
+    setAnalysisNotice(null);
     setResult(null);
     setYoutubeMessage(null);
 
@@ -454,12 +475,14 @@ function HomeContent() {
       if ("fingerprint" in body && body.fingerprint) {
         setResult(body as AnalyzeResponse);
         void refreshHistory();
+        setAnalysisNotice(null);
         setLoading(false);
         return;
       }
 
       if ("status" in body && body.status === "failed") {
         setError(body.failureReason ?? "Analysis failed. Please try again.");
+        setAnalysisNotice(null);
         setLoading(false);
         return;
       }
@@ -473,6 +496,7 @@ function HomeContent() {
       void pollAnalysisJob(body.videoAnalysisId, passMode);
     } catch {
       setError("Could not analyze this URL. Please try again.");
+      setAnalysisNotice(null);
       setLoading(false);
     }
   };
@@ -734,6 +758,11 @@ function HomeContent() {
               <button type="submit" className="cs-button justify-center" disabled={loading}>
                 {loading ? "Analyzing..." : "Analyze video"}
               </button>
+              {analysisNotice ? (
+                <p className="text-xs text-muted" role="status" aria-live="polite">
+                  {analysisNotice}
+                </p>
+              ) : null}
               <div className="flex items-start gap-3 rounded-md border border-border bg-surface-strong/70 p-3 text-xs text-muted">
                 <span className="text-lg">💡</span>
                 <div>
