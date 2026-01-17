@@ -59,6 +59,22 @@ const parsePositiveInt = (raw: string | undefined, fallback: number) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 };
 
+const formatFetchError = (context: string, error: unknown) => {
+  if (!(error instanceof Error)) return context;
+  const details: string[] = [];
+  if (error.message) details.push(error.message);
+  const errorCode = (error as { code?: unknown }).code;
+  if (errorCode) details.push(String(errorCode));
+  const cause = (error as { cause?: unknown }).cause;
+  if (cause && typeof (cause as { message?: unknown }).message === "string") {
+    details.push(String((cause as { message?: unknown }).message));
+  }
+  const causeCode = cause && (cause as { code?: unknown }).code;
+  if (causeCode) details.push(String(causeCode));
+  const unique = details.filter((value, index) => details.indexOf(value) === index);
+  return unique.length ? `${context} (${unique.join("; ")})` : context;
+};
+
 const buildPrompt = (videoUrl: string) =>
   [
     "You are a concise video analyst.",
@@ -142,7 +158,7 @@ export async function getTranscriptAndScenes(
       }),
     });
   } catch (error) {
-    throw new GeminiApiError("UpstreamError", "Failed to reach Gemini API.", undefined, error);
+    throw new GeminiApiError("UpstreamError", formatFetchError("Failed to reach Gemini API", error), undefined, error);
   }
 
   if (!response.ok) {
@@ -393,7 +409,7 @@ const callGemini = async (input: {
 
     return { ok: true, status: response.status, payload };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to reach Gemini API.";
+    const message = formatFetchError("Failed to reach Gemini API", error);
     return { ok: false, status: undefined, errorMessage: message };
   }
 };
