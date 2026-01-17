@@ -770,6 +770,7 @@ export const getDerivedMetrics = () => getMetricsByTier(3);
 # Analysis depth control
 ANALYSIS_DEPTH=standard          # minimal | standard | full
 ENABLE_STRUCTURE_PASS=true       # Enable tier 0
+STRUCTURE_PASS_TIMEOUT_MS=30000  # Structure pass timeout (ms)
 ENABLE_ADVANCED_METRICS=true     # Enable tier 2
 ENABLE_DERIVED_SCORES=true       # Enable tier 3
 
@@ -1038,10 +1039,10 @@ Keep the data structures in schema for future use, but don't compute or display.
 
 ## Appendix B: Prompt Templates
 
-See separate file: `docs/prompt-templates.md` (to be created)
+See separate file: `docs/prompt-templates.md` 
 
 ---
 
 ## Appendix C: Schema Migration
 
-See separate file: `docs/schema-migration-v2.md` (to be created)
+See separate file: `docs/schema-migration-v2.md` (

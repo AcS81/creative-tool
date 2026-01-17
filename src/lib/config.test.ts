@@ -18,6 +18,8 @@ describe("getAppConfig", () => {
     delete process.env.ENABLE_ANALYSIS_V2_MULTIMODAL;
     delete process.env.ENABLE_ADVANCED_METRICS;
     delete process.env.GEMINI_RESPONSE_SCHEMA_ENABLED;
+    delete process.env.ENABLE_STRUCTURE_PASS;
+    delete process.env.STRUCTURE_PASS_TIMEOUT_MS;
   });
 
   it("defaults to mock mode and performance disabled", () => {
@@ -28,6 +30,8 @@ describe("getAppConfig", () => {
     expect(config.analysisV2MultimodalEnabled).toBe(false);
     expect(config.advancedMetricsEnabled).toBe(false);
     expect(config.geminiResponseSchemaEnabled).toBe(false);
+    expect(config.structurePassEnabled).toBe(true);
+    expect(config.structurePassTimeoutMs).toBe(30000);
   });
 
   it("enables multimodal by default in gemini mode when keys are present", () => {
@@ -94,5 +98,17 @@ describe("getAppConfig", () => {
 
     const config = getAppConfig();
     expect(config.advancedMetricsEnabled).toBe(false);
+  });
+
+  it("respects ENABLE_STRUCTURE_PASS override", () => {
+    process.env.ENABLE_STRUCTURE_PASS = "false";
+    const config = getAppConfig();
+    expect(config.structurePassEnabled).toBe(false);
+  });
+
+  it("uses STRUCTURE_PASS_TIMEOUT_MS when provided", () => {
+    process.env.STRUCTURE_PASS_TIMEOUT_MS = "45000";
+    const config = getAppConfig();
+    expect(config.structurePassTimeoutMs).toBe(45000);
   });
 });

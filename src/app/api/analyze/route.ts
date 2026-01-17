@@ -213,6 +213,8 @@ export async function POST(request: Request) {
           displayName: creatorDisplayName,
           channelId: cachedAnalysis.creator.channelId ?? undefined,
         });
+        // Extract fingerprint before transaction to satisfy TypeScript narrowing
+        const cachedFingerprintJson = cachedAnalysis.videoFingerprint.fingerprint;
 
         let cachedCopy: Prisma.VideoAnalysisGetPayload<{ include: { creator: true } }> | null = null;
         try {
@@ -244,7 +246,7 @@ export async function POST(request: Request) {
             await tx.videoFingerprint.create({
               data: {
                 videoAnalysisId: created.id,
-                fingerprint: cachedAnalysis.videoFingerprint.fingerprint,
+                fingerprint: cachedFingerprintJson,
               },
             });
 
@@ -455,7 +457,7 @@ export async function POST(request: Request) {
     }
 
     if (videoAnalysisId) {
-      await prisma.videoAnalysis.update({
+      const failedAnalysis = await prisma.videoAnalysis.update({
         where: { id: videoAnalysisId },
         data: {
           status: "failed",
@@ -466,7 +468,7 @@ export async function POST(request: Request) {
       });
       logEvent("alert", "analysis_job_failed_preflight", {
         analysisId: videoAnalysisId,
-        videoId,
+        videoId: failedAnalysis.youtubeVideoId,
         failureMessage: message,
       });
     }

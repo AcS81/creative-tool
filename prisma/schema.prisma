@@ -41,6 +41,7 @@ model VideoAnalysis {
   leaseExpiresAt  DateTime?
   leaseHeartbeatAt DateTime?
   ingestionJson   String?
+  structureJson   String?
   coreMetricsJson String?
   advancedMetricsJson String?
   idempotencyKey   String?         @unique

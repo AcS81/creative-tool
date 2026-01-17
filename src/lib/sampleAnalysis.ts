@@ -1,5 +1,6 @@
 import type { VideoFingerprintJson } from "./types";
 import type { AnalyzeVideoResult } from "./analysis/types";
+import type { VideoSkeleton } from "./analysis/types/skeleton";
 import { buildMockAdvancedMetrics, hashStringToNumber } from "./analysis/fingerprint/mockAdvancedMetrics";
 
 const samplePerformance: VideoFingerprintJson["performanceProfile"] = {
@@ -134,10 +135,83 @@ const sampleFingerprint: VideoFingerprintJson = {
   hasPerformanceData: true,
 };
 
+const sampleSkeleton: VideoSkeleton = {
+  durationSeconds: 420,
+  videoType: "essay",
+  topicSummary: "A creator walkthrough of CreatorSight. It highlights insights and coaching outputs.",
+  chapters: [
+    {
+      id: "ch1",
+      title: "Intro",
+      startSeconds: 0,
+      endSeconds: 90,
+      summary: "Introduces the CreatorSight workflow and goals.",
+      chapterType: "intro",
+    },
+    {
+      id: "ch2",
+      title: "Analysis Tour",
+      startSeconds: 90,
+      endSeconds: 300,
+      summary: "Walks through metrics, radar, and insights.",
+      chapterType: "body",
+    },
+    {
+      id: "ch3",
+      title: "Wrap",
+      startSeconds: 300,
+      endSeconds: 420,
+      summary: "Summarizes takeaways and invites feedback.",
+      chapterType: "outro",
+    },
+  ],
+  keyMoments: [
+    {
+      type: "hook",
+      timestamp: 12,
+      chapterId: "ch1",
+      description: "Promises faster creator insights.",
+    },
+    {
+      type: "cta",
+      timestamp: 402,
+      chapterId: "ch3",
+      description: "Asks viewers to share feedback.",
+    },
+  ],
+  contentMix: {
+    talkingHeadPct: 70,
+    brollPct: 10,
+    graphicsPct: 15,
+    screencastPct: 5,
+    otherPct: 0,
+  },
+  analysisHints: {
+    hasMusic: true,
+    hasSFX: false,
+    hasOnScreenText: true,
+    hasMultipleSpeakers: false,
+    primaryLanguage: "en",
+    estimatedComplexity: "medium",
+  },
+};
+
 export const sampleAnalysisResult: AnalyzeVideoResult = {
   fingerprint: sampleFingerprint,
+  skeleton: sampleSkeleton,
   overallArchetype: sampleFingerprint.overallArchetype ?? "Sample Archetype",
-  diagnostics: { source: "mock", analysisPath: "mock", analysisVersion: "v2" },
+  diagnostics: {
+    source: "mock",
+    analysisPath: "mock",
+    analysisVersion: "v2",
+    structurePass: {
+      success: true,
+      durationMs: 0,
+      tokensUsed: 0,
+      costUsd: 0,
+      retryCount: 0,
+    },
+  },
 };
 
 export const sampleMetadata = {

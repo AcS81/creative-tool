@@ -88,8 +88,9 @@ export function VoicePaceMiniChart({ prosodyArc }: { prosodyArc?: VideoFingerpri
                 cy={point.y}
                 r={3.5}
                 className="fill-white stroke-accent stroke-2"
-                title={`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}
-              />
+              >
+                <title>{`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}</title>
+              </circle>
             ))}
           </svg>
         </div>

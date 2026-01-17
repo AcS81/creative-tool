@@ -288,6 +288,8 @@ describe("analyzeVideoMultimodal", () => {
         analysisV2MultimodalEnabled: true,
         performanceEnabled: false,
         advancedMetricsEnabled: false,
+        structurePassEnabled: true,
+        structurePassTimeoutMs: 30000,
         multimodalPassMode: "core",
       },
     });

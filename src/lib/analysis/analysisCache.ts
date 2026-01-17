@@ -12,6 +12,8 @@ type AnalysisConfigPayload = {
   analysisVersion: AppConfig["analysisVersion"];
   multimodalPassMode: AppConfig["multimodalPassMode"] | null;
   advancedMetricsEnabled: boolean;
+  structurePassEnabled: boolean;
+  structurePassTimeoutMs: number;
   geminiResponseSchemaEnabled: boolean;
   models: {
     core: string | null;
@@ -36,6 +38,8 @@ export const buildAnalysisConfigSignature = (config: AppConfig): AnalysisConfigS
     analysisVersion: config.analysisVersion,
     multimodalPassMode: config.multimodalPassMode ?? null,
     advancedMetricsEnabled: config.advancedMetricsEnabled,
+    structurePassEnabled: config.structurePassEnabled,
+    structurePassTimeoutMs: config.structurePassTimeoutMs,
     geminiResponseSchemaEnabled: config.geminiResponseSchemaEnabled ?? false,
     models: {
       core: config.geminiMultimodalCoreModel ?? null,

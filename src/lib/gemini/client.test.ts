@@ -90,6 +90,9 @@ describe("callGeminiMultimodalJson", () => {
     performanceEnabled: false,
     analysisV2MultimodalEnabled: true,
     advancedMetricsEnabled: true,
+    structurePassEnabled: true,
+    structurePassTimeoutMs: 30000,
+    geminiResponseSchemaEnabled: false,
   };
 
   const sampleCandidate = (data: unknown, usageMetadata?: Record<string, unknown>) => ({

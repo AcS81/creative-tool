@@ -31,6 +31,11 @@ const buildSteps = (passMode?: "core" | "full"): Step[] => {
       detail: "Pulling audio + frames for analysis.",
     },
     {
+      key: "structure",
+      label: "Extracting structure",
+      detail: "Identifying chapters and key moments.",
+    },
+    {
       key: "core",
       label: "Analyzing core signals",
       detail: "Voice, language, narrative, visual, editing, and sound.",

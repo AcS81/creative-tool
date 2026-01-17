@@ -60,6 +60,7 @@ The current app covers the PRD MVP features:
 - Multimodal regression helper: `npm run golden:multimodal` runs a small golden set (requires Gemini keys; see `docs/multimodal_golden_set.md`).
 - Alignment & Load preview: mock mode and seeds now surface alignment/drift/balance/timing and cognitive-load timelines (Overview “Alignment & Load” section).
 - Rollback: set `ENABLE_ADVANCED_METRICS=false` to force placeholder alignment/load metrics (schema stays v1.3.0) while keeping the rest of the analysis live.
+- Structure pass control: `ENABLE_STRUCTURE_PASS=false` skips tier 0 and uses fallback skeletons; `STRUCTURE_PASS_TIMEOUT_MS` sets the tier 0 timeout in ms.
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.

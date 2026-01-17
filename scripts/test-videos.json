@@ -1,0 +1,106 @@
+{
+  "description": "Test videos for validating the tiered analysis pipeline",
+  "lastUpdated": "2026-01-17",
+  "videos": [
+    {
+      "id": "test_short_5min",
+      "youtubeId": "IobYjhdAlH0",
+      "youtubeUrl": "https://www.youtube.com/watch?v=IobYjhdAlH0",
+      "title": "Test: 5-Minute Short Video",
+      "durationSeconds": 300,
+      "bucket": "short",
+      "type": "essay",
+      "expectedChapters": 4,
+      "notes": "5-minute test case"
+    },
+    {
+      "id": "test_medium_13min",
+      "youtubeId": "K-8c0ETmTvg",
+      "youtubeUrl": "https://www.youtube.com/watch?v=K-8c0ETmTvg",
+      "title": "Test: 13-Minute Medium Video (treat as 10min bucket)",
+      "durationSeconds": 780,
+      "bucket": "medium",
+      "type": "essay",
+      "expectedChapters": 5,
+      "notes": "Using as 10-minute test case"
+    },
+    {
+      "id": "test_long_20min",
+      "youtubeId": "UFXiFfj058U",
+      "youtubeUrl": "https://www.youtube.com/watch?v=UFXiFfj058U",
+      "title": "Test: 20-Minute Long Video",
+      "durationSeconds": 1200,
+      "bucket": "long",
+      "type": "essay",
+      "expectedChapters": 6,
+      "notes": "Primary 20-minute test case"
+    },
+    {
+      "id": "test_extended_40min",
+      "youtubeId": "5J2WGVrspd8",
+      "youtubeUrl": "https://www.youtube.com/watch?v=5J2WGVrspd8",
+      "title": "Test: 40-Minute Extended Video",
+      "durationSeconds": 2400,
+      "bucket": "extended",
+      "type": "documentary",
+      "expectedChapters": 7,
+      "notes": "Stress test for long-form content"
+    }
+  ],
+  "buckets": {
+    "micro": {
+      "minSeconds": 0,
+      "maxSeconds": 60
+    },
+    "short": {
+      "minSeconds": 60,
+      "maxSeconds": 180
+    },
+    "medium": {
+      "minSeconds": 180,
+      "maxSeconds": 600
+    },
+    "long": {
+      "minSeconds": 600,
+      "maxSeconds": 1200
+    },
+    "extended": {
+      "minSeconds": 1200,
+      "maxSeconds": 2700
+    },
+    "marathon": {
+      "minSeconds": 2700,
+      "maxSeconds": null
+    }
+  },
+  "thresholds": {
+    "structureLatencyMs": {
+      "short": 20000,
+      "medium": 30000,
+      "long": 45000,
+      "extended": 60000
+    },
+    "coreLatencyMs": {
+      "short": 60000,
+      "medium": 120000,
+      "long": 180000,
+      "extended": 240000
+    },
+    "totalLatencyMs": {
+      "short": 90000,
+      "medium": 180000,
+      "long": 300000,
+      "extended": 420000
+    },
+    "tier1ObservedPct": {
+      "min": 75,
+      "target": 85
+    },
+    "maxCostUsd": {
+      "short": 0.1,
+      "medium": 0.15,
+      "long": 0.25,
+      "extended": 0.4
+    }
+  }
+}

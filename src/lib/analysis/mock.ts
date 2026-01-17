@@ -5,6 +5,7 @@ import type { DomainKey } from "../archetypes/descriptions";
 import { getAxesForDomain } from "./axisMetadata";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildMockAdvancedMetrics, hashStringToNumber } from "./fingerprint/mockAdvancedMetrics";
+import { buildFallbackSkeleton } from "./structurePass";
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
 
@@ -44,6 +45,9 @@ const archetypeForMeta = (meta: VideoFingerprintJson["metaAxes"]) => {
 export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   const seed = hashStringToNumber(input.videoId);
   const advancedMetrics = buildMockAdvancedMetrics(seed);
+  const skeleton = buildFallbackSkeleton({
+    durationSeconds: input.durationSeconds,
+  });
 
   const fingerprint: VideoFingerprintJson = {
     version: "1.3.0",
@@ -88,12 +92,20 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
 
   return {
     fingerprint: validatedFingerprint,
+    skeleton,
     overallArchetype,
     diagnostics: {
       source: "mock",
       hashSeed: seed,
       analysisPath: "mock",
       analysisVersion: "v2",
+      structurePass: {
+        success: true,
+        durationMs: 0,
+        tokensUsed: 0,
+        costUsd: 0,
+        retryCount: 0,
+      },
       advancedMetricsDefaulted: false,
       advancedMetricsObserved: true,
     },

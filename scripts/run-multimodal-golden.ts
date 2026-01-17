@@ -427,6 +427,8 @@ async function run() {
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "dev",
     performanceEnabled: false,
     advancedMetricsEnabled: true,
+    structurePassEnabled: true,
+    structurePassTimeoutMs: 30000,
     geminiResponseSchemaEnabled: false,
   };
 

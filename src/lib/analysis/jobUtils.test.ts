@@ -23,6 +23,7 @@ describe("jobUtils", () => {
       storedSchemaHash: "old",
       currentConfigHash: "new",
       currentSchemaHash: "new",
+      hasStructure: true,
       hasIngestion: true,
       hasCore: true,
       hasAdvanced: true,
@@ -39,6 +40,7 @@ describe("jobUtils", () => {
       storedSchemaHash: "schema",
       currentConfigHash: "hash",
       currentSchemaHash: "schema",
+      hasStructure: true,
       hasIngestion: true,
       hasCore: true,
       hasAdvanced: false,
@@ -55,6 +57,7 @@ describe("jobUtils", () => {
       storedSchemaHash: "schema",
       currentConfigHash: "hash",
       currentSchemaHash: "schema",
+      hasStructure: true,
       hasIngestion: true,
       hasCore: true,
       hasAdvanced: true,
@@ -63,5 +66,37 @@ describe("jobUtils", () => {
     expect(plan.resetStages).toBe(false);
     expect(plan.resumeStage).toBe("performance");
     expect(plan.useAdvanced).toBe(false);
+  });
+
+  it("inserts structure stage before core when missing", () => {
+    const plan = resolveResumePlan({
+      storedConfigHash: "hash",
+      storedSchemaHash: "schema",
+      currentConfigHash: "hash",
+      currentSchemaHash: "schema",
+      hasStructure: false,
+      hasIngestion: true,
+      hasCore: false,
+      hasAdvanced: false,
+      advancedMetricsEnabled: false,
+    });
+    expect(plan.resumeStage).toBe("structure");
+    expect(plan.useStructure).toBe(false);
+  });
+
+  it("skips structure when core is already available", () => {
+    const plan = resolveResumePlan({
+      storedConfigHash: "hash",
+      storedSchemaHash: "schema",
+      currentConfigHash: "hash",
+      currentSchemaHash: "schema",
+      hasStructure: false,
+      hasIngestion: true,
+      hasCore: true,
+      hasAdvanced: false,
+      advancedMetricsEnabled: false,
+    });
+    expect(plan.resumeStage).toBe("performance");
+    expect(plan.useStructure).toBe(true);
   });
 });

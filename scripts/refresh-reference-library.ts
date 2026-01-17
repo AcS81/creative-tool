@@ -44,7 +44,7 @@ const matchesFilter = (
   if (!filters.length) return true;
   const latestVideoId = ref.analyses[0]?.youtubeVideoId;
   const candidates = [ref.id, ref.displayName, ref.channelId, latestVideoId]
-    .filter(Boolean)
+    .filter((value): value is string => Boolean(value))
     .map((value) => value.toLowerCase());
   return candidates.some((candidate) => filters.includes(candidate));
 };

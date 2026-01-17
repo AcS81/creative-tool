@@ -85,6 +85,8 @@ async function main() {
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "unused",
     performanceEnabled: false,
     advancedMetricsEnabled: true,
+    structurePassEnabled: true,
+    structurePassTimeoutMs: 30000,
   };
 
   console.log("=== Gemini multimodal call (URL-only ingestion) ===");

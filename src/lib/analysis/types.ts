@@ -1,5 +1,6 @@
 import type { VideoFingerprintJson } from "../types";
 import type { GeminiRequestMetrics, GeminiUsage } from "../gemini/client";
+import type { VideoSkeleton } from "./types/skeleton";
 
 export interface AnalyzeVideoInput {
   videoId: string;
@@ -17,11 +18,22 @@ export type FingerprintLoadError = {
   schemaHash?: string;
 };
 
+export type PassResult = {
+  success: boolean;
+  durationMs: number;
+  tokensUsed: number;
+  costUsd: number;
+  retryCount: number;
+  errorMessage?: string;
+};
+
 export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
+  skeleton: VideoSkeleton;
   overallArchetype: string;
   diagnostics?: {
     source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal";
+    structurePass?: PassResult;
     hashSeed?: number;
     performanceAttached?: boolean;
     performanceErrorType?: string;
@@ -104,4 +116,4 @@ export type IngestionPreflight = {
 };
 
 // Multimodal analysis v2 response contracts.
-export * from "./types/multimodal";
+export * from "./types";

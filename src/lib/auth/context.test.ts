@@ -48,7 +48,13 @@ describe("auth context", () => {
 
     const config = {
       analysisMode: "gemini" as const,
+      analysisVersion: "v2" as const,
+      analysisV2MultimodalEnabled: true,
       performanceEnabled: true,
+      advancedMetricsEnabled: true,
+      structurePassEnabled: true,
+      structurePassTimeoutMs: 30000,
+      geminiResponseSchemaEnabled: false,
       googleClientId: process.env.GOOGLE_CLIENT_ID,
       googleClientSecret: process.env.GOOGLE_CLIENT_SECRET,
       googleRedirectUrl: process.env.GOOGLE_REDIRECT_URL,
@@ -59,4 +65,3 @@ describe("auth context", () => {
     expect(() => requirePerformanceReady(config)).not.toThrow();
   });
 });
-

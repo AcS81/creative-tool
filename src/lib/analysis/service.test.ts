@@ -6,9 +6,14 @@ import { ConfigError } from "../config";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 
 const mockAnalyzeVideoMultimodal = vi.fn();
+const mockRunStructurePass = vi.fn();
 
 vi.mock("./geminiMultimodalAnalyzer", () => ({
   analyzeVideoMultimodal: (...args: any[]) => mockAnalyzeVideoMultimodal(...args),
+}));
+
+vi.mock("./structurePass", () => ({
+  runStructurePass: (...args: any[]) => mockRunStructurePass(...args),
 }));
 
 function mockDomain(label: string, base: number): DomainProfile {
@@ -32,11 +37,15 @@ const baseConfig: AppConfig = {
   youtubeApiKey: "yt",
   performanceEnabled: false,
   advancedMetricsEnabled: true,
+  structurePassEnabled: true,
+  structurePassTimeoutMs: 30000,
+  geminiResponseSchemaEnabled: false,
 };
 
 describe("analyzeVideo service", () => {
   beforeEach(() => {
     mockAnalyzeVideoMultimodal.mockReset();
+    mockRunStructurePass.mockReset();
   });
 
   afterEach(() => {
@@ -62,22 +71,78 @@ describe("analyzeVideo service", () => {
     });
   };
 
+  const setupStructurePass = () => {
+    mockRunStructurePass.mockResolvedValue({
+      skeleton: {
+        durationSeconds: 600,
+        videoType: "tutorial",
+        topicSummary: "Sample topic summary for tests. It covers the video overview.",
+        chapters: [
+          {
+            id: "ch1",
+            title: "Intro",
+            startSeconds: 0,
+            endSeconds: 60,
+            summary: "Introduces the topic briefly.",
+            chapterType: "intro",
+          },
+          {
+            id: "ch2",
+            title: "Body",
+            startSeconds: 60,
+            endSeconds: 600,
+            summary: "Covers the main discussion points.",
+            chapterType: "body",
+          },
+        ],
+        keyMoments: [
+          {
+            type: "hook",
+            timestamp: 5,
+            chapterId: "ch1",
+            description: "Promises clear outcomes quickly.",
+          },
+        ],
+        contentMix: {
+          talkingHeadPct: 60,
+          brollPct: 20,
+          graphicsPct: 10,
+          screencastPct: 5,
+          otherPct: 5,
+        },
+        analysisHints: {
+          hasMusic: false,
+          hasSFX: false,
+          hasOnScreenText: true,
+          hasMultipleSpeakers: false,
+          primaryLanguage: "en",
+          estimatedComplexity: "medium",
+        },
+      },
+      source: "gemini",
+    });
+  };
+
   it("returns a valid fingerprint with multimodal analysis", async () => {
     setupMultimodal();
+    setupStructurePass();
 
     const result = await analyzeVideo({ videoId: "abc123" }, { config: baseConfig });
     expect(result.fingerprint.version).toBe("1.3.0");
     expect(result.fingerprint.perDomain.voiceProfile.scores.length).toBeGreaterThan(0);
     expect(result.fingerprint.supporting?.beats?.length).toBe(1);
+    expect(result.skeleton.durationSeconds).toBe(600);
     expect(result.diagnostics?.source).toBe("gemini-v2-multimodal");
     expect(result.diagnostics?.analysisVersion).toBe("v2");
     expect(result.diagnostics?.advancedMetricsDefaulted).toBe(true);
     expect(result.diagnostics?.advancedMetricsObserved).toBe(false);
     expect(result.diagnostics?.advancedMetricsDefaultReason).toContain("unavailable");
+    expect(result.diagnostics?.structurePass?.success).toBe(true);
   });
 
   it("surfaces rollback diagnostics when advanced metrics are disabled", async () => {
     setupMultimodal();
+    setupStructurePass();
 
     const result = await analyzeVideo(
       { videoId: "abc-disabled" },
@@ -115,6 +180,7 @@ describe("analyzeVideo service", () => {
       },
       advancedMetrics,
     });
+    setupStructurePass();
 
     const result = await analyzeVideo({ videoId: "abc-advanced" }, { config: baseConfig });
     expect(result.diagnostics?.advancedMetricsObserved).toBe(true);
@@ -135,5 +201,6 @@ describe("analyzeVideo service", () => {
     );
     expect(result.diagnostics?.source).toBe("mock");
     expect(result.fingerprint.version).toBe("1.3.0");
+    expect(result.diagnostics?.structurePass?.success).toBe(true);
   });
 });

@@ -233,7 +233,9 @@ function HomeContent() {
   const jobStalled =
     jobStatus === "running" &&
     jobHeartbeatAt &&
-    Date.now() - new Date(jobHeartbeatAt).getTime() > STALLED_HEARTBEAT_MS;
+    Date.now() - new Date(jobHeartbeatAt).getTime() > STALLED_HEARTBEAT_MS
+      ? true
+      : undefined;
 
   const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -422,7 +424,7 @@ function HomeContent() {
           return;
         }
 
-        if ("status" in body) {
+        if ("status" in body && body.status) {
           setJobStatus(body.status);
           setJobStage(body.analysisStage ?? null);
           setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
@@ -430,7 +432,8 @@ function HomeContent() {
         }
 
         if ("status" in body && body.status === "failed") {
-          setError(body.failureReason ?? "Analysis failed. Please try again.");
+          const failureReason = "failureReason" in body ? body.failureReason : undefined;
+          setError(failureReason ?? "Analysis failed. Please try again.");
           setAnalysisNotice(null);
           setLoading(false);
           setJobStatus(null);
@@ -536,7 +539,8 @@ function HomeContent() {
       }
 
       if ("status" in body && body.status === "failed") {
-        setError(body.failureReason ?? "Analysis failed. Please try again.");
+        const failureReason = "failureReason" in body ? body.failureReason : undefined;
+        setError(failureReason ?? "Analysis failed. Please try again.");
         setAnalysisNotice(null);
         setLoading(false);
         setJobStatus(null);
@@ -556,7 +560,9 @@ function HomeContent() {
         return;
       }
 
-      setJobStatus(body.status);
+      if (body.status) {
+        setJobStatus(body.status);
+      }
       setJobStage(body.analysisStage ?? null);
       setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
       setJobId(body.videoAnalysisId);
@@ -596,7 +602,9 @@ function HomeContent() {
         return;
       }
       const body = (await res.json()) as AnalyzeJobResponse;
-      setJobStatus(body.status);
+      if (body.status) {
+        setJobStatus(body.status);
+      }
       setJobStage(body.analysisStage ?? null);
       setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
       setJobId(body.videoAnalysisId);
@@ -1036,13 +1044,9 @@ function HomeContent() {
                             <span
                               key={`${chip?.label}-${idx}`}
                               className={`cs-pill text-[11px] ${
-                                chip?.tone === "warn"
-                                  ? "border-amber-300 bg-amber-100 text-amber-800"
-                                  : chip?.tone === "alert"
-                                    ? "border-red-300 bg-red-50 text-red-700"
-                                    : chip?.tone === "success"
-                                      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
-                                      : "bg-surface-strong text-muted"
+                                chip?.tone === "success"
+                                  ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                  : "bg-surface-strong text-muted"
                               }`}
                             >
                               {chip?.label}

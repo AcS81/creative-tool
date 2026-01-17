@@ -1,4 +1,11 @@
-export type AnalysisStage = "queued" | "ingestion" | "core" | "advanced" | "performance" | "finalize";
+export type AnalysisStage =
+  | "queued"
+  | "ingestion"
+  | "structure"
+  | "core"
+  | "advanced"
+  | "performance"
+  | "finalize";
 
 export type ClaimableJobInput = {
   status?: string | null;
@@ -10,6 +17,7 @@ export type ResumePlan = {
   resetStages: boolean;
   resumeStage: AnalysisStage;
   useIngestion: boolean;
+  useStructure: boolean;
   useCore: boolean;
   useAdvanced: boolean;
 };
@@ -39,6 +47,7 @@ export const resolveResumePlan = (input: {
   storedSchemaHash?: string | null;
   currentConfigHash: string;
   currentSchemaHash: string;
+  hasStructure: boolean;
   hasIngestion: boolean;
   hasCore: boolean;
   hasAdvanced: boolean;
@@ -53,18 +62,22 @@ export const resolveResumePlan = (input: {
       resetStages: true,
       resumeStage: "ingestion",
       useIngestion: false,
+      useStructure: false,
       useCore: false,
       useAdvanced: false,
     };
   }
 
   const useIngestion = input.hasIngestion;
+  const useStructure = input.hasStructure || input.hasCore;
   const useCore = input.hasCore;
   const useAdvanced = input.advancedMetricsEnabled && input.hasAdvanced;
 
   let resumeStage: AnalysisStage = "performance";
   if (!useIngestion) {
     resumeStage = "ingestion";
+  } else if (!useStructure) {
+    resumeStage = "structure";
   } else if (!useCore) {
     resumeStage = "core";
   } else if (input.advancedMetricsEnabled && !useAdvanced) {
@@ -75,6 +88,7 @@ export const resolveResumePlan = (input: {
     resetStages: false,
     resumeStage,
     useIngestion,
+    useStructure,
     useCore,
     useAdvanced,
   };

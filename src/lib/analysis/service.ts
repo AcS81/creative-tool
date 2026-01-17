@@ -1,6 +1,6 @@
 import { ConfigError, getAppConfig, type AppConfig } from "../config";
 import { mockAnalyzeVideo } from "./mock";
-import type { AnalyzeVideoInput, AnalyzeVideoResult, IngestionPreflight } from "./types";
+import type { AnalyzeVideoInput, AnalyzeVideoResult, IngestionPreflight, PassResult } from "./types";
 import type {
   MetaAxes,
   VideoFingerprintJson,
@@ -17,12 +17,16 @@ import type { MultimodalAnalysisResult } from "./geminiMultimodalAnalyzer";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
+import { buildFallbackSkeleton, runStructurePass } from "./structurePass";
+import type { VideoSkeleton } from "./types/skeleton";
 
 type AnalyzeOptions = {
   config?: AppConfig;
   useMock?: boolean;
   auth?: AuthContext | null;
   ingestionPreflight?: IngestionPreflight;
+  structurePass?: PassResult;
+  skeleton?: VideoSkeleton;
 };
 
 const archetypeForMeta = (meta: MetaAxes) => {
@@ -72,12 +76,57 @@ const observedAdvancedSections = (advanced?: AdvancedFingerprintMetrics) =>
         secondOrder: hasObservedSection(advanced.secondOrder),
       };
 
+const buildStructurePassDiagnostics = (input: {
+  success: boolean;
+  durationMs?: number;
+  errorMessage?: string;
+}): PassResult => ({
+  success: input.success,
+  durationMs: input.durationMs ?? 0,
+  tokensUsed: 0,
+  costUsd: 0,
+  retryCount: 0,
+  errorMessage: input.errorMessage,
+});
+
+const resolveStructureContext = (input: {
+  skeleton?: VideoSkeleton;
+  structurePass?: PassResult;
+  durationSeconds?: number;
+}): { skeleton: VideoSkeleton; structurePass: PassResult } => {
+  if (input.skeleton && input.structurePass) {
+    return { skeleton: input.skeleton, structurePass: input.structurePass };
+  }
+
+  const skeleton =
+    input.skeleton ??
+    buildFallbackSkeleton({
+      durationSeconds: input.durationSeconds,
+    });
+
+  const structurePass =
+    input.structurePass ??
+    buildStructurePassDiagnostics({
+      success: false,
+      errorMessage: input.skeleton
+        ? "Structure pass diagnostics missing; using provided skeleton."
+        : "Structure pass not run; using fallback skeleton.",
+    });
+
+  return { skeleton, structurePass };
+};
+
 export async function buildAnalysisFromMultimodal(
   input: AnalyzeVideoInput,
   multimodal: MultimodalAnalysisResult,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
+  const structureContext = resolveStructureContext({
+    skeleton: options.skeleton,
+    structurePass: options.structurePass,
+    durationSeconds: input.durationSeconds,
+  });
   const attachPerformance = async (currentFingerprint: VideoFingerprintJson) => {
     let fingerprint = currentFingerprint;
     let performanceAttached = false;
@@ -174,9 +223,11 @@ export async function buildAnalysisFromMultimodal(
 
   return {
     fingerprint: validated,
+    skeleton: structureContext.skeleton,
     overallArchetype,
     diagnostics: {
       source: "gemini-v2-multimodal",
+      structurePass: structureContext.structurePass,
       performanceAttached: performance.performanceAttached,
       performanceErrorType: performance.performanceErrorType,
       performanceErrorMessage: performance.performanceErrorMessage,
@@ -215,6 +266,22 @@ export async function analyzeVideo(
   }
 
   const videoUrl = buildVideoUrl(input.videoId);
+  const structureStart = Date.now();
+  const structureResult = await runStructurePass({
+    youtubeUrl: videoUrl,
+    durationSeconds: input.durationSeconds,
+  }, {
+    config,
+  });
+  const structurePass = buildStructurePassDiagnostics({
+    success: structureResult.source === "gemini",
+    durationMs: Date.now() - structureStart,
+    errorMessage: structureResult.error,
+  });
   const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
-  return buildAnalysisFromMultimodal(input, multimodal, options);
+  return buildAnalysisFromMultimodal(input, multimodal, {
+    ...options,
+    skeleton: structureResult.skeleton,
+    structurePass,
+  });
 }

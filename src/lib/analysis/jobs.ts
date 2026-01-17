@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import prisma from "../db";
 import { analyzeVideo, buildAnalysisFromMultimodal } from "./service";
-import type { IngestionPreflight } from "./types";
+import type { IngestionPreflight, PassResult } from "./types";
 import { GeminiApiError, preflightGeminiIngestion } from "../gemini/client";
 import { getAuthContext } from "../auth/context";
 import { ConfigError, getAppConfig, type AppConfig, type MultimodalPassMode } from "../config";
@@ -18,6 +18,8 @@ import {
   type MultimodalCorePayload,
 } from "./geminiMultimodalAnalyzer";
 import { isJobClaimable, resolveResumePlan, type AnalysisStage } from "./jobUtils";
+import { buildFallbackSkeleton, runStructurePass } from "./structurePass";
+import type { VideoSkeleton } from "./types/skeleton";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
 const BASE_RETRY_DELAY_MS = 5000;
@@ -125,6 +127,13 @@ const safeParseJson = <T>(raw: string | null | undefined): T | null => {
   } catch {
     return null;
   }
+};
+
+type StructurePassPayload = {
+  skeleton?: VideoSkeleton;
+  structureSource?: "gemini" | "fallback";
+  structureError?: string;
+  structureDurationMs?: number;
 };
 
 const updateStage = async (analysisId: string, leaseOwner: string, stage: AnalysisStage) => {
@@ -289,6 +298,7 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
   let requestConfig: AppConfig | undefined;
   let configSignature: ReturnType<typeof buildAnalysisConfigSignature> | undefined;
   let ingestionPreflight: IngestionPreflight | undefined;
+  let structurePayload: StructurePassPayload | null = null;
   let corePayload: MultimodalCorePayload | null = null;
   let advancedPayload: MultimodalAdvancedPayload | null = null;
 
@@ -314,17 +324,24 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
     };
 
     ingestionPreflight = safeParseJson<IngestionPreflight>(analysis.ingestionJson) ?? undefined;
+    structurePayload = safeParseJson<StructurePassPayload>(analysis.structureJson);
+    if (structurePayload && !structurePayload.skeleton) {
+      structurePayload = null;
+    }
     corePayload = safeParseJson<MultimodalCorePayload>(analysis.coreMetricsJson);
     if (corePayload && !corePayload.parsed) {
       corePayload = null;
     }
     advancedPayload = safeParseJson<MultimodalAdvancedPayload>(analysis.advancedMetricsJson);
 
+    const hasStructure = Boolean(structurePayload?.skeleton) || Boolean(corePayload?.parsed);
+
     const resumePlan = resolveResumePlan({
       storedConfigHash: analysis.analysisConfigHash,
       storedSchemaHash: analysis.fingerprintSchemaHash,
       currentConfigHash: configSignature.hash,
       currentSchemaHash: FINGERPRINT_SCHEMA_HASH,
+      hasStructure,
       hasIngestion: Boolean(ingestionPreflight),
       hasCore: Boolean(corePayload?.parsed),
       hasAdvanced: Boolean(advancedPayload),
@@ -340,6 +357,7 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
         where: { id: analysis.id, leaseOwner },
         data: {
           ingestionJson: null,
+          structureJson: null,
           coreMetricsJson: null,
           advancedMetricsJson: null,
           analysisStage: resetStage,
@@ -455,6 +473,45 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
         return;
       }
 
+      if (!resumePlan.useStructure) {
+        const stageOk = await updateStage(analysis.id, leaseOwner, "structure");
+        if (!stageOk) {
+          logEvent("warn", "analysis_job_orphaned", {
+            analysisId: analysis.id,
+            videoId: analysis.youtubeVideoId,
+            stage: "structure_start",
+          });
+          return;
+        }
+
+        const structureStartedAt = Date.now();
+        const structureResult = await runStructurePass({
+          youtubeUrl,
+          durationSeconds: analysis.durationSeconds,
+        }, {
+          config: requestConfig,
+        });
+        structurePayload = {
+          skeleton: structureResult.skeleton,
+          structureSource: structureResult.source,
+          structureError: structureResult.error,
+          structureDurationMs: Date.now() - structureStartedAt,
+        };
+
+        const saved = await completeStage(analysis.id, leaseOwner, {
+          structureJson: JSON.stringify(structurePayload),
+          ...configUpdate,
+        });
+        if (saved.count === 0) {
+          logEvent("warn", "analysis_job_orphaned", {
+            analysisId: analysis.id,
+            videoId: analysis.youtubeVideoId,
+            stage: "structure_store",
+          });
+          return;
+        }
+      }
+
       if (!resumePlan.useCore) {
         const stageOk = await updateStage(analysis.id, leaseOwner, "core");
         if (!stageOk) {
@@ -524,6 +581,22 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
         advanced: advancedPayload ?? undefined,
       });
 
+      const structureSkeleton =
+        structurePayload?.skeleton ??
+        buildFallbackSkeleton({
+          durationSeconds: analysis.durationSeconds,
+        });
+      const structurePass: PassResult = {
+        success: structurePayload?.structureSource === "gemini",
+        durationMs: structurePayload?.structureDurationMs ?? 0,
+        tokensUsed: 0,
+        costUsd: 0,
+        retryCount: 0,
+        errorMessage:
+          structurePayload?.structureError ??
+          (!structurePayload ? "Structure pass missing; using fallback skeleton." : undefined),
+      };
+
       const stageOk = await updateStage(analysis.id, leaseOwner, "performance");
       if (!stageOk) {
         logEvent("warn", "analysis_job_orphaned", {
@@ -544,7 +617,12 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
           channelId: analysis.creator.channelId ?? undefined,
         },
         multimodal,
-        { config: requestConfig, auth: authContext ?? undefined },
+        {
+          config: requestConfig,
+          auth: authContext ?? undefined,
+          skeleton: structureSkeleton,
+          structurePass,
+        },
       );
 
       const diagnosticsPayload = ingestionPreflight

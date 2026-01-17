@@ -102,7 +102,7 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
 
   const loadSpark = load?.timeline?.length ? buildSparkline(load.timeline, 320, 120) : null;
   const loadHighlights =
-    load?.loadHighlights?.spans?.filter(
+    fingerprint.cognitiveLoad?.loadHighlights?.spans?.filter(
       (span) =>
         typeof span.startSeconds === "number" &&
         typeof span.endSeconds === "number" &&
@@ -240,8 +240,9 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
                       cy={point.y}
                       r={3.5}
                       className="fill-white stroke-accent stroke-2"
-                      title={`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}
-                    />
+                    >
+                      <title>{`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}</title>
+                    </circle>
                   ))}
                 </svg>
               </div>
@@ -373,8 +374,9 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
                   cy={point.y}
                   r={3.5}
                   className="fill-white stroke-accent stroke-2"
-                  title={`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}
-                />
+                >
+                  <title>{`${formatSeconds(point.timeSeconds)} • ${Math.round(point.value ?? 0)}/100`}</title>
+                </circle>
               ))}
               {loadSpikes.map((spike) => (
                 <circle
@@ -383,10 +385,11 @@ export function AlignmentLoadSection({ fingerprint }: Props) {
                   cy={spike.y}
                   r={5}
                   className="fill-accent stroke-white stroke-2"
-                  title={`${spike.label ?? "Load spike"} • ${formatSeconds(spike.center)}${
+                >
+                  <title>{`${spike.label ?? "Load spike"} • ${formatSeconds(spike.center)}${
                     typeof spike.value === "number" ? ` • ${Math.round(spike.value)}/100` : ""
-                  }${spike.alignedBeat ? ` • ${spike.alignedBeat}` : ""}`}
-                />
+                  }${spike.alignedBeat ? ` • ${spike.alignedBeat}` : ""}`}</title>
+                </circle>
               ))}
             </svg>
           </div>

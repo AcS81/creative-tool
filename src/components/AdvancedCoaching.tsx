@@ -18,8 +18,8 @@ const isObservedMetric = (metric?: ScoredMetric) => {
   return metric.observed === true || hasValue || hasScore;
 };
 
-const sectionObserved = (section?: Record<string, ScoredMetric>) =>
-  !!section && Object.values(section).some((metric) => isObservedMetric(metric));
+const sectionObserved = (section?: Record<string, ScoredMetric> | null) =>
+  !!section && Object.values(section as Record<string, ScoredMetric>).some((metric) => isObservedMetric(metric));
 
 const buildInsight = (label: string, body: string) => `${label}: ${body}`;
 
@@ -111,12 +111,12 @@ export const AdvancedCoaching = ({
   }
 
   const missingSections = {
-    prosody: !sectionObserved(prosody),
-    language: !sectionObserved(language),
-    narrative: !sectionObserved(narrative),
-    visual: !sectionObserved(visual),
-    balance: !sectionObserved(balance),
-    load: !sectionObserved(load),
+    prosody: !sectionObserved(prosody as unknown as Record<string, ScoredMetric>),
+    language: !sectionObserved(language as unknown as Record<string, ScoredMetric>),
+    narrative: !sectionObserved(narrative as unknown as Record<string, ScoredMetric>),
+    visual: !sectionObserved(visual as unknown as Record<string, ScoredMetric>),
+    balance: !sectionObserved(balance as unknown as Record<string, ScoredMetric>),
+    load: !sectionObserved(load as unknown as Record<string, ScoredMetric>),
   };
 
   const allMissing = Object.values(missingSections).every(Boolean);

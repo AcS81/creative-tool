@@ -9,6 +9,8 @@ export type AppConfig = {
   youtubeApiKey?: string;
   performanceEnabled: boolean;
   advancedMetricsEnabled: boolean;
+  structurePassEnabled: boolean;
+  structurePassTimeoutMs: number;
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUrl?: string;
@@ -71,12 +73,19 @@ const parseOptionalInt = (raw?: string | null) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
+const DEFAULT_STRUCTURE_PASS_TIMEOUT_MS = 30000;
+
 export const getAppConfig = (): AppConfig => {
   const analysisMode = normalizeAnalysisMode(process.env.ANALYSIS_MODE);
   const analysisVersionFromEnv = normalizeAnalysisVersion(process.env.ANALYSIS_VERSION);
   const geminiApiKey = process.env.GEMINI_API_KEY;
   const youtubeApiKey = process.env.YOUTUBE_API_KEY;
   const performanceEnabled = parseBoolean(process.env.ENABLE_PERFORMANCE);
+  const rawStructurePassEnabled = process.env.ENABLE_STRUCTURE_PASS;
+  const structurePassEnabled =
+    typeof rawStructurePassEnabled === "string" ? parseBoolean(rawStructurePassEnabled) : true;
+  const structurePassTimeoutMs =
+    parseOptionalInt(process.env.STRUCTURE_PASS_TIMEOUT_MS) ?? DEFAULT_STRUCTURE_PASS_TIMEOUT_MS;
   const googleClientId = process.env.GOOGLE_CLIENT_ID;
   const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
   const googleRedirectUrl = process.env.GOOGLE_REDIRECT_URL;
@@ -161,6 +170,8 @@ export const getAppConfig = (): AppConfig => {
     youtubeApiKey,
     performanceEnabled,
     advancedMetricsEnabled,
+    structurePassEnabled,
+    structurePassTimeoutMs,
     googleClientId,
     googleClientSecret,
     googleRedirectUrl,
