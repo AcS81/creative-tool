@@ -1,6 +1,14 @@
 import { z } from "zod";
 import { buildDefaultAdvancedMetrics } from "../analysis/fingerprint/defaults";
+import { ADVANCED_METRIC_SECTIONS, SECOND_ORDER_METRICS, type AdvancedSectionKey } from "../analysis/metricRegistry";
 import type { AdvancedFingerprintMetrics, LegacyVideoFingerprintJson, VideoFingerprintJson } from "../types";
+import { FINGERPRINT_SCHEMA_VERSION } from "./fingerprintContract";
+
+const LEGACY_FINGERPRINT_V12 = "1.2.0" as const;
+const LEGACY_FINGERPRINT_V11 = "1.1.0" as const;
+
+const resolveHasPerformanceData = (hasPerformanceData: boolean | undefined, performanceProfile?: unknown) =>
+  Boolean(performanceProfile) || hasPerformanceData === true;
 
 const domainScoreSchema = z.object({
   key: z.string().min(1, "score key is required"),
@@ -99,68 +107,21 @@ const scoredMetricSchema = z.object({
   trend: z.number().optional(),
 });
 
-const prosodyArcSchema = z.object({
-  paceMeanWpm: scoredMetricSchema,
-  paceVariabilityPct: scoredMetricSchema,
-  withinSegmentPaceChangePct: scoredMetricSchema,
-  emphasisAlignmentScore: scoredMetricSchema,
-  energyDriftDbPerMin: scoredMetricSchema,
-});
-
-const languageTextureSchema = z.object({
-  analogyExampleDefinitionRatio: scoredMetricSchema,
-  sentenceCompressionRatio: scoredMetricSchema,
-  humorTimingScore: scoredMetricSchema,
-  referenceDensityPerMin: scoredMetricSchema,
-  questionRate: scoredMetricSchema,
-});
-
-const narrativeArcSchema = z.object({
-  timeToHookSeconds: scoredMetricSchema,
-  hookStrengthScore: scoredMetricSchema,
-  segmentCohesionDrift: scoredMetricSchema,
-  openLoopsUnresolvedRatio: scoredMetricSchema,
-  endingResolutionScore: scoredMetricSchema,
-});
-
-const visualEditAlignmentSchema = z.object({
-  visualEntropy: scoredMetricSchema,
-  cutRateRefinement: scoredMetricSchema,
-  silenceForEmphasisFidelity: scoredMetricSchema,
-  audioVisualEmphasisAlignment: scoredMetricSchema,
-  beatsVsEditsAlignment: scoredMetricSchema,
-  prosodyVsSemanticImportanceAlignment: scoredMetricSchema,
-});
-
-const modalityBalanceSchema = z.object({
-  redundancyVsComplementarity: scoredMetricSchema,
-  modalityOverReliance: scoredMetricSchema,
-});
-
-const cognitiveLoadSchema = z.object({
-  loadPerSecond: scoredMetricSchema,
-  loadHighlights: scoredMetricSchema,
-});
-
-const secondOrderSchema = z.object({
-  alignmentScore: scoredMetricSchema,
-  driftScore: scoredMetricSchema,
-  decayScore: scoredMetricSchema,
-  balanceScore: scoredMetricSchema,
-  timingScore: scoredMetricSchema,
-});
+const buildSectionSchema = (keys: readonly string[]) =>
+  z.object(Object.fromEntries(keys.map((key) => [key, scoredMetricSchema])));
 
 const advancedMetricsShape = {
-  prosodyArc: prosodyArcSchema,
-  languageTexture: languageTextureSchema,
-  narrativeArc: narrativeArcSchema,
-  visualEditAlignment: visualEditAlignmentSchema,
-  modalityBalance: modalityBalanceSchema,
-  cognitiveLoad: cognitiveLoadSchema,
-  secondOrder: secondOrderSchema,
-};
+  ...Object.fromEntries(
+    (Object.entries(ADVANCED_METRIC_SECTIONS) as Array<[AdvancedSectionKey, readonly string[]]>).map(
+      ([section, keys]) => [section, buildSectionSchema(keys)],
+    ),
+  ),
+  secondOrder: buildSectionSchema(SECOND_ORDER_METRICS),
+} as {
+  [K in AdvancedSectionKey]: z.ZodObject<Record<string, typeof scoredMetricSchema>>;
+} & { secondOrder: z.ZodObject<Record<string, typeof scoredMetricSchema>> };
 
-const fingerprintVersionSchema = z.literal("1.3.0");
+const fingerprintVersionSchema = z.literal(FINGERPRINT_SCHEMA_VERSION);
 
 const baseFingerprintShape = {
   createdAt: z
@@ -215,39 +176,72 @@ export const fingerprintSchema = z.object({
   ...advancedMetricsShape,
 });
 
-const legacyFingerprintSchemaV12 = z.object({
-  version: z.literal("1.2.0"),
-  ...baseFingerprintShape,
-});
+const legacyFingerprintSchemaV12 = z
+  .object({
+    version: z.literal(LEGACY_FINGERPRINT_V12),
+    ...baseFingerprintShape,
+  })
+  .passthrough();
 
-const legacyFingerprintSchemaV11 = z.object({
-  version: z.literal("1.1.0"),
-  ...baseFingerprintShape,
-});
+const legacyFingerprintSchemaV11 = z
+  .object({
+    version: z.literal(LEGACY_FINGERPRINT_V11),
+    ...baseFingerprintShape,
+  })
+  .passthrough();
 
 export type FingerprintSchema = z.infer<typeof fingerprintSchema>;
+type LegacyFingerprintV12 = z.infer<typeof legacyFingerprintSchemaV12>;
+type LegacyFingerprintV11 = z.infer<typeof legacyFingerprintSchemaV11>;
+
+const pickAdvancedOverrides = (legacy: Partial<AdvancedFingerprintMetrics>) => ({
+  prosodyArc: legacy.prosodyArc,
+  languageTexture: legacy.languageTexture,
+  narrativeArc: legacy.narrativeArc,
+  visualEditAlignment: legacy.visualEditAlignment,
+  modalityBalance: legacy.modalityBalance,
+  cognitiveLoad: legacy.cognitiveLoad,
+  secondOrder: legacy.secondOrder,
+});
 
 const buildDefaultAdvancedSections = (overrides?: Partial<AdvancedFingerprintMetrics>) => {
   const base = buildDefaultAdvancedMetrics();
   return {
-    prosodyArc: overrides?.prosodyArc ?? base.prosodyArc,
-    languageTexture: overrides?.languageTexture ?? base.languageTexture,
-    narrativeArc: overrides?.narrativeArc ?? base.narrativeArc,
-    visualEditAlignment: overrides?.visualEditAlignment ?? base.visualEditAlignment,
-    modalityBalance: overrides?.modalityBalance ?? base.modalityBalance,
-    cognitiveLoad: overrides?.cognitiveLoad ?? base.cognitiveLoad,
-    secondOrder: overrides?.secondOrder ?? base.secondOrder,
+    prosodyArc: { ...base.prosodyArc, ...overrides?.prosodyArc },
+    languageTexture: { ...base.languageTexture, ...overrides?.languageTexture },
+    narrativeArc: { ...base.narrativeArc, ...overrides?.narrativeArc },
+    visualEditAlignment: { ...base.visualEditAlignment, ...overrides?.visualEditAlignment },
+    modalityBalance: { ...base.modalityBalance, ...overrides?.modalityBalance },
+    cognitiveLoad: { ...base.cognitiveLoad, ...overrides?.cognitiveLoad },
+    secondOrder: { ...base.secondOrder, ...overrides?.secondOrder },
   };
 };
 
-const upgradeLegacyFingerprint = (legacy: LegacyVideoFingerprintJson): VideoFingerprintJson => {
+const upgradeV11ToV12 = (legacy: LegacyFingerprintV11): LegacyFingerprintV12 => ({
+  ...legacy,
+  version: LEGACY_FINGERPRINT_V12,
+  hasPerformanceData: resolveHasPerformanceData(legacy.hasPerformanceData, legacy.performanceProfile),
+});
+
+const upgradeV12ToV13 = (legacy: LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>): VideoFingerprintJson => {
   const upgraded = {
     ...legacy,
-    ...buildDefaultAdvancedSections(),
-    version: "1.3.0" as const,
-    hasPerformanceData: legacy.hasPerformanceData ?? Boolean(legacy.performanceProfile),
+    ...buildDefaultAdvancedSections(pickAdvancedOverrides(legacy)),
+    version: FINGERPRINT_SCHEMA_VERSION,
+    hasPerformanceData: resolveHasPerformanceData(legacy.hasPerformanceData, legacy.performanceProfile),
   };
   return fingerprintSchema.parse(upgraded);
+};
+
+const upgradeLegacyFingerprint = (legacy: LegacyVideoFingerprintJson): VideoFingerprintJson => {
+  if (legacy.version === LEGACY_FINGERPRINT_V12) {
+    return upgradeV12ToV13(legacy as LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>);
+  }
+  if (legacy.version === LEGACY_FINGERPRINT_V11) {
+    const upgradedV12 = upgradeV11ToV12(legacy as LegacyFingerprintV11);
+    return upgradeV12ToV13(upgradedV12);
+  }
+  throw new Error(`Unsupported fingerprint version: ${legacy.version}`);
 };
 
 export function validateFingerprint(json: unknown): VideoFingerprintJson {
@@ -255,7 +249,7 @@ export function validateFingerprint(json: unknown): VideoFingerprintJson {
   if (parsed.success) {
     return {
       ...parsed.data,
-      hasPerformanceData: parsed.data.hasPerformanceData ?? Boolean(parsed.data.performanceProfile),
+      hasPerformanceData: resolveHasPerformanceData(parsed.data.hasPerformanceData, parsed.data.performanceProfile),
     };
   }
 

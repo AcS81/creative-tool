@@ -1,9 +1,13 @@
 import crypto from "node:crypto";
 import type { AppConfig } from "../config";
 import type { VideoFingerprintJson } from "../types";
+import { FINGERPRINT_SCHEMA_VERSION } from "../schemas/fingerprintContract";
+import { FINGERPRINT_SCHEMA_HASH } from "../schemas/fingerprintSchemaHash";
 
 type AnalysisConfigPayload = {
   signatureVersion: 1;
+  fingerprintSchemaVersion: typeof FINGERPRINT_SCHEMA_VERSION;
+  fingerprintSchemaHash: string;
   analysisMode: AppConfig["analysisMode"];
   analysisVersion: AppConfig["analysisVersion"];
   multimodalPassMode: AppConfig["multimodalPassMode"] | null;
@@ -26,6 +30,8 @@ export type AnalysisConfigSignature = {
 export const buildAnalysisConfigSignature = (config: AppConfig): AnalysisConfigSignature => {
   const payload: AnalysisConfigPayload = {
     signatureVersion: 1,
+    fingerprintSchemaVersion: FINGERPRINT_SCHEMA_VERSION,
+    fingerprintSchemaHash: FINGERPRINT_SCHEMA_HASH,
     analysisMode: config.analysisMode,
     analysisVersion: config.analysisVersion,
     multimodalPassMode: config.multimodalPassMode ?? null,

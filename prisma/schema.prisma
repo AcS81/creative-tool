@@ -32,6 +32,17 @@ model VideoAnalysis {
   analysisVersion  String?
   analysisConfigHash String?
   analysisConfigJson String?
+  fingerprintSchemaVersion String?
+  fingerprintSchemaHash String?
+  analysisStage   String?
+  stageStartedAt  DateTime?
+  stageCompletedAt DateTime?
+  leaseOwner      String?
+  leaseExpiresAt  DateTime?
+  leaseHeartbeatAt DateTime?
+  ingestionJson   String?
+  coreMetricsJson String?
+  advancedMetricsJson String?
   idempotencyKey   String?         @unique
   attemptCount     Int             @default(0)
   maxAttempts      Int             @default(3)
@@ -49,6 +60,7 @@ model VideoAnalysis {
   @@index([sessionId])
   @@index([status])
   @@index([nextAttemptAt])
+  @@index([leaseExpiresAt])
   @@index([youtubeVideoId, analysisConfigHash, status])
 }
 

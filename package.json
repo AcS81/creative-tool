@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:all": "tsx scripts/dev-all.ts",
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
@@ -18,7 +19,8 @@
     "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts",
     "eval:golden": "tsx scripts/run-multimodal-golden.ts",
     "golden:multimodal": "tsx scripts/run-multimodal-golden.ts",
-    "visual:check": "tsx scripts/visual-check.ts"
+    "visual:check": "tsx scripts/visual-check.ts",
+    "worker": "tsx scripts/analysis-worker.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",

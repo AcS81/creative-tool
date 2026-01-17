@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 type Step = {
+  key: string;
   label: string;
   detail: string;
   optional?: boolean;
@@ -11,19 +12,26 @@ type Step = {
 type Props = {
   active: boolean;
   passMode?: "core" | "full";
+  currentStage?: string | null;
+  lastHeartbeatAt?: string | null;
+  stalled?: boolean;
+  onResume?: () => void;
 };
 
 const buildSteps = (passMode?: "core" | "full"): Step[] => {
   const steps: Step[] = [
     {
+      key: "queued",
       label: "Validating URL and metadata",
       detail: "Checking the video link and fetching title/duration.",
     },
     {
+      key: "ingestion",
       label: "Ingesting video",
       detail: "Pulling audio + frames for analysis.",
     },
     {
+      key: "core",
       label: "Analyzing core signals",
       detail: "Voice, language, narrative, visual, editing, and sound.",
     },
@@ -31,6 +39,7 @@ const buildSteps = (passMode?: "core" | "full"): Step[] => {
 
   if (passMode !== "core") {
     steps.push({
+      key: "advanced",
       label: "Analyzing advanced signals",
       detail: "Prosody, alignment, modality balance, and cognitive load.",
       optional: passMode === undefined,
@@ -38,6 +47,7 @@ const buildSteps = (passMode?: "core" | "full"): Step[] => {
   }
 
   steps.push({
+    key: "finalize",
     label: "Synthesizing coaching",
     detail: "Building insights and archetypes.",
   });
@@ -45,13 +55,45 @@ const buildSteps = (passMode?: "core" | "full"): Step[] => {
   return steps;
 };
 
-export const AnalysisLoadingState = ({ active, passMode }: Props) => {
+const formatElapsed = (timestamp: string) => {
+  const elapsedMs = Date.now() - new Date(timestamp).getTime();
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) return "just now";
+  if (elapsedMs < 60000) return "just now";
+  if (elapsedMs < 3600000) return `${Math.round(elapsedMs / 60000)}m ago`;
+  const hours = Math.round(elapsedMs / 3600000);
+  return `${hours}h ago`;
+};
+
+export const AnalysisLoadingState = ({
+  active,
+  passMode,
+  currentStage,
+  lastHeartbeatAt,
+  stalled,
+  onResume,
+}: Props) => {
   const steps = useMemo(() => buildSteps(passMode), [passMode]);
   const [stage, setStage] = useState(0);
+
+  const resolvedStageIndex = useMemo(() => {
+    if (!currentStage) return null;
+    const directIndex = steps.findIndex((step) => step.key === currentStage);
+    if (directIndex >= 0) return directIndex;
+    if (currentStage === "performance") {
+      const finalizeIndex = steps.findIndex((step) => step.key === "finalize");
+      return finalizeIndex >= 0 ? finalizeIndex : null;
+    }
+    return null;
+  }, [currentStage, steps]);
 
   useEffect(() => {
     if (!active) {
       setStage(0);
+      return;
+    }
+
+    if (resolvedStageIndex !== null) {
+      setStage(resolvedStageIndex);
       return;
     }
 
@@ -63,11 +105,29 @@ export const AnalysisLoadingState = ({ active, passMode }: Props) => {
     }, 3200);
 
     return () => clearInterval(interval);
-  }, [active, steps.length]);
+  }, [active, steps.length, resolvedStageIndex]);
+
+  const currentLabel =
+    currentStage === "performance"
+      ? "Attaching performance data"
+      : steps[stage]?.label ?? "Running analysis";
+  const heartbeatLabel = lastHeartbeatAt ? formatElapsed(lastHeartbeatAt) : null;
 
   return (
     <div className="cs-card space-y-4 p-6" role="status" aria-live="polite">
-      <p className="text-sm font-semibold text-muted">Running analysis...</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-muted">Running analysis...</p>
+        {stalled && onResume ? (
+          <button type="button" className="cs-button-secondary text-xs" onClick={onResume}>
+            Resume analysis
+          </button>
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center gap-3 text-xs text-muted">
+        <span>Stage: {currentLabel}</span>
+        {heartbeatLabel ? <span>Last heartbeat {heartbeatLabel}</span> : null}
+        {stalled ? <span className="text-amber-600">Heartbeat stalled</span> : null}
+      </div>
       <div className="space-y-3">
         {steps.map((step, idx) => {
           const isActive = idx === stage;

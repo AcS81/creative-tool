@@ -1,0 +1,22 @@
+{
+  "pending": true,
+  "notes": "Run `npm run eval:golden -- --write-baseline` after updating scripts/golden-set.json.",
+  "schemaVersion": "1.3.0",
+  "schemaHash": "79d62462f72a3903ffe0b3774daca23c30b32a809266635c8eddf6df7dc9ab3b",
+  "goldenSetHash": "pending",
+  "goldenSetSource": "pending",
+  "generatedAt": "pending",
+  "run": {
+    "pass": 0,
+    "fail": 0,
+    "skipped": 0,
+    "analyzed": 0
+  },
+  "coverage": {
+    "core": {},
+    "advanced": {}
+  },
+  "thresholds": {
+    "maxCoverageDropPct": 10
+  }
+}

@@ -43,6 +43,9 @@ type AnalyzeResponse = {
     growthInsights: string[];
     bullets: string[];
   };
+  analysisStage?: string;
+  stageStartedAt?: string;
+  leaseHeartbeatAt?: string;
   domainInsights?: {
     voiceProfile?: string[];
     languageProfile?: string[];
@@ -66,6 +69,9 @@ type AnalyzeJobResponse = {
   status: AnalyzeJobStatus;
   failureReason?: string;
   diagnostics?: AnalyzeVideoResult["diagnostics"];
+  analysisStage?: string;
+  stageStartedAt?: string;
+  leaseHeartbeatAt?: string;
 };
 
 type RecentAnalysisSummary = {
@@ -209,6 +215,10 @@ function HomeContent() {
   const [passMode, setPassMode] = useState<"core" | "full">("core");
   const [lastSubmittedUrl, setLastSubmittedUrl] = useState<string | null>(null);
   const [lastPassMode, setLastPassMode] = useState<"core" | "full" | undefined>(undefined);
+  const [jobStatus, setJobStatus] = useState<AnalyzeJobStatus | null>(null);
+  const [jobStage, setJobStage] = useState<string | null>(null);
+  const [jobHeartbeatAt, setJobHeartbeatAt] = useState<string | null>(null);
+  const [jobId, setJobId] = useState<string | null>(null);
   const activeJobRef = useRef<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -218,6 +228,12 @@ function HomeContent() {
   const supporting = result?.fingerprint.supporting;
   const deliveryTone = deriveTonePlacement(result?.fingerprint);
   const deliveryConnection = deriveConnectionPlacement(result?.fingerprint);
+
+  const STALLED_HEARTBEAT_MS = 120000;
+  const jobStalled =
+    jobStatus === "running" &&
+    jobHeartbeatAt &&
+    Date.now() - new Date(jobHeartbeatAt).getTime() > STALLED_HEARTBEAT_MS;
 
   const [recentAnalyses, setRecentAnalyses] = useState<RecentAnalysisSummary[]>([]);
   const [historyError, setHistoryError] = useState<string | null>(null);
@@ -384,6 +400,10 @@ function HomeContent() {
           setError(body?.message ?? "Could not fetch analysis status. Please try again.");
           setAnalysisNotice(null);
           setLoading(false);
+          setJobStatus(null);
+          setJobStage(null);
+          setJobHeartbeatAt(null);
+          setJobId(null);
           activeJobRef.current = null;
           return;
         }
@@ -394,14 +414,29 @@ function HomeContent() {
           void refreshHistory();
           setAnalysisNotice(null);
           setLoading(false);
+          setJobStatus(null);
+          setJobStage(null);
+          setJobHeartbeatAt(null);
+          setJobId(null);
           activeJobRef.current = null;
           return;
+        }
+
+        if ("status" in body) {
+          setJobStatus(body.status);
+          setJobStage(body.analysisStage ?? null);
+          setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
+          setJobId(body.videoAnalysisId);
         }
 
         if ("status" in body && body.status === "failed") {
           setError(body.failureReason ?? "Analysis failed. Please try again.");
           setAnalysisNotice(null);
           setLoading(false);
+          setJobStatus(null);
+          setJobStage(null);
+          setJobHeartbeatAt(null);
+          setJobId(null);
           activeJobRef.current = null;
           return;
         }
@@ -409,6 +444,10 @@ function HomeContent() {
         setError("Could not fetch analysis status. Please try again.");
         setAnalysisNotice(null);
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         activeJobRef.current = null;
         return;
       }
@@ -428,6 +467,10 @@ function HomeContent() {
         setError("Analysis is taking longer than expected. You can keep waiting or check History to see if it completed.");
         setAnalysisNotice(null);
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         activeJobRef.current = null;
         return;
       }
@@ -441,6 +484,10 @@ function HomeContent() {
     setAnalysisNotice(null);
     setResult(null);
     setYoutubeMessage(null);
+    setJobStatus(null);
+    setJobStage(null);
+    setJobHeartbeatAt(null);
+    setJobId(null);
 
     if (!isValidYouTubeUrl(targetUrl)) {
       setError("Please enter a valid YouTube URL.");
@@ -468,6 +515,10 @@ function HomeContent() {
         const body = await res.json().catch(() => ({}));
         setError(body?.message ?? "Could not analyze this URL. Please try again.");
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         return;
       }
 
@@ -477,6 +528,10 @@ function HomeContent() {
         void refreshHistory();
         setAnalysisNotice(null);
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         return;
       }
 
@@ -484,20 +539,36 @@ function HomeContent() {
         setError(body.failureReason ?? "Analysis failed. Please try again.");
         setAnalysisNotice(null);
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         return;
       }
 
       if (!("videoAnalysisId" in body)) {
         setError("Could not analyze this URL. Please try again.");
         setLoading(false);
+        setJobStatus(null);
+        setJobStage(null);
+        setJobHeartbeatAt(null);
+        setJobId(null);
         return;
       }
 
+      setJobStatus(body.status);
+      setJobStage(body.analysisStage ?? null);
+      setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
+      setJobId(body.videoAnalysisId);
       void pollAnalysisJob(body.videoAnalysisId, passMode);
     } catch {
       setError("Could not analyze this URL. Please try again.");
       setAnalysisNotice(null);
       setLoading(false);
+      setJobStatus(null);
+      setJobStage(null);
+      setJobHeartbeatAt(null);
+      setJobId(null);
     }
   };
 
@@ -514,6 +585,25 @@ function HomeContent() {
     }
     void runAnalysis(targetUrl, passMode);
   };
+
+  const handleResumeJob = useCallback(async () => {
+    if (!jobId) return;
+    try {
+      const res = await fetch(`/api/analyze/${jobId}`, { method: "POST" });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body?.message ?? "Could not resume this analysis. Please try again.");
+        return;
+      }
+      const body = (await res.json()) as AnalyzeJobResponse;
+      setJobStatus(body.status);
+      setJobStage(body.analysisStage ?? null);
+      setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
+      setJobId(body.videoAnalysisId);
+    } catch {
+      setError("Could not resume this analysis. Please try again.");
+    }
+  }, [jobId]);
 
   const handleRunAdvanced = () => {
     const targetUrl = lastSubmittedUrl ?? url;
@@ -816,7 +906,16 @@ function HomeContent() {
         </div>
       )}
 
-      {loading && <AnalysisLoadingState active={loading} passMode={lastPassMode} />}
+      {loading && (
+        <AnalysisLoadingState
+          active={loading}
+          passMode={lastPassMode}
+          currentStage={jobStage}
+          lastHeartbeatAt={jobHeartbeatAt}
+          stalled={jobStalled}
+          onResume={jobStalled ? handleResumeJob : undefined}
+        />
+      )}
 
       {!loading && error && !result && (
         <div className="cs-card space-y-2 p-6 border-red-200 bg-red-50" role="alert" aria-live="assertive">

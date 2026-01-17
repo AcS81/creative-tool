@@ -9,8 +9,11 @@ import { buildAnalysisConfigSignature, isCacheableFingerprint } from "../../../l
 import { buildSessionCookie, ensureSessionId } from "../../../lib/session";
 import { enqueueAnalysisJob } from "../../../lib/analysis/jobs";
 import { fetchReferenceData, safeParseFingerprint } from "./utils";
+import type { VideoFingerprintJson } from "../../../lib/types";
 import { Prisma } from "@prisma/client";
 import { logEvent } from "../../../lib/observability/logger";
+import { FINGERPRINT_SCHEMA_VERSION } from "../../../lib/schemas/fingerprintContract";
+import { FINGERPRINT_SCHEMA_HASH } from "../../../lib/schemas/fingerprintSchemaHash";
 
 type AnalyzeRequestBody = {
   url: string;
@@ -41,13 +44,9 @@ const buildAnalysisPayload = async (
     thumbnailUrl: string | null;
     creator: { displayName: string };
   },
-  fingerprint: ReturnType<typeof safeParseFingerprint>,
+  fingerprint: VideoFingerprintJson,
   diagnostics?: unknown,
 ) => {
-  if (!fingerprint) {
-    throw new Error("Stored fingerprint is invalid.");
-  }
-
   const { nearestReferences, averageMetaAxes, referenceMetaAxes } = await fetchReferenceData(fingerprint);
   const insightDetails = generateInsights(fingerprint.metaAxes, referenceMetaAxes);
 
@@ -157,7 +156,7 @@ export async function POST(request: Request) {
     if (videoAnalysis) {
       const now = new Date();
       if (videoAnalysis.status === "pending" && (!videoAnalysis.nextAttemptAt || videoAnalysis.nextAttemptAt <= now)) {
-        enqueueAnalysisJob(videoAnalysis.id);
+        void enqueueAnalysisJob(videoAnalysis.id);
       }
       logEvent("info", "analysis_job_idempotent", {
         analysisId: videoAnalysis.id,
@@ -170,6 +169,9 @@ export async function POST(request: Request) {
           videoAnalysisId: videoAnalysis.id,
           status: videoAnalysis.status,
           failureReason: videoAnalysis.failureReason ?? undefined,
+          analysisStage: videoAnalysis.analysisStage ?? undefined,
+          stageStartedAt: videoAnalysis.stageStartedAt?.toISOString(),
+          leaseHeartbeatAt: videoAnalysis.leaseHeartbeatAt?.toISOString(),
         },
         { status: 202 },
       );
@@ -191,8 +193,20 @@ export async function POST(request: Request) {
     });
 
     if (cachedAnalysis?.videoFingerprint) {
-      const cachedFingerprint = safeParseFingerprint(cachedAnalysis.videoFingerprint.fingerprint);
-      if (cachedFingerprint && isCacheableFingerprint(cachedFingerprint)) {
+      const cachedFingerprintResult = safeParseFingerprint(cachedAnalysis.videoFingerprint.fingerprint, {
+        expectedSchemaHash: cachedAnalysis.fingerprintSchemaHash,
+        expectedSchemaVersion: cachedAnalysis.fingerprintSchemaVersion,
+      });
+      if (!cachedFingerprintResult.fingerprint && cachedFingerprintResult.error) {
+        logEvent("warn", "analysis_cache_invalid_fingerprint", {
+          analysisId: cachedAnalysis.id,
+          videoId,
+          analysisConfigHash: configSignature.hash,
+          error: cachedFingerprintResult.error.code,
+          version: cachedFingerprintResult.error.version,
+        });
+      }
+      if (cachedFingerprintResult.fingerprint && isCacheableFingerprint(cachedFingerprintResult.fingerprint)) {
         const creatorDisplayName =
           body.creatorDisplayName || cachedAnalysis.channelTitle || "Local Anonymous";
         const creatorProfile = await resolveCreatorProfile({
@@ -219,7 +233,10 @@ export async function POST(request: Request) {
                 analysisVersion: requestConfig.analysisVersion,
                 analysisConfigHash: configSignature.hash,
                 analysisConfigJson: configSignature.serialized,
+                fingerprintSchemaVersion: FINGERPRINT_SCHEMA_VERSION,
+                fingerprintSchemaHash: FINGERPRINT_SCHEMA_HASH,
                 diagnosticsJson: cachedAnalysis.diagnosticsJson ?? null,
+                analysisStage: "finalize",
               },
               include: { creator: true },
             });
@@ -242,6 +259,9 @@ export async function POST(request: Request) {
                   videoAnalysisId: videoAnalysis.id,
                   status: videoAnalysis.status,
                   failureReason: videoAnalysis.failureReason ?? undefined,
+                  analysisStage: videoAnalysis.analysisStage ?? undefined,
+                  stageStartedAt: videoAnalysis.stageStartedAt?.toISOString(),
+                  leaseHeartbeatAt: videoAnalysis.leaseHeartbeatAt?.toISOString(),
                 },
                 { status: 202 },
               );
@@ -271,7 +291,7 @@ export async function POST(request: Request) {
           }
         }
 
-        const payload = await buildAnalysisPayload(cachedCopy, cachedFingerprint, diagnostics);
+        const payload = await buildAnalysisPayload(cachedCopy, cachedFingerprintResult.fingerprint, diagnostics);
         logEvent("info", "analysis_cache_hit", {
           analysisId: cachedCopy.id,
           cachedFromId: cachedAnalysis.id,
@@ -368,6 +388,11 @@ export async function POST(request: Request) {
           analysisVersion: requestConfig.analysisVersion,
           analysisConfigHash: configSignature.hash,
           analysisConfigJson: configSignature.serialized,
+          fingerprintSchemaVersion: FINGERPRINT_SCHEMA_VERSION,
+          fingerprintSchemaHash: FINGERPRINT_SCHEMA_HASH,
+          analysisStage: "queued",
+          stageStartedAt: new Date(),
+          stageCompletedAt: null,
         },
       });
     } catch (error) {
@@ -386,7 +411,7 @@ export async function POST(request: Request) {
     }
 
     videoAnalysisId = videoAnalysis.id;
-    enqueueAnalysisJob(videoAnalysis.id);
+    void enqueueAnalysisJob(videoAnalysis.id);
     logEvent("info", "analysis_job_enqueued", {
       analysisId: videoAnalysis.id,
       videoId,
@@ -399,6 +424,9 @@ export async function POST(request: Request) {
         videoAnalysisId: videoAnalysis.id,
         status: videoAnalysis.status,
         failureReason: videoAnalysis.failureReason ?? undefined,
+        analysisStage: videoAnalysis.analysisStage ?? undefined,
+        stageStartedAt: videoAnalysis.stageStartedAt?.toISOString(),
+        leaseHeartbeatAt: videoAnalysis.leaseHeartbeatAt?.toISOString(),
       },
       { status: 202 },
     );

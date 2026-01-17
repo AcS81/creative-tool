@@ -6,6 +6,16 @@ import type { AppConfig } from "../src/lib/config";
 import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
 import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
 import { BASE_DOMAIN_METRICS } from "../src/lib/analysis/metricRegistry";
+import { FINGERPRINT_SCHEMA_VERSION } from "../src/lib/schemas/fingerprintContract";
+import { FINGERPRINT_SCHEMA_HASH } from "../src/lib/schemas/fingerprintSchemaHash";
+import {
+  buildCoverageSummary,
+  buildGoldenSetHash,
+  compareGoldenSummaries,
+  DEFAULT_MAX_COVERAGE_DROP_PCT,
+  type GoldenBaseline,
+  type GoldenSummary,
+} from "./golden-set-baseline-utils";
 
 type ValueRange = {
   min?: number;
@@ -47,8 +57,35 @@ type CoverageDiagnostics = {
 
 const DEFAULT_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.json");
 const SAMPLE_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.sample.json");
+const DEFAULT_SUMMARY_PATH = path.resolve(process.cwd(), "scripts/golden-set.summary.json");
 
-const loadGoldenSet = (): { source: string; videos: GoldenVideo[] } => {
+const args = process.argv.slice(2);
+const hasFlag = (flag: string) => args.includes(flag);
+const getArgValue = (flag: string) => {
+  const idx = args.indexOf(flag);
+  if (idx === -1) return undefined;
+  return args[idx + 1];
+};
+
+const WRITE_BASELINE = hasFlag("--write-baseline");
+const WRITE_SUMMARY = hasFlag("--write-summary");
+const SKIP_BASELINE_CHECK = hasFlag("--skip-baseline-check");
+const BASELINE_PATH = getArgValue("--baseline-path") ?? path.resolve(
+  process.cwd(),
+  `scripts/golden-set.baseline.v${FINGERPRINT_SCHEMA_VERSION}.json`,
+);
+const SUMMARY_PATH = getArgValue("--summary-path") ?? DEFAULT_SUMMARY_PATH;
+const maxCoverageDropArg = getArgValue("--max-coverage-drop");
+const maxCoverageDropValue = maxCoverageDropArg ? Number.parseFloat(maxCoverageDropArg) : NaN;
+const MAX_COVERAGE_DROP_PCT = Number.isFinite(maxCoverageDropValue)
+  ? maxCoverageDropValue
+  : DEFAULT_MAX_COVERAGE_DROP_PCT;
+
+const loadGoldenSet = (): {
+  sourcePath: string;
+  sourceLabel: string;
+  videos: GoldenVideo[];
+} => {
   const candidates: { path?: string; label: string }[] = [
     { path: process.env.GOLDEN_SET_PATH, label: "GOLDEN_SET_PATH" },
     { path: DEFAULT_GOLDEN_SET_PATH, label: "scripts/golden-set.json" },
@@ -62,14 +99,16 @@ const loadGoldenSet = (): { source: string; videos: GoldenVideo[] } => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-var-requires
       const data = require(resolvedPath);
-      if (Array.isArray(data)) return { source: resolvedPath, videos: data as GoldenVideo[] };
+      if (Array.isArray(data)) {
+        return { sourcePath: resolvedPath, sourceLabel: candidate.label, videos: data as GoldenVideo[] };
+      }
       console.warn(`Golden set file did not contain an array, skipping. (${resolvedPath})`);
     } catch (error) {
       console.warn(`Failed to load golden set (${resolvedPath}), skipping.`, error);
     }
   }
 
-  return { source: "none", videos: [] };
+  return { sourcePath: "none", sourceLabel: "none", videos: [] };
 };
 
 const getScore = (domain: keyof ReturnType<typeof computeMetaAxesFromProfiles> | string, axis: string, axisDetails?: Record<string, { rawValue?: string }>) => {
@@ -351,8 +390,24 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
   return failures;
 };
 
+const readBaseline = (baselinePath: string): GoldenBaseline | null => {
+  if (!fs.existsSync(baselinePath)) return null;
+  try {
+    const raw = fs.readFileSync(baselinePath, "utf8");
+    return JSON.parse(raw) as GoldenBaseline;
+  } catch (error) {
+    console.warn(`Failed to read baseline at ${baselinePath}.`, error);
+    return null;
+  }
+};
+
+const writeJson = (outputPath: string, payload: unknown) => {
+  fs.writeFileSync(outputPath, JSON.stringify(payload, null, 2));
+};
+
 async function run() {
-  const { source, videos: goldenSet } = loadGoldenSet();
+  const { sourcePath, sourceLabel, videos: goldenSet } = loadGoldenSet();
+  const goldenSetHash = buildGoldenSetHash(goldenSet);
   const coverageAggregateCore: Record<string, { observed: number; total: number }> = {};
   const coverageAggregateAdvanced: Record<string, { observed: number; total: number }> = {};
   let passCount = 0;
@@ -375,8 +430,8 @@ async function run() {
     geminiResponseSchemaEnabled: false,
   };
 
-  if (source !== "none") {
-    console.log(`Golden set loaded from: ${source}`);
+  if (sourcePath !== "none") {
+    console.log(`Golden set loaded from: ${sourcePath}`);
   } else {
     console.warn("Golden set not found. Set GOLDEN_SET_PATH or create scripts/golden-set.json.");
   }
@@ -448,6 +503,73 @@ async function run() {
   }
   if (Object.keys(coverageAggregateAdvanced).length > 0) {
     console.log(`Avg coverage (advanced): ${formatCoverageAggregate(coverageAggregateAdvanced)}`);
+  }
+
+  const summary: GoldenSummary = {
+    schemaVersion: FINGERPRINT_SCHEMA_VERSION,
+    schemaHash: FINGERPRINT_SCHEMA_HASH,
+    goldenSetHash,
+    goldenSetSource: sourceLabel,
+    generatedAt: new Date().toISOString(),
+    run: {
+      pass: passCount,
+      fail: failCount,
+      skipped: skippedCount,
+      analyzed: passCount + failCount,
+    },
+    coverage: {
+      core: buildCoverageSummary(coverageAggregateCore),
+      advanced:
+        Object.keys(coverageAggregateAdvanced).length > 0
+          ? buildCoverageSummary(coverageAggregateAdvanced)
+          : undefined,
+    },
+  };
+
+  console.log("\n=== Golden set compact summary ===");
+  console.log(JSON.stringify(summary, null, 2));
+
+  if (WRITE_SUMMARY) {
+    writeJson(SUMMARY_PATH, summary);
+    console.log(`Summary written to ${SUMMARY_PATH}`);
+  }
+
+  if (WRITE_BASELINE) {
+    if (summary.run.fail > 0 || summary.run.skipped > 0) {
+      console.error("Refusing to write baseline: fix failures and skipped videos first.");
+      process.exitCode = 1;
+      return;
+    }
+    const baseline: GoldenBaseline = {
+      ...summary,
+      thresholds: {
+        maxCoverageDropPct: MAX_COVERAGE_DROP_PCT,
+      },
+    };
+    writeJson(BASELINE_PATH, baseline);
+    console.log(`Baseline written to ${BASELINE_PATH}`);
+    return;
+  }
+
+  if (!SKIP_BASELINE_CHECK) {
+    const baseline = readBaseline(BASELINE_PATH);
+    if (!baseline) {
+      console.error(`Baseline not found at ${BASELINE_PATH}. Run with --write-baseline to create it.`);
+      process.exitCode = 1;
+      return;
+    }
+    const { failures, maxCoverageDropPct } = compareGoldenSummaries(baseline, summary);
+    if (failures.length) {
+      console.error("\n=== Golden set baseline check failed ===");
+      for (const failure of failures) {
+        console.error(`- ${failure}`);
+      }
+      console.error(`Max coverage drop allowed: ${maxCoverageDropPct}%`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log("\n=== Golden set baseline check ===");
+    console.log("Baseline check: PASS");
   }
 }
 

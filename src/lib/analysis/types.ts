@@ -9,6 +9,14 @@ export interface AnalyzeVideoInput {
   channelId?: string;
 }
 
+export type FingerprintLoadError = {
+  code: "invalid_json" | "invalid_schema";
+  message: string;
+  details?: string;
+  version?: string;
+  schemaHash?: string;
+};
+
 export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   overallArchetype: string;
@@ -82,6 +90,7 @@ export interface AnalyzeVideoResult {
       };
     };
     ingestionPreflight?: IngestionPreflight;
+    fingerprintLoadError?: FingerprintLoadError;
   };
 }
 

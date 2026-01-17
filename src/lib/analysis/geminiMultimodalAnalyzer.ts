@@ -105,7 +105,7 @@ type CoverageDiagnostics = {
   };
 };
 
-type SalvageDiagnostics = {
+export type SalvageDiagnostics = {
   attempted: boolean;
   sections?: string[];
   reason?: string;
@@ -118,10 +118,30 @@ type AdvancedParseDiagnostics = {
   preview?: string;
 };
 
-type AdvancedParseDiagnosticsByPass = {
+export type AdvancedParseDiagnosticsByPass = {
   audioText?: AdvancedParseDiagnostics;
   visualCross?: AdvancedParseDiagnostics;
   salvage?: Record<string, AdvancedParseDiagnostics>;
+};
+
+export type MultimodalCorePayload = {
+  parsed: GeminiMultimodalResponse;
+  status?: number;
+  passMetrics?: {
+    core?: GeminiRequestMetrics;
+    coreRetry?: GeminiRequestMetrics;
+  };
+};
+
+export type MultimodalAdvancedPayload = {
+  mergedAdvanced?: GeminiAdvancedMetricsPartial;
+  salvage: SalvageDiagnostics;
+  advancedParse?: AdvancedParseDiagnosticsByPass;
+  passMetrics?: {
+    advancedAudioText?: GeminiRequestMetrics;
+    advancedVisualCross?: GeminiRequestMetrics;
+    salvage?: Record<string, GeminiRequestMetrics>;
+  };
 };
 
 const timelinePointSchema = {
@@ -1228,20 +1248,13 @@ const runCorePass = async (input: {
   };
 };
 
-export const analyzeVideoMultimodal = async (input: {
+export const runMultimodalCore = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
-}): Promise<MultimodalAnalysisResult> => {
-  const passMode = input.config?.multimodalPassMode ?? "full";
-  const advancedMetricsEnabled = passMode !== "core" && input.config?.advancedMetricsEnabled !== false;
+}): Promise<MultimodalCorePayload> => {
   const coreModel = input.config?.geminiMultimodalCoreModel;
-  const advancedAudioModel = input.config?.geminiMultimodalAdvancedAudioModel;
-  const advancedVisualModel = input.config?.geminiMultimodalAdvancedVisualModel;
-  const salvageModel = input.config?.geminiMultimodalSalvageModel;
   const baseTimeoutMs = input.config?.geminiMultimodalTimeoutMs;
   const coreTimeoutMs = input.config?.geminiMultimodalTimeoutMsCore ?? baseTimeoutMs;
-  const advancedTimeoutMs = input.config?.geminiMultimodalTimeoutMsAdvanced ?? baseTimeoutMs;
-  const salvageTimeoutMs = input.config?.geminiMultimodalTimeoutMsSalvage ?? advancedTimeoutMs ?? baseTimeoutMs;
 
   const coreOutcome = await runCorePass({
     youtubeUrl: input.youtubeUrl,
@@ -1250,49 +1263,68 @@ export const analyzeVideoMultimodal = async (input: {
     timeoutMs: coreTimeoutMs,
   });
 
-  const corePassMetrics = coreOutcome.passMetrics;
-  const coreRetryMetrics = coreOutcome.retryMetrics;
-  const parsed = coreOutcome.parsed;
-  const axisDetails: Record<string, AxisDetail> = {};
-  const profiles = buildProfiles(parsed, axisDetails);
-  const audioTextPass = advancedMetricsEnabled
-    ? await runAdvancedPass({
-        youtubeUrl: input.youtubeUrl,
-        prompt: advancedAudioTextPrompt,
-        jsonSchema: advancedAudioTextResponseJsonSchema,
-        jsonSchemaFallback: advancedAudioTextResponseJsonSchemaLite,
-        sections: ADVANCED_AUDIO_TEXT_SECTIONS,
-        config: input.config,
-        model: advancedAudioModel,
-        timeoutMs: advancedTimeoutMs,
-      })
-    : undefined;
-  const visualCrossPass = advancedMetricsEnabled
-    ? await runAdvancedPass({
-        youtubeUrl: input.youtubeUrl,
-        prompt: advancedVisualCrossPrompt,
-        jsonSchema: advancedVisualCrossResponseJsonSchema,
-        jsonSchemaFallback: advancedVisualCrossResponseJsonSchemaLite,
-        sections: ADVANCED_VISUAL_CROSS_SECTIONS,
-        config: input.config,
-        model: advancedVisualModel,
-        timeoutMs: advancedTimeoutMs,
-      })
-    : undefined;
+  return {
+    parsed: coreOutcome.parsed,
+    status: coreOutcome.status,
+    passMetrics: {
+      core: coreOutcome.passMetrics,
+      coreRetry: coreOutcome.retryMetrics,
+    },
+  };
+};
+
+export const runMultimodalAdvanced = async (input: {
+  youtubeUrl: string;
+  config?: AppConfig;
+  coreParsed: GeminiMultimodalResponse;
+}): Promise<MultimodalAdvancedPayload> => {
+  const passMode = input.config?.multimodalPassMode ?? "full";
+  const advancedMetricsEnabled = passMode !== "core" && input.config?.advancedMetricsEnabled !== false;
+  if (!advancedMetricsEnabled) {
+    return { mergedAdvanced: undefined, salvage: { attempted: false } };
+  }
+
+  const advancedAudioModel = input.config?.geminiMultimodalAdvancedAudioModel;
+  const advancedVisualModel = input.config?.geminiMultimodalAdvancedVisualModel;
+  const salvageModel = input.config?.geminiMultimodalSalvageModel;
+  const baseTimeoutMs = input.config?.geminiMultimodalTimeoutMs;
+  const advancedTimeoutMs = input.config?.geminiMultimodalTimeoutMsAdvanced ?? baseTimeoutMs;
+  const salvageTimeoutMs = input.config?.geminiMultimodalTimeoutMsSalvage ?? advancedTimeoutMs ?? baseTimeoutMs;
+
+  const audioTextPass = await runAdvancedPass({
+    youtubeUrl: input.youtubeUrl,
+    prompt: advancedAudioTextPrompt,
+    jsonSchema: advancedAudioTextResponseJsonSchema,
+    jsonSchemaFallback: advancedAudioTextResponseJsonSchemaLite,
+    sections: ADVANCED_AUDIO_TEXT_SECTIONS,
+    config: input.config,
+    model: advancedAudioModel,
+    timeoutMs: advancedTimeoutMs,
+  });
+
+  const visualCrossPass = await runAdvancedPass({
+    youtubeUrl: input.youtubeUrl,
+    prompt: advancedVisualCrossPrompt,
+    jsonSchema: advancedVisualCrossResponseJsonSchema,
+    jsonSchemaFallback: advancedVisualCrossResponseJsonSchemaLite,
+    sections: ADVANCED_VISUAL_CROSS_SECTIONS,
+    config: input.config,
+    model: advancedVisualModel,
+    timeoutMs: advancedTimeoutMs,
+  });
+
   const passMetrics: PassMetricsDiagnostics = {
-    core: corePassMetrics,
-    coreRetry: coreRetryMetrics,
-    advancedAudioText: audioTextPass?.passMetrics,
-    advancedVisualCross: visualCrossPass?.passMetrics,
+    advancedAudioText: audioTextPass.passMetrics,
+    advancedVisualCross: visualCrossPass.passMetrics,
   };
 
-  let mergedAdvanced = mergeAdvancedMetrics(audioTextPass?.metrics, visualCrossPass?.metrics);
-  const coverageBeforeSalvage = buildCoverageDiagnostics(parsed, mergedAdvanced);
+  let mergedAdvanced = mergeAdvancedMetrics(audioTextPass.metrics, visualCrossPass.metrics);
+  const coverageBeforeSalvage = buildCoverageDiagnostics(input.coreParsed, mergedAdvanced);
   const salvageSections: AdvancedSectionKey[] = [];
   const salvagePassMetrics: Record<string, GeminiRequestMetrics> = {};
   const salvageParseDiagnostics: Record<string, AdvancedParseDiagnostics> = {};
 
-  if (advancedMetricsEnabled && coverageBeforeSalvage.advanced) {
+  if (coverageBeforeSalvage.advanced) {
     for (const section of ADVANCED_GEMINI_SECTIONS) {
       const stat = coverageBeforeSalvage.advanced[section];
       if (stat && shouldSalvageSection(stat)) {
@@ -1301,7 +1333,7 @@ export const analyzeVideoMultimodal = async (input: {
     }
   }
 
-  if (advancedMetricsEnabled && salvageSections.length > 0) {
+  if (salvageSections.length > 0) {
     for (const section of salvageSections) {
       const sectionModel =
         ADVANCED_AUDIO_TEXT_SECTIONS.includes(section) ? advancedAudioModel : advancedVisualModel;
@@ -1333,50 +1365,99 @@ export const analyzeVideoMultimodal = async (input: {
       if (salvagePass.parseDiagnostics) {
         salvageParseDiagnostics[section] = salvagePass.parseDiagnostics;
       }
-      mergedAdvanced = applySalvageMetrics(
-        mergedAdvanced,
-        mergeAdvancedMetrics(salvagePass.metrics),
-      );
+      mergedAdvanced = applySalvageMetrics(mergedAdvanced, mergeAdvancedMetrics(salvagePass.metrics));
     }
   }
 
-  const advancedMetrics = mapAdvancedMetrics(mergedAdvanced);
   if (Object.keys(salvagePassMetrics).length > 0) {
     passMetrics.salvage = salvagePassMetrics;
   }
-  passMetrics.totals = buildPassTotals(passMetrics);
+
   const advancedParse: AdvancedParseDiagnosticsByPass = {};
-  if (audioTextPass?.parseDiagnostics) {
+  if (audioTextPass.parseDiagnostics) {
     advancedParse.audioText = audioTextPass.parseDiagnostics;
   }
-  if (visualCrossPass?.parseDiagnostics) {
+  if (visualCrossPass.parseDiagnostics) {
     advancedParse.visualCross = visualCrossPass.parseDiagnostics;
   }
   if (Object.keys(salvageParseDiagnostics).length > 0) {
     advancedParse.salvage = salvageParseDiagnostics;
   }
-  const advancedParseDiagnostics =
-    Object.keys(advancedParse).length > 0 ? advancedParse : undefined;
+
+  return {
+    mergedAdvanced,
+    salvage: {
+      attempted: salvageSections.length > 0,
+      sections: salvageSections.length > 0 ? salvageSections : undefined,
+      reason:
+        salvageSections.length > 0
+          ? `unobserved >= ${SALVAGE_UNOBSERVED_THRESHOLD_PCT}%`
+          : undefined,
+    },
+    advancedParse: Object.keys(advancedParse).length > 0 ? advancedParse : undefined,
+    passMetrics: {
+      advancedAudioText: audioTextPass.passMetrics,
+      advancedVisualCross: visualCrossPass.passMetrics,
+      salvage: Object.keys(salvagePassMetrics).length > 0 ? salvagePassMetrics : undefined,
+    },
+  };
+};
+
+export const buildMultimodalResult = (input: {
+  core: MultimodalCorePayload;
+  advanced?: MultimodalAdvancedPayload;
+}): MultimodalAnalysisResult => {
+  const parsed = input.core.parsed;
+  const axisDetails: Record<string, AxisDetail> = {};
+  const profiles = buildProfiles(parsed, axisDetails);
+  const beats = toBeatSegments(parsed.narrative.beats, parsed.narrative.devices);
+  const mergedAdvanced = input.advanced?.mergedAdvanced;
+  const advancedMetrics = mapAdvancedMetrics(mergedAdvanced);
+
+  const passMetrics: PassMetricsDiagnostics = {
+    core: input.core.passMetrics?.core,
+    coreRetry: input.core.passMetrics?.coreRetry,
+    advancedAudioText: input.advanced?.passMetrics?.advancedAudioText,
+    advancedVisualCross: input.advanced?.passMetrics?.advancedVisualCross,
+    salvage: input.advanced?.passMetrics?.salvage,
+  };
+  passMetrics.totals = buildPassTotals(passMetrics);
 
   return {
     profiles,
-    beats: toBeatSegments(parsed.narrative.beats, parsed.narrative.devices),
+    beats,
     axisDetails,
     diagnostics: {
       unobservedCounts: collectUnobservedCounts(parsed),
       coverage: buildCoverageDiagnostics(parsed, mergedAdvanced, advancedMetrics?.secondOrder),
-      salvage: {
-        attempted: salvageSections.length > 0,
-        sections: salvageSections.length > 0 ? salvageSections : undefined,
-        reason:
-          salvageSections.length > 0
-            ? `unobserved >= ${SALVAGE_UNOBSERVED_THRESHOLD_PCT}%`
-            : undefined,
-      },
-      advancedParse: advancedParseDiagnostics,
-      rawStatus: coreOutcome.status,
+      salvage: input.advanced?.salvage ?? { attempted: false },
+      advancedParse: input.advanced?.advancedParse,
+      rawStatus: input.core.status,
       passMetrics,
     },
     advancedMetrics,
   };
+};
+
+export const analyzeVideoMultimodal = async (input: {
+  youtubeUrl: string;
+  config?: AppConfig;
+}): Promise<MultimodalAnalysisResult> => {
+  const passMode = input.config?.multimodalPassMode ?? "full";
+  const advancedMetricsEnabled = passMode !== "core" && input.config?.advancedMetricsEnabled !== false;
+
+  const core = await runMultimodalCore({
+    youtubeUrl: input.youtubeUrl,
+    config: input.config,
+  });
+
+  const advanced = advancedMetricsEnabled
+    ? await runMultimodalAdvanced({
+        youtubeUrl: input.youtubeUrl,
+        config: input.config,
+        coreParsed: core.parsed,
+      })
+    : undefined;
+
+  return buildMultimodalResult({ core, advanced });
 };

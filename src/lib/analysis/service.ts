@@ -13,6 +13,7 @@ import { fetchVideoAnalytics } from "../youtube/analytics";
 import { buildPerformanceTimeline } from "./performanceTimeline";
 import { buildPerformanceProfile } from "./performanceProfile";
 import type { AuthContext } from "../auth/context";
+import type { MultimodalAnalysisResult } from "./geminiMultimodalAnalyzer";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "./fingerprint/videoFingerprint";
@@ -71,26 +72,12 @@ const observedAdvancedSections = (advanced?: AdvancedFingerprintMetrics) =>
         secondOrder: hasObservedSection(advanced.secondOrder),
       };
 
-export async function analyzeVideo(
+export async function buildAnalysisFromMultimodal(
   input: AnalyzeVideoInput,
+  multimodal: MultimodalAnalysisResult,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
-  const useMock = options.useMock ?? config.analysisMode === "mock";
-
-  if (useMock !== false) {
-    return mockAnalyzeVideo(input);
-  }
-
-  if (config.analysisMode !== "gemini" || config.analysisV2MultimodalEnabled === false) {
-    throw new ConfigError("Multimodal analysis is required; set ANALYSIS_MODE=gemini and ENABLE_ANALYSIS_V2_MULTIMODAL=true.");
-  }
-
-  if (config.analysisVersion === "v1") {
-    throw new ConfigError("ANALYSIS_VERSION=v1 is no longer supported; v2 multimodal is canonical.");
-  }
-
-  const videoUrl = buildVideoUrl(input.videoId);
   const attachPerformance = async (currentFingerprint: VideoFingerprintJson) => {
     let fingerprint = currentFingerprint;
     let performanceAttached = false;
@@ -132,8 +119,6 @@ export async function analyzeVideo(
 
     return { fingerprint, performanceAttached, performanceErrorType, performanceErrorMessage };
   };
-
-  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
 
   const voiceProfile = multimodal.profiles.voice;
   const languageProfile = multimodal.profiles.language;
@@ -208,4 +193,28 @@ export async function analyzeVideo(
       advancedMetricsObservedBySection,
     },
   };
+}
+
+export async function analyzeVideo(
+  input: AnalyzeVideoInput,
+  options: AnalyzeOptions = {},
+): Promise<AnalyzeVideoResult> {
+  const config = options.config ?? getAppConfig();
+  const useMock = options.useMock ?? config.analysisMode === "mock";
+
+  if (useMock !== false) {
+    return mockAnalyzeVideo(input);
+  }
+
+  if (config.analysisMode !== "gemini" || config.analysisV2MultimodalEnabled === false) {
+    throw new ConfigError("Multimodal analysis is required; set ANALYSIS_MODE=gemini and ENABLE_ANALYSIS_V2_MULTIMODAL=true.");
+  }
+
+  if (config.analysisVersion === "v1") {
+    throw new ConfigError("ANALYSIS_VERSION=v1 is no longer supported; v2 multimodal is canonical.");
+  }
+
+  const videoUrl = buildVideoUrl(input.videoId);
+  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+  return buildAnalysisFromMultimodal(input, multimodal, options);
 }

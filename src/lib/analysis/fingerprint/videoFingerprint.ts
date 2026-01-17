@@ -11,6 +11,7 @@ import type {
   AdvancedFingerprintMetrics,
 } from "../../types";
 import { buildDefaultAdvancedMetrics } from "./defaults";
+import { FINGERPRINT_SCHEMA_VERSION } from "../../schemas/fingerprintContract";
 
 type BuildFingerprintOptions = {
   version?: VideoFingerprintJson["version"];
@@ -50,7 +51,7 @@ export const buildVideoFingerprint = (
   options: BuildFingerprintOptions = {},
 ): VideoFingerprintJson => {
   const createdAt = options.createdAt ?? new Date().toISOString();
-  const version = options.version ?? "1.3.0";
+  const version = options.version ?? FINGERPRINT_SCHEMA_VERSION;
   const metaAxes = options.metaAxes ?? computeMetaAxesFromProfiles(perDomain);
   const advancedMetrics = options.advancedMetrics ?? buildDefaultAdvancedMetrics();
 

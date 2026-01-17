@@ -3,7 +3,7 @@ import prisma from "../../../../lib/db";
 import { buildSessionCookie, ensureSessionId } from "../../../../lib/session";
 import { generateInsights } from "../../../../lib/analysis/insights";
 import { generateDomainInsights } from "../../../../lib/analysis/domainInsights";
-import { fetchReferenceData, safeParseFingerprint } from "../../analyze/utils";
+import { attachFingerprintLoadError, fetchReferenceData, safeParseFingerprint } from "../../analyze/utils";
 
 export async function GET(
   request: Request,
@@ -35,13 +35,32 @@ export async function GET(
     );
   }
 
-  const fingerprint = safeParseFingerprint(analysis.videoFingerprint.fingerprint);
-  if (!fingerprint) {
+  let diagnostics: unknown;
+  if (analysis.diagnosticsJson) {
+    try {
+      diagnostics = JSON.parse(analysis.diagnosticsJson);
+    } catch {
+      diagnostics = undefined;
+    }
+  }
+
+  const fingerprintResult = safeParseFingerprint(analysis.videoFingerprint.fingerprint, {
+    expectedSchemaHash: analysis.fingerprintSchemaHash,
+    expectedSchemaVersion: analysis.fingerprintSchemaVersion,
+  });
+  if (!fingerprintResult.fingerprint) {
+    const diagnosticsWithError = attachFingerprintLoadError(diagnostics, fingerprintResult.error);
+    const status = fingerprintResult.error?.code === "invalid_json" ? 500 : 409;
     return NextResponse.json(
-      { error: "InvalidData", message: "Stored fingerprint is invalid." },
-      { status: 500 },
+      {
+        error: "FingerprintIncompatible",
+        message: fingerprintResult.error?.message ?? "Stored fingerprint is invalid.",
+        diagnostics: diagnosticsWithError,
+      },
+      { status },
     );
   }
+  const fingerprint = fingerprintResult.fingerprint;
 
   const { nearestReferences, averageMetaAxes, referenceMetaAxes } = await fetchReferenceData(fingerprint);
   const insightDetails = generateInsights(fingerprint.metaAxes, referenceMetaAxes);
@@ -58,15 +77,6 @@ export async function GET(
     domainInsights = generateDomainInsights(fingerprint, referenceMetaAxes);
   } catch (e) {
     console.warn("domainInsights generation failed for history load, returning empty", e);
-  }
-
-  let diagnostics: unknown;
-  if (analysis.diagnosticsJson) {
-    try {
-      diagnostics = JSON.parse(analysis.diagnosticsJson);
-    } catch {
-      diagnostics = undefined;
-    }
   }
 
   const response = NextResponse.json({

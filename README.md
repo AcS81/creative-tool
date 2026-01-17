@@ -18,12 +18,13 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
    - `npm run prisma:migrate -- --name add-oauth-auth-tables` (if not already applied)  
    - `npm run prisma:migrate -- --name add-session-id` (if not already applied)  
    - `npm run prisma:migrate -- --name add-video-metadata` (if not already applied)
+   - `npm run prisma:migrate -- --name add-analysis-worker` (if not already applied)
 5) (Optional) Seed reference creators: `npm run seed`
-6) Start the app: `npm run dev` then open http://localhost:3000.
+6) Start the app + worker: `npm run dev:all` then open http://localhost:3000.
 7) Optional demo: click “Try a sample analysis” on the landing card to see the full experience without external keys.
 
 ## Useful scripts
-- `npm run dev` / `npm run build` / `npm start`
+- `npm run dev` / `npm run dev:all` / `npm run build` / `npm start`
 - `npm run lint`
 - `npm run format` / `npm run format:fix`
 - `npm run prisma:migrate -- --name <label>` (SQLite)
@@ -34,8 +35,10 @@ CreatorSight is a local Next.js app for analyzing YouTube videos. Across Iterati
 - `npm run probe:ingestion` (dev probe for Gemini URL ingestion)
 - `npm run eval:golden` (run multimodal pipeline against the documented golden YouTube set)
 - `npm run visual:check` (optional Playwright screenshots of landing/sample/performance; requires `npm install` to fetch Playwright)
+- `npm run worker` (durable local analysis worker)
 
 ## Notes
+- Durable analyses require the local worker (`npm run worker`); `npm run dev:all` runs app + worker together.
 - `/` lets you paste a YouTube URL, run the analysis API, and see archetype, radar chart (with reference average), nearest references, overview insights, and domain tabs (radars + score bars + micro-insights). A sample analysis button is available for instant demo.
 - The Overview now also includes a “Recent analyses (this browser)” panel, powered by an anonymous `sessionId`, so you can reopen recent runs without re-calling Gemini/YouTube.
 - Prisma models include core entities (`CreatorProfile`, `VideoAnalysis`, `VideoFingerprint`, `User`, `YoutubeAuthToken`); see `docs/iteration_5_prd_mvp_status.md` for a PRD FR‑1–FR‑18 mapping.
@@ -96,4 +99,5 @@ The current app covers the PRD MVP features:
 - **Iteration 4**: `docs/iteration_4_e2e.md` – Performance mode (YouTube OAuth + Analytics) end-to-end.
 - **Iteration 5**: `docs/iteration_5_e2e.md` – quick checklist that combines running an analysis, revisiting it via “Recent analyses”, and (optionally) seeing the Performance tab with live data.
 - **Iteration 6**: `docs/iteration_6_e2e.md` – alignment/load scaffold (schema v1.3.0, mock alignment/load metrics, UI Alignment & Load section).
+- **Iteration 11**: `docs/iteration_11_e2e.md` – durable worker loop, stage resume, and restart flow.
 - **Axes glossary**: `docs/axes_and_domains.md` – human-readable meanings for meta/domain axes and how to interpret scores/unobserved states.
