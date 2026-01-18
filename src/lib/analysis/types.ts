@@ -32,7 +32,7 @@ export interface AnalyzeVideoResult {
   skeleton: VideoSkeleton;
   overallArchetype: string;
   diagnostics?: {
-    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal";
+    source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal" | "gemini-v2-tiered";
     structurePass?: PassResult;
     hashSeed?: number;
     performanceAttached?: boolean;
@@ -40,7 +40,7 @@ export interface AnalyzeVideoResult {
     performanceErrorMessage?: string;
     analysisVersion?: "v1" | "v2";
     unobservedCounts?: Record<string, number>;
-    analysisPath?: "gemini-v2-multimodal" | "gemini-v1-text" | "mock";
+    analysisPath?: "gemini-v2-multimodal" | "gemini-v2-tiered" | "gemini-v1-text" | "mock";
     analysisErrorMessage?: string;
     advancedMetricsDefaulted?: boolean;
     advancedMetricsObserved?: boolean;

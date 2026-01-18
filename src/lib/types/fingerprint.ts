@@ -227,6 +227,7 @@ interface VideoFingerprintBase {
     sceneSegments?: SceneSegment[];
     beats?: BeatSegment[];
     axisDetails?: Record<string, AxisDetail>;
+    perChapterMetrics?: Array<Record<string, unknown>>;
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;

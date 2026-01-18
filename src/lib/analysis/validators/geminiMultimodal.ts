@@ -121,7 +121,7 @@ const languageSchema = z.object(buildObservedMetricFields(BASE_DOMAIN_METRICS.la
 
 const narrativeSchema = z
   .object({
-    beats: z.array(beatSchema).min(1, "beats must contain at least one segment"),
+    beats: z.array(beatSchema).optional().default([]),
     ...buildObservedMetricFields(BASE_DOMAIN_METRICS.narrative),
     devices: z
       .array(

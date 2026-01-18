@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { analyzeVideoMultimodal } from "../src/lib/analysis/geminiMultimodalAnalyzer";
+import { runStructurePass } from "../src/lib/analysis/structurePass";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "../src/lib/analysis/fingerprint/videoFingerprint";
 import type { AppConfig } from "../src/lib/config";
 import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
@@ -70,6 +71,7 @@ const getArgValue = (flag: string) => {
 const WRITE_BASELINE = hasFlag("--write-baseline");
 const WRITE_SUMMARY = hasFlag("--write-summary");
 const SKIP_BASELINE_CHECK = hasFlag("--skip-baseline-check");
+const USE_TIERED = hasFlag("--tiered");
 const BASELINE_PATH = getArgValue("--baseline-path") ?? path.resolve(
   process.cwd(),
   `scripts/golden-set.baseline.v${FINGERPRINT_SCHEMA_VERSION}.json`,
@@ -80,6 +82,9 @@ const maxCoverageDropValue = maxCoverageDropArg ? Number.parseFloat(maxCoverageD
 const MAX_COVERAGE_DROP_PCT = Number.isFinite(maxCoverageDropValue)
   ? maxCoverageDropValue
   : DEFAULT_MAX_COVERAGE_DROP_PCT;
+const minTier1ObservedArg = getArgValue("--min-tier1-observed");
+const minTier1ObservedValue = minTier1ObservedArg ? Number.parseFloat(minTier1ObservedArg) : NaN;
+const MIN_TIER1_OBSERVED_PCT = Number.isFinite(minTier1ObservedValue) ? minTier1ObservedValue : 90;
 
 const loadGoldenSet = (): {
   sourcePath: string;
@@ -111,9 +116,18 @@ const loadGoldenSet = (): {
   return { sourcePath: "none", sourceLabel: "none", videos: [] };
 };
 
-const getScore = (domain: keyof ReturnType<typeof computeMetaAxesFromProfiles> | string, axis: string, axisDetails?: Record<string, { rawValue?: string }>) => {
+const getScore = (
+  domain: keyof ReturnType<typeof computeMetaAxesFromProfiles> | string,
+  axis: string,
+  axisDetails?: Record<string, { rawValue?: string }>,
+) => {
   const key = axis.includes(".") ? axis : `${domain}.${axis}`;
-  return axisDetails?.[key];
+  const direct = axisDetails?.[key];
+  if (direct) return direct;
+  if (axis === "story_presence") {
+    return axisDetails?.["language.story_presence"];
+  }
+  return undefined;
 };
 
 const summarize = (video: GoldenVideo, axisDetails?: Record<string, { rawValue?: string; observed?: boolean }>) => {
@@ -260,6 +274,18 @@ const formatCoverageAggregate = (aggregate: Record<string, { observed: number; t
     })
     .join(", ");
 
+const computeAggregateObservedPct = (aggregate: Record<string, { observed: number; total: number }>) => {
+  const totals = Object.values(aggregate).reduce(
+    (acc, entry) => {
+      acc.observed += entry.observed;
+      acc.total += entry.total;
+      return acc;
+    },
+    { observed: 0, total: 0 },
+  );
+  return totals.total === 0 ? 0 : Math.round((totals.observed / totals.total) * 100);
+};
+
 const toFingerprintDomains = (
   profiles: Awaited<ReturnType<typeof analyzeVideoMultimodal>>["profiles"],
 ): FingerprintPerDomain => ({
@@ -356,7 +382,9 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
   }
 
   const storyRaw = getScore("narrative", "story_presence", axisDetails)?.rawValue;
-  const storyScore = getScoreValue(analysis.profiles?.narrative?.scores, "narrative.story_presence");
+  const storyScore =
+    getScoreValue(analysis.profiles?.narrative?.scores, "narrative.story_presence") ??
+    getScoreValue(analysis.profiles?.language?.scores, "language.story_presence");
   const storyBucket = bucketStory(storyRaw, storyScore);
   checkRange("storyScore", storyScore, video.expected.storyScore, failures);
   if (video.expected.story) {
@@ -448,7 +476,15 @@ async function run() {
     console.log(`Notes: ${video.notes}`);
     const start = Date.now();
     try {
-      const analysis = await analyzeVideoMultimodal({ youtubeUrl: video.url, config });
+      const structureResult = USE_TIERED
+        ? await runStructurePass({ youtubeUrl: video.url }, { config })
+        : null;
+      const analysis = await analyzeVideoMultimodal({
+        youtubeUrl: video.url,
+        config,
+        useTieredAnalysis: USE_TIERED,
+        skeleton: structureResult?.skeleton,
+      });
       const perDomain = toFingerprintDomains(analysis.profiles);
       const fingerprint = buildVideoFingerprint(perDomain, {
         metaAxes: computeMetaAxesFromProfiles(perDomain),
@@ -459,6 +495,9 @@ async function run() {
       const failures = checkExpectations(video, analysis);
       const coverage = analysis.diagnostics.coverage ?? buildFallbackCoverage(analysis.diagnostics.unobservedCounts);
       console.log(`Status: ok unobserved=${JSON.stringify(analysis.diagnostics.unobservedCounts)}`);
+      if (structureResult && structureResult.source !== "gemini") {
+        warn(`structure pass fallback used (${structureResult.source})`);
+      }
       console.log(formatCoverageGroup("Coverage (core):", coverage.core));
       if (coverage.advanced) {
         console.log(formatCoverageGroup("Coverage (advanced):", coverage.advanced));
@@ -507,12 +546,14 @@ async function run() {
     console.log(`Avg coverage (advanced): ${formatCoverageAggregate(coverageAggregateAdvanced)}`);
   }
 
+  const tier1ObservedPct = computeAggregateObservedPct(coverageAggregateCore);
   const summary: GoldenSummary = {
     schemaVersion: FINGERPRINT_SCHEMA_VERSION,
     schemaHash: FINGERPRINT_SCHEMA_HASH,
     goldenSetHash,
     goldenSetSource: sourceLabel,
     generatedAt: new Date().toISOString(),
+    analysisMode: USE_TIERED ? "tiered" : "legacy",
     run: {
       pass: passCount,
       fail: failCount,
@@ -526,6 +567,7 @@ async function run() {
           ? buildCoverageSummary(coverageAggregateAdvanced)
           : undefined,
     },
+    tier1ObservedPct,
   };
 
   console.log("\n=== Golden set compact summary ===");
@@ -572,6 +614,13 @@ async function run() {
     }
     console.log("\n=== Golden set baseline check ===");
     console.log("Baseline check: PASS");
+  }
+
+  if (tier1ObservedPct > 0 && tier1ObservedPct < MIN_TIER1_OBSERVED_PCT) {
+    console.error(
+      `Tier 1 observed rate ${tier1ObservedPct}% below target ${MIN_TIER1_OBSERVED_PCT}%.`,
+    );
+    process.exitCode = 1;
   }
 }
 

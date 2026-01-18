@@ -11,6 +11,7 @@ export type AppConfig = {
   advancedMetricsEnabled: boolean;
   structurePassEnabled: boolean;
   structurePassTimeoutMs: number;
+  useTieredAnalysis?: boolean;
   googleClientId?: string;
   googleClientSecret?: string;
   googleRedirectUrl?: string;
@@ -96,6 +97,8 @@ export const getAppConfig = (): AppConfig => {
   const rawAdvancedMetricsFlag = process.env.ENABLE_ADVANCED_METRICS;
   const advancedMetricsFlag =
     typeof rawAdvancedMetricsFlag === "string" ? parseBoolean(rawAdvancedMetricsFlag) : undefined;
+  const rawTieredFlag = process.env.ENABLE_TIERED_ANALYSIS;
+  const useTieredAnalysis = typeof rawTieredFlag === "string" ? parseBoolean(rawTieredFlag) : false;
   const passModeFromEnv = normalizePassMode(process.env.MULTIMODAL_PASS_MODE);
   const geminiMultimodalCoreModel = process.env.GEMINI_MULTIMODAL_CORE_MODEL;
   const geminiMultimodalAdvancedAudioModel = process.env.GEMINI_MULTIMODAL_ADV_AUDIO_MODEL;
@@ -172,6 +175,7 @@ export const getAppConfig = (): AppConfig => {
     advancedMetricsEnabled,
     structurePassEnabled,
     structurePassTimeoutMs,
+    useTieredAnalysis,
     googleClientId,
     googleClientSecret,
     googleRedirectUrl,

@@ -16,8 +16,15 @@ vi.mock("../gemini/client", () => {
   };
 });
 
+const mockAnalyzeCoreChapters = vi.fn();
+vi.mock("./corePass", () => ({
+  analyzeCoreChapters: (...args: any[]) => mockAnalyzeCoreChapters(...args),
+}));
+
 import { callGeminiMultimodalJson } from "../gemini/client";
 import { analyzeVideoMultimodal } from "./geminiMultimodalAnalyzer";
+import type { ChapterCoreMetrics, CoreMetrics } from "./types/coreMetrics";
+import type { VideoSkeleton } from "./types/skeleton";
 
 const rich = (value: string, extra: Record<string, unknown> = {}) => ({
   score: 70,
@@ -187,12 +194,57 @@ const mockGeminiOk = (rawJson: unknown, metrics?: { durationMs: number; attempts
   metrics,
 });
 
+const metric = (value: string, score = 60, observed = true) => ({
+  score,
+  value,
+  observed,
+});
+
+const buildCoreMetrics = (): CoreMetrics => ({
+  voice: {
+    speakingRate: metric("150 wpm"),
+    fillerRate: metric("2/min"),
+    pauseUsage: metric("moderate"),
+    loudnessRange: metric("10 dB"),
+    pitchVariation: metric("varied"),
+    clarity: metric("clear"),
+    warmth: metric("warm"),
+  },
+  language: {
+    concreteness: metric("mostly concrete"),
+    metaphorDensity: metric("occasional"),
+    references: metric("few"),
+    humor: metric("light"),
+    teachingVsRiffing: metric("structured"),
+    storyPresence: metric("present"),
+  },
+  narrative: {
+    structureClarity: metric("clear"),
+    hookPresence: metric("strong"),
+    transitionQuality: metric("smooth"),
+    payoffDelivery: metric("solid"),
+  },
+  visual: {
+    cutRate: metric("3s avg"),
+    environmentStability: metric("stable"),
+    movement: metric("minimal"),
+    expression: metric("expressive"),
+  },
+  sound: {
+    musicCoverage: metric("30%"),
+    musicBalance: metric("understated"),
+    sfxDensity: metric("light"),
+    silenceUsage: metric("occasional"),
+  },
+});
+
 describe("analyzeVideoMultimodal", () => {
   beforeEach(() => {
     vi.mocked(callGeminiMultimodalJson)
       .mockResolvedValueOnce(mockGeminiOk(sampleCoreRaw))
       .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedAudioRaw))
       .mockResolvedValueOnce(mockGeminiOk(sampleAdvancedVisualRaw));
+    mockAnalyzeCoreChapters.mockReset();
   });
 
   it("returns domain profiles and beats from multimodal response", async () => {
@@ -312,5 +364,68 @@ describe("analyzeVideoMultimodal", () => {
     expect(result.diagnostics.passMetrics?.advancedAudioText?.attempts).toBe(2);
     expect(result.diagnostics.passMetrics?.totals?.durationMs).toBe(500);
     expect(result.diagnostics.passMetrics?.totals?.retries).toBe(1);
+  });
+
+  it("maps skeleton key moments into beats for tiered analysis", async () => {
+    const coreMetrics = buildCoreMetrics();
+    const perChapter: ChapterCoreMetrics = { chapterId: "ch1", ...coreMetrics };
+    mockAnalyzeCoreChapters.mockResolvedValue([perChapter]);
+
+    const skeleton: VideoSkeleton = {
+      durationSeconds: 120,
+      videoType: "tutorial",
+      topicSummary: "Sample topic",
+      chapters: [
+        {
+          id: "ch1",
+          title: "Intro",
+          startSeconds: 0,
+          endSeconds: 60,
+          summary: "Intro summary",
+          chapterType: "intro",
+        },
+      ],
+      keyMoments: [
+        {
+          type: "hook",
+          timestamp: 5,
+          chapterId: "ch1",
+          description: "Quick promise",
+        },
+        {
+          type: "twist",
+          timestamp: 45,
+          chapterId: "ch1",
+          description: "Unexpected pivot",
+        },
+      ],
+      contentMix: {
+        talkingHeadPct: 80,
+        brollPct: 10,
+        graphicsPct: 5,
+        screencastPct: 0,
+        otherPct: 5,
+      },
+      analysisHints: {
+        hasMusic: false,
+        hasSFX: false,
+        hasOnScreenText: false,
+        hasMultipleSpeakers: false,
+        primaryLanguage: "en",
+        estimatedComplexity: "low",
+      },
+    };
+
+    const result = await analyzeVideoMultimodal({
+      youtubeUrl: "https://youtu.be/abc",
+      useTieredAnalysis: true,
+      skeleton,
+    });
+
+    expect(mockAnalyzeCoreChapters).toHaveBeenCalled();
+    expect(result.beats?.length).toBe(2);
+    expect(result.beats?.[0]?.label).toBe("Quick promise");
+    expect(result.beats?.[0]?.role).toBe("hook");
+    expect(result.beats?.[1]?.role).toBe("break");
   });
 });

@@ -231,6 +231,15 @@ const languageAxes: AxisMetadata[] = [
 
 const narrativeAxes: AxisMetadata[] = [
   {
+    id: "narrative.structure_clarity",
+    domain: "narrative",
+    label: "Structure clarity",
+    shortDescription: "Clarity of the chapter-to-chapter structure.",
+    howMeasured: "Presence of clear hooks, transitions, and payoffs across chapters.",
+    scaleDirection: "low=unclear, high=clear",
+    aliases: ["structure_clarity", "structureClarity", "structure"],
+  },
+  {
     id: "narrative.story_presence",
     domain: "narrative",
     label: "Story presence",
@@ -256,6 +265,15 @@ const narrativeAxes: AxisMetadata[] = [
     howMeasured: "Occurrences of open questions and later callbacks.",
     scaleDirection: "low=rare, high=frequent",
     aliases: ["foreshadow_callbacks", "callbacks"],
+  },
+  {
+    id: "narrative.payoff_delivery",
+    domain: "narrative",
+    label: "Payoff delivery",
+    shortDescription: "How well the video delivers on its promises.",
+    howMeasured: "Strength and completeness of payoffs and conclusions.",
+    scaleDirection: "low=weak, high=strong",
+    aliases: ["payoff_delivery", "payoffDelivery"],
   },
   {
     id: "narrative.transition_clarity",

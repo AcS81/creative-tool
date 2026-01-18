@@ -1,0 +1,452 @@
+{
+  "timestamp": "2026-01-18T00:25:56.981Z",
+  "summary": {
+    "passed": 0,
+    "total": 4,
+    "passRate": 0,
+    "totalCostUsd": 0,
+    "avgLatencyMs": 57149
+  },
+  "results": [
+    {
+      "videoId": "test_short_5min",
+      "title": "Test: 5-Minute Short Video",
+      "bucket": "short",
+      "durationSeconds": 300,
+      "success": false,
+      "totalLatencyMs": 55640,
+      "observedMetricsPct": 0,
+      "unobservedMetrics": [
+        "voice.speaking_rate",
+        "voice.filler_rate",
+        "voice.pauses",
+        "voice.loudness_range",
+        "voice.pitch_variation",
+        "voice.clarity",
+        "voice.warmth",
+        "language.concreteness",
+        "language.metaphor_density",
+        "language.references",
+        "language.humor",
+        "language.teaching_vs_riffing",
+        "language.story_presence",
+        "narrative.structure_clarity",
+        "narrative.hooks",
+        "narrative.transition_clarity",
+        "narrative.payoff_delivery",
+        "visual_edit_sound.environment_stability",
+        "visual_edit_sound.movement",
+        "visual_edit_sound.expression",
+        "visual_edit_sound.cut_rate",
+        "visual_edit_sound.music_coverage",
+        "visual_edit_sound.music_balance",
+        "visual_edit_sound.sfx_density",
+        "visual_edit_sound.silence_for_emphasis"
+      ],
+      "warnings": [],
+      "errors": [
+        "Low observation rate: 0.0% (min: 75%)"
+      ],
+      "diagnostics": {
+        "unobservedCounts": {
+          "voice": 7,
+          "language": 6,
+          "narrative": 4,
+          "visual_edit_sound": 8
+        },
+        "coverage": {
+          "core": {
+            "voice": {
+              "observed": 0,
+              "total": 7,
+              "missing": [
+                "speaking_rate",
+                "filler_rate",
+                "pauses",
+                "loudness_range",
+                "pitch_variation",
+                "clarity",
+                "warmth"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "language": {
+              "observed": 0,
+              "total": 6,
+              "missing": [
+                "concreteness",
+                "metaphor_density",
+                "references",
+                "humor",
+                "teaching_vs_riffing",
+                "story_presence"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "narrative": {
+              "observed": 0,
+              "total": 4,
+              "missing": [
+                "structure_clarity",
+                "hooks",
+                "transition_clarity",
+                "payoff_delivery"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "visual_edit_sound": {
+              "observed": 0,
+              "total": 8,
+              "missing": [
+                "environment_stability",
+                "movement",
+                "expression",
+                "cut_rate",
+                "music_coverage",
+                "music_balance",
+                "sfx_density",
+                "silence_for_emphasis"
+              ],
+              "observedPct": 0,
+              "available": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "videoId": "test_medium_13min",
+      "title": "Test: 13-Minute Medium Video (treat as 10min bucket)",
+      "bucket": "medium",
+      "durationSeconds": 780,
+      "success": false,
+      "totalLatencyMs": 54946,
+      "observedMetricsPct": 0,
+      "unobservedMetrics": [
+        "voice.speaking_rate",
+        "voice.filler_rate",
+        "voice.pauses",
+        "voice.loudness_range",
+        "voice.pitch_variation",
+        "voice.clarity",
+        "voice.warmth",
+        "language.concreteness",
+        "language.metaphor_density",
+        "language.references",
+        "language.humor",
+        "language.teaching_vs_riffing",
+        "language.story_presence",
+        "narrative.structure_clarity",
+        "narrative.hooks",
+        "narrative.transition_clarity",
+        "narrative.payoff_delivery",
+        "visual_edit_sound.environment_stability",
+        "visual_edit_sound.movement",
+        "visual_edit_sound.expression",
+        "visual_edit_sound.cut_rate",
+        "visual_edit_sound.music_coverage",
+        "visual_edit_sound.music_balance",
+        "visual_edit_sound.sfx_density",
+        "visual_edit_sound.silence_for_emphasis"
+      ],
+      "warnings": [],
+      "errors": [
+        "Low observation rate: 0.0% (min: 75%)"
+      ],
+      "diagnostics": {
+        "unobservedCounts": {
+          "voice": 7,
+          "language": 6,
+          "narrative": 4,
+          "visual_edit_sound": 8
+        },
+        "coverage": {
+          "core": {
+            "voice": {
+              "observed": 0,
+              "total": 7,
+              "missing": [
+                "speaking_rate",
+                "filler_rate",
+                "pauses",
+                "loudness_range",
+                "pitch_variation",
+                "clarity",
+                "warmth"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "language": {
+              "observed": 0,
+              "total": 6,
+              "missing": [
+                "concreteness",
+                "metaphor_density",
+                "references",
+                "humor",
+                "teaching_vs_riffing",
+                "story_presence"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "narrative": {
+              "observed": 0,
+              "total": 4,
+              "missing": [
+                "structure_clarity",
+                "hooks",
+                "transition_clarity",
+                "payoff_delivery"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "visual_edit_sound": {
+              "observed": 0,
+              "total": 8,
+              "missing": [
+                "environment_stability",
+                "movement",
+                "expression",
+                "cut_rate",
+                "music_coverage",
+                "music_balance",
+                "sfx_density",
+                "silence_for_emphasis"
+              ],
+              "observedPct": 0,
+              "available": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "videoId": "test_long_20min",
+      "title": "Test: 20-Minute Long Video",
+      "bucket": "long",
+      "durationSeconds": 1200,
+      "success": false,
+      "totalLatencyMs": 55970,
+      "observedMetricsPct": 0,
+      "unobservedMetrics": [
+        "voice.speaking_rate",
+        "voice.filler_rate",
+        "voice.pauses",
+        "voice.loudness_range",
+        "voice.pitch_variation",
+        "voice.clarity",
+        "voice.warmth",
+        "language.concreteness",
+        "language.metaphor_density",
+        "language.references",
+        "language.humor",
+        "language.teaching_vs_riffing",
+        "language.story_presence",
+        "narrative.structure_clarity",
+        "narrative.hooks",
+        "narrative.transition_clarity",
+        "narrative.payoff_delivery",
+        "visual_edit_sound.environment_stability",
+        "visual_edit_sound.movement",
+        "visual_edit_sound.expression",
+        "visual_edit_sound.cut_rate",
+        "visual_edit_sound.music_coverage",
+        "visual_edit_sound.music_balance",
+        "visual_edit_sound.sfx_density",
+        "visual_edit_sound.silence_for_emphasis"
+      ],
+      "warnings": [
+        "Few beats detected: 1"
+      ],
+      "errors": [
+        "Low observation rate: 0.0% (min: 75%)"
+      ],
+      "diagnostics": {
+        "unobservedCounts": {
+          "voice": 7,
+          "language": 6,
+          "narrative": 4,
+          "visual_edit_sound": 8
+        },
+        "coverage": {
+          "core": {
+            "voice": {
+              "observed": 0,
+              "total": 7,
+              "missing": [
+                "speaking_rate",
+                "filler_rate",
+                "pauses",
+                "loudness_range",
+                "pitch_variation",
+                "clarity",
+                "warmth"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "language": {
+              "observed": 0,
+              "total": 6,
+              "missing": [
+                "concreteness",
+                "metaphor_density",
+                "references",
+                "humor",
+                "teaching_vs_riffing",
+                "story_presence"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "narrative": {
+              "observed": 0,
+              "total": 4,
+              "missing": [
+                "structure_clarity",
+                "hooks",
+                "transition_clarity",
+                "payoff_delivery"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "visual_edit_sound": {
+              "observed": 0,
+              "total": 8,
+              "missing": [
+                "environment_stability",
+                "movement",
+                "expression",
+                "cut_rate",
+                "music_coverage",
+                "music_balance",
+                "sfx_density",
+                "silence_for_emphasis"
+              ],
+              "observedPct": 0,
+              "available": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "videoId": "test_extended_40min",
+      "title": "Test: 40-Minute Extended Video",
+      "bucket": "extended",
+      "durationSeconds": 2400,
+      "success": false,
+      "totalLatencyMs": 62040,
+      "observedMetricsPct": 0,
+      "unobservedMetrics": [
+        "voice.speaking_rate",
+        "voice.filler_rate",
+        "voice.pauses",
+        "voice.loudness_range",
+        "voice.pitch_variation",
+        "voice.clarity",
+        "voice.warmth",
+        "language.concreteness",
+        "language.metaphor_density",
+        "language.references",
+        "language.humor",
+        "language.teaching_vs_riffing",
+        "language.story_presence",
+        "narrative.structure_clarity",
+        "narrative.hooks",
+        "narrative.transition_clarity",
+        "narrative.payoff_delivery",
+        "visual_edit_sound.environment_stability",
+        "visual_edit_sound.movement",
+        "visual_edit_sound.expression",
+        "visual_edit_sound.cut_rate",
+        "visual_edit_sound.music_coverage",
+        "visual_edit_sound.music_balance",
+        "visual_edit_sound.sfx_density",
+        "visual_edit_sound.silence_for_emphasis"
+      ],
+      "warnings": [
+        "Few beats detected: 1"
+      ],
+      "errors": [
+        "Low observation rate: 0.0% (min: 75%)"
+      ],
+      "diagnostics": {
+        "unobservedCounts": {
+          "voice": 7,
+          "language": 6,
+          "narrative": 4,
+          "visual_edit_sound": 8
+        },
+        "coverage": {
+          "core": {
+            "voice": {
+              "observed": 0,
+              "total": 7,
+              "missing": [
+                "speaking_rate",
+                "filler_rate",
+                "pauses",
+                "loudness_range",
+                "pitch_variation",
+                "clarity",
+                "warmth"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "language": {
+              "observed": 0,
+              "total": 6,
+              "missing": [
+                "concreteness",
+                "metaphor_density",
+                "references",
+                "humor",
+                "teaching_vs_riffing",
+                "story_presence"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "narrative": {
+              "observed": 0,
+              "total": 4,
+              "missing": [
+                "structure_clarity",
+                "hooks",
+                "transition_clarity",
+                "payoff_delivery"
+              ],
+              "observedPct": 0,
+              "available": true
+            },
+            "visual_edit_sound": {
+              "observed": 0,
+              "total": 8,
+              "missing": [
+                "environment_stability",
+                "movement",
+                "expression",
+                "cut_rate",
+                "music_coverage",
+                "music_balance",
+                "sfx_density",
+                "silence_for_emphasis"
+              ],
+              "observedPct": 0,
+              "available": true
+            }
+          }
+        }
+      }
+    }
+  ]
+}

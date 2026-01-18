@@ -7,6 +7,7 @@ import type {
   FingerprintPerDomain,
   AdvancedFingerprintMetrics,
   ScoredMetric,
+  BeatSegment,
 } from "../types";
 import { validateFingerprint } from "../schemas/fingerprint";
 import { fetchVideoAnalytics } from "../youtube/analytics";
@@ -40,6 +41,33 @@ const buildVideoUrl = (videoId: string) => `https://www.youtube.com/watch?v=${vi
 
 const extractScoredMetrics = (advanced: AdvancedFingerprintMetrics): ScoredMetric[] =>
   Object.values(advanced).flatMap((section) => Object.values(section ?? {}));
+
+const mapKeyMomentRole = (type: string): BeatSegment["role"] => {
+  const lower = type.toLowerCase();
+  if (lower === "hook") return "hook";
+  if (lower === "payoff") return "payoff";
+  if (lower === "cta") return "cta";
+  if (lower === "peak") return "escalation";
+  if (lower === "twist") return "break";
+  return undefined;
+};
+
+const buildBeatsFromSkeleton = (skeleton: VideoSkeleton): BeatSegment[] => {
+  if (!skeleton.keyMoments || skeleton.keyMoments.length === 0) return [];
+  const chapterMap = new Map(skeleton.chapters.map((chapter) => [chapter.id, chapter]));
+  return skeleton.keyMoments.map((moment) => {
+    const chapter = chapterMap.get(moment.chapterId);
+    const startSeconds = moment.timestamp;
+    const endSeconds = chapter ? Math.min(chapter.endSeconds, startSeconds + 1) : startSeconds + 1;
+    return {
+      label: moment.description || moment.type,
+      role: mapKeyMomentRole(moment.type),
+      startSeconds,
+      endSeconds,
+      devices: [],
+    };
+  });
+};
 
 const hasObservedAdvancedMetrics = (advanced?: AdvancedFingerprintMetrics) => {
   if (!advanced) return false;
@@ -122,6 +150,7 @@ export async function buildAnalysisFromMultimodal(
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeVideoResult> {
   const config = options.config ?? getAppConfig();
+  const tieredMode = Boolean(multimodal.coreMetrics || multimodal.perChapterMetrics);
   const structureContext = resolveStructureContext({
     skeleton: options.skeleton,
     structurePass: options.structurePass,
@@ -175,12 +204,16 @@ export async function buildAnalysisFromMultimodal(
   const visualProfile = multimodal.profiles.visual;
   const editingProfile = multimodal.profiles.editing;
   const soundProfile = multimodal.profiles.sound;
-  const beats = multimodal.beats;
+  const beats =
+    multimodal.beats && multimodal.beats.length > 0
+      ? multimodal.beats
+      : buildBeatsFromSkeleton(structureContext.skeleton);
   const axisDetails = multimodal.axisDetails;
   const unobservedCounts = multimodal.diagnostics.unobservedCounts;
   const coverage = multimodal.diagnostics.coverage;
   const salvage = multimodal.diagnostics.salvage;
   const passMetrics = multimodal.diagnostics.passMetrics;
+  const analysisPath = tieredMode ? "gemini-v2-tiered" : "gemini-v2-multimodal";
 
   const perDomain: FingerprintPerDomain = {
     voiceProfile,
@@ -203,7 +236,9 @@ export async function buildAnalysisFromMultimodal(
     ? undefined
     : !advancedMetricsEnabled
       ? "Advanced metrics disabled via ENABLE_ADVANCED_METRICS=false."
-      : "Advanced metrics unavailable from Gemini; using defaults.";
+      : tieredMode
+        ? "Tiered analysis currently returns core metrics only; using defaults for advanced metrics."
+        : "Advanced metrics unavailable from Gemini; using defaults.";
   const advancedMetrics = advancedMetricsFromAnalysis ?? buildDefaultAdvancedMetrics();
   let fingerprint: VideoFingerprintJson = buildVideoFingerprint(perDomain, {
     metaAxes,
@@ -211,6 +246,7 @@ export async function buildAnalysisFromMultimodal(
     supporting: {
       beats,
       axisDetails,
+      perChapterMetrics: multimodal.perChapterMetrics,
     },
     hasPerformanceData: false,
     advancedMetrics,
@@ -226,12 +262,12 @@ export async function buildAnalysisFromMultimodal(
     skeleton: structureContext.skeleton,
     overallArchetype,
     diagnostics: {
-      source: "gemini-v2-multimodal",
+      source: analysisPath,
       structurePass: structureContext.structurePass,
       performanceAttached: performance.performanceAttached,
       performanceErrorType: performance.performanceErrorType,
       performanceErrorMessage: performance.performanceErrorMessage,
-      analysisPath: "gemini-v2-multimodal",
+      analysisPath,
       analysisErrorMessage: undefined,
       analysisVersion: "v2",
       unobservedCounts,
@@ -278,7 +314,12 @@ export async function analyzeVideo(
     durationMs: Date.now() - structureStart,
     errorMessage: structureResult.error,
   });
-  const multimodal = await analyzeVideoMultimodal({ youtubeUrl: videoUrl, config });
+  const multimodal = await analyzeVideoMultimodal({
+    youtubeUrl: videoUrl,
+    config,
+    useTieredAnalysis: config.useTieredAnalysis,
+    skeleton: structureResult.skeleton,
+  });
   return buildAnalysisFromMultimodal(input, multimodal, {
     ...options,
     skeleton: structureResult.skeleton,

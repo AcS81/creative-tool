@@ -46,18 +46,18 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create or update `src/lib/analysis/types/coreMetrics.ts` with:
+- [x] Create or update `src/lib/analysis/types/coreMetrics.ts` with:
   - `SummaryMetric` interface:
     - `score: number` (0-100)
     - `value: string` (human-readable summary, e.g., "145 wpm, moderate")
     - `observed: boolean` (false if couldn't measure)
-- [ ] Define `CoreMetrics` interface with domains:
+- [x] Define `CoreMetrics` interface with domains:
   - `voice`: speakingRate, fillerRate, pauseUsage, loudnessRange, pitchVariation, clarity, warmth
   - `language`: concreteness, metaphorDensity, references, humor, teachingVsRiffing, storyPresence
   - `narrative`: structureClarity, hookPresence, transitionQuality, payoffDelivery
   - `visual`: cutRate, environmentStability, movement, expression
   - `sound`: musicCoverage, musicBalance, sfxDensity, silenceUsage
-- [ ] Define `ChapterCoreMetrics` as CoreMetrics + chapterId
+- [x] Define `ChapterCoreMetrics` as CoreMetrics + chapterId
 
 **Constraints**
 
@@ -67,9 +67,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Types compile and are JSON-serializable
-- [ ] No timeline/array fields in core schema
-- [ ] Types exported from analysis types index
+- [x] Types compile and are JSON-serializable
+- [x] No timeline/array fields in core schema
+- [x] Types exported from analysis types index
 
 ---
 
@@ -82,14 +82,14 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/metricRegistry.ts`:
+- [x] Modify `src/lib/analysis/metricRegistry.ts`:
   - Add `tier: 1 | 2 | 3` to metric definitions
   - Add `hasTimeline: boolean` field
   - Add `requiresTimeline: boolean` field
   - Mark Tier 1 metrics: all 23 core metrics
   - Mark Tier 2 metrics: 17 advanced metrics
   - Mark Tier 3 metrics: 15 derived metrics
-- [ ] Add helper functions:
+- [x] Add helper functions:
   - `getTier1Metrics(): MetricDefinition[]`
   - `getTier2Metrics(): MetricDefinition[]`
   - `getDerivedMetrics(): MetricDefinition[]`
@@ -102,10 +102,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] All metrics have tier assigned
-- [ ] Helper functions return correct subsets
+- [x] All metrics have tier assigned
+- [x] Helper functions return correct subsets
 - [ ] Existing tests still pass
-- [ ] No breaking changes to metric lookup
+- [x] No breaking changes to metric lookup
 
 ---
 
@@ -120,12 +120,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/corePass.ts` with:
+- [x] Create `src/lib/analysis/corePass.ts` with:
   - `analyzeChapterCore(input: ChapterCoreInput): Promise<ChapterCoreMetrics>`
   - Input includes: youtubeUrl, startSeconds, endSeconds, chapterContext, videoContext (skeleton)
   - Uses Gemini with focused prompt per chapter
   - Returns `ChapterCoreMetrics` with all domain scores
-- [ ] Implement the prompt from refactor doc Part 3.3:
+- [x] Implement the prompt from refactor doc Part 3.3:
   - Uses videoType and topicSummary for context
   - Asks for scores (0-100) and short descriptions
   - Specifies the exact metric list
@@ -139,10 +139,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Chapter analysis returns valid CoreMetrics
-- [ ] Context from skeleton improves relevance
-- [ ] observed:false used appropriately
-- [ ] Unit tests with mocked Gemini
+- [x] Chapter analysis returns valid CoreMetrics
+- [x] Context from skeleton improves relevance
+- [x] observed:false used appropriately
+- [x] Unit tests with mocked Gemini
 
 ---
 
@@ -154,12 +154,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add `analyzeCoreMetrics(input: CorePassInput): Promise<CoreMetrics>`:
+- [x] Add `analyzeCoreMetrics(input: CorePassInput): Promise<CoreMetrics>`:
   - Takes skeleton and video URL
   - Runs `Promise.all` on chapter analyses
   - Handles partial failures gracefully
   - Returns aggregated CoreMetrics
-- [ ] Add chapter batching for long videos:
+- [x] Add chapter batching for long videos:
   - Max 5 parallel Gemini calls
   - Queue additional chapters
   - Respect rate limits
@@ -171,9 +171,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Parallel execution working for multi-chapter videos
-- [ ] Partial failures handled gracefully
-- [ ] Rate limiting prevents Gemini quota issues
+- [x] Parallel execution working for multi-chapter videos
+- [x] Partial failures handled gracefully
+- [x] Rate limiting prevents Gemini quota issues
 - [ ] Performance acceptable for long videos
 
 ---
@@ -186,12 +186,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/aggregation.ts` with:
+- [x] Create `src/lib/analysis/aggregation.ts` with:
   - `aggregateCoreMetrics(chapters: ChapterCoreMetrics[], skeleton: VideoSkeleton): CoreMetrics`
   - Duration-weighted averaging for numeric scores
   - Combine observed flags (observed if majority observed)
   - Merge value descriptions appropriately
-- [ ] Implement weighting strategy:
+- [x] Implement weighting strategy:
   - Weight by chapter duration (endSeconds - startSeconds)
   - Handle missing chapters (use other chapters' average)
   - Generate aggregate value descriptions
@@ -203,10 +203,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Aggregation produces valid CoreMetrics
-- [ ] Weights by duration correctly
-- [ ] Handles partial observation
-- [ ] Unit tests for aggregation logic
+- [x] Aggregation produces valid CoreMetrics
+- [x] Weights by duration correctly
+- [x] Handles partial observation
+- [x] Unit tests for aggregation logic
 
 ---
 
@@ -221,12 +221,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/geminiMultimodalAnalyzer.ts`:
+- [x] Modify `src/lib/analysis/geminiMultimodalAnalyzer.ts`:
   - Add `useTieredAnalysis: boolean` flag
   - When enabled: use skeleton + core pass instead of all-at-once
   - Remove timeline extraction from core pass
   - Keep existing path for backward compatibility (deprecated)
-- [ ] Update `MultimodalAnalysisResult`:
+- [x] Update `MultimodalAnalysisResult`:
   - Add `skeleton?: VideoSkeleton`
   - Add `coreMetrics?: CoreMetrics`
   - Add `perChapterMetrics?: ChapterCoreMetrics[]`
@@ -239,9 +239,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Tiered analysis produces valid results
-- [ ] Existing tests still pass
-- [ ] New tiered path tested separately
+- [x] Tiered analysis produces valid results
+- [x] Existing tests still pass
+- [x] New tiered path tested separately
 - [ ] Performance improved for long videos
 
 ---
@@ -254,12 +254,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/service.ts`:
+- [x] Modify `src/lib/analysis/service.ts`:
   - Add config flag `useTieredAnalysis` (from env)
   - When enabled: call structure pass, then core pass
   - Build fingerprint from CoreMetrics instead of all-at-once
   - Include per-chapter data in supporting info
-- [ ] Update `buildAnalysisFromMultimodal` or create new function:
+- [x] Update `buildAnalysisFromMultimodal` or create new function:
   - `buildAnalysisFromTiered(skeleton, coreMetrics, options)`
   - Maps CoreMetrics to existing fingerprint domain profiles
   - Maintains compatibility with existing UI
@@ -271,10 +271,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Tiered analysis produces valid fingerprints
+- [x] Tiered analysis produces valid fingerprints
 - [ ] UI displays results correctly
-- [ ] Diagnostics show tiered path info
-- [ ] Config flag controls behavior
+- [x] Diagnostics show tiered path info
+- [x] Config flag controls behavior
 
 ---
 
@@ -286,12 +286,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Identify beat detection code in current analyzer
-- [ ] Remove beat detection from core pass:
+- [x] Identify beat detection code in current analyzer
+- [x] Remove beat detection from core pass:
   - Beats now come from skeleton.keyMoments
   - Chapters provide structural context
   - Narrative metrics derived from skeleton structure
-- [ ] Update any code that depends on beat detection:
+- [x] Update any code that depends on beat detection:
   - Map keyMoments to expected beat format
   - Ensure narrative metrics still work
 
@@ -302,9 +302,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Beat detection removed from core Gemini call
-- [ ] Skeleton keyMoments used instead
-- [ ] Fingerprint beats populated correctly
+- [x] Beat detection removed from core Gemini call
+- [x] Skeleton keyMoments used instead
+- [x] Fingerprint beats populated correctly
 - [ ] Narrative metrics still accurate
 
 ---
@@ -319,18 +319,18 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add tests for core pass:
+- [x] Add tests for core pass:
   - Chapter analysis returns valid metrics
   - Aggregation produces expected results
   - Parallel execution handles errors
   - Observed flags work correctly
-- [ ] Add tests for metric registry:
+- [x] Add tests for metric registry:
   - Tier helpers return correct metrics
   - No duplicates between tiers
 
 **Acceptance Criteria**
 
-- [ ] All new functions have unit tests
+- [x] All new functions have unit tests
 - [ ] Edge cases covered
 - [ ] Tests run in CI
 
@@ -344,11 +344,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Update golden set tests:
+- [x] Update golden set tests:
   - Run tiered analysis on golden set videos
   - Compare core metrics to baseline
   - Verify >90% tier 1 metrics observed
-- [ ] Add regression detection:
+- [x] Add regression detection:
   - Flag significant metric deviations
   - Track observed rate over time
 
@@ -393,18 +393,18 @@ Files to modify:
 ## Phase Transition Checklist (Stability Iteration 2)
 
 ### ✅ Phase 0 – Simplified Schema
-- [ ] SummaryMetric and CoreMetrics types defined
-- [ ] Metric registry updated with tiers
+- [x] SummaryMetric and CoreMetrics types defined
+- [x] Metric registry updated with tiers
 
 ### ✅ Phase 1 – Per-Chapter Analysis
-- [ ] Chapter core analysis working
-- [ ] Parallel execution implemented
-- [ ] Aggregation utilities complete
+- [x] Chapter core analysis working
+- [x] Parallel execution implemented
+- [x] Aggregation utilities complete
 
 ### ✅ Phase 2 – Integration
-- [ ] Multimodal analyzer supports tiered mode
-- [ ] Service uses tiered analysis
-- [ ] Beat detection removed from core
+- [x] Multimodal analyzer supports tiered mode
+- [x] Service uses tiered analysis
+- [x] Beat detection removed from core
 
 ### ✅ Phase 3 – Testing
 - [ ] Unit tests passing

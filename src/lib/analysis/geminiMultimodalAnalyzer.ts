@@ -37,6 +37,10 @@ import {
   SECOND_ORDER_METRICS,
   type AdvancedSectionKey,
 } from "./metricRegistry";
+import { aggregateCoreMetrics, buildUnobservedCoreMetrics } from "./aggregation";
+import { analyzeCoreChapters } from "./corePass";
+import type { ChapterCoreMetrics, CoreMetrics, SummaryMetric } from "./types/coreMetrics";
+import type { VideoSkeleton } from "./types/skeleton";
 
 type MultimodalProfiles = {
   voice: DomainProfile;
@@ -52,6 +56,9 @@ export type MultimodalAnalysisResult = {
   beats?: BeatSegment[];
   axisDetails: Record<string, AxisDetail>;
   advancedMetrics?: AdvancedFingerprintMetrics;
+  skeleton?: VideoSkeleton;
+  coreMetrics?: CoreMetrics;
+  perChapterMetrics?: ChapterCoreMetrics[];
   diagnostics: {
     unobservedCounts: Record<string, number>;
     coverage?: CoverageDiagnostics;
@@ -104,6 +111,40 @@ type CoverageDiagnostics = {
     secondOrder: CoverageStat;
   };
 };
+
+const TIERED_DOMAIN_METRICS = {
+  voice: [
+    "speaking_rate",
+    "filler_rate",
+    "pauses",
+    "loudness_range",
+    "pitch_variation",
+    "clarity",
+    "warmth",
+  ],
+  language: [
+    "concreteness",
+    "metaphor_density",
+    "references",
+    "humor",
+    "teaching_vs_riffing",
+    "story_presence",
+  ],
+  narrative: ["structure_clarity", "hooks", "transition_clarity", "payoff_delivery"],
+  visual: ["environment_stability", "movement", "expression"],
+  editing: ["cut_rate"],
+  sound: ["music_coverage", "music_balance", "sfx_density", "silence_for_emphasis"],
+  visual_edit_sound: [
+    "environment_stability",
+    "movement",
+    "expression",
+    "cut_rate",
+    "music_coverage",
+    "music_balance",
+    "sfx_density",
+    "silence_for_emphasis",
+  ],
+} as const;
 
 export type SalvageDiagnostics = {
   attempted: boolean;
@@ -297,34 +338,9 @@ const coreResponseJsonSchema = {
     narrative: {
       type: "object",
       properties: {
-        beats: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              label: { type: "string" },
-              start: { type: "number" },
-              end: { type: "number" },
-              role: { type: "string" },
-            },
-            required: ["label", "start", "end"],
-          },
-          minItems: 1,
-        },
         ...buildMetricProperties(narrativeMetricKeys),
-        devices: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              type: { type: "string" },
-              timestamp: { type: "number" },
-            },
-            required: ["type", "timestamp"],
-          },
-        },
       },
-      required: ["beats", ...narrativeMetricKeys],
+      required: [...narrativeMetricKeys],
     },
     visual_edit_sound: buildMetricObjectSchema(BASE_DOMAIN_METRICS.visual_edit_sound),
   },
@@ -339,34 +355,9 @@ const coreResponseJsonSchemaLite = {
     narrative: {
       type: "object",
       properties: {
-        beats: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              label: { type: "string" },
-              start: { type: "number" },
-              end: { type: "number" },
-              role: { type: "string" },
-            },
-            required: ["label", "start", "end"],
-          },
-          minItems: 1,
-        },
         ...buildMetricPropertiesLite(narrativeMetricKeys),
-        devices: {
-          type: "array",
-          items: {
-            type: "object",
-            properties: {
-              type: { type: "string" },
-              timestamp: { type: "number" },
-            },
-            required: ["type", "timestamp"],
-          },
-        },
       },
-      required: ["beats", ...narrativeMetricKeys],
+      required: [...narrativeMetricKeys],
     },
     visual_edit_sound: buildMetricObjectSchemaLite(BASE_DOMAIN_METRICS.visual_edit_sound),
   },
@@ -452,11 +443,9 @@ const corePrompt = [
   "Base domains:",
   "- voice: speaking_rate, filler_rate, pauses, loudness_range, pitch_variation.",
   "- language: concreteness, metaphor_density, references, humor, teaching_vs_riffing.",
-  "- narrative: beats [{label,start,end,role in hook|setup|escalation|payoff|outro|cta|break}], mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence, devices [{type,timestamp}].",
+  "- narrative: mini_arc_density, foreshadow_callbacks, transition_clarity, story_presence.",
   "- visual_edit_sound: environment_stability, talking_vs_broll_vs_graphics, cut_rate, pattern_interrupts, broll_coverage, music_coverage, music_changes, sfx_density, silence_for_emphasis.",
   "Rules:",
-  "- Provide beats using seconds and include hook/setup/escalation/payoff/outro labels when present; supply role in the beat object.",
-  "- For narrative.devices, use types: contrast, foreshadow, callback, analogy, reversal, pattern_interrupt, stakes_change.",
   "- JSON only; no prose.",
   "- If safety filters block content, return an object matching the schema with unobserved metrics.",
 ].join("\n");
@@ -524,6 +513,12 @@ const normalizeMetricValue = (value: GeminiObservedMetric["value"] | undefined):
   } catch {
     return String(value);
   }
+};
+
+const toObservedMetric = (metric: SummaryMetric): GeminiObservedMetric => {
+  const value = metric.observed && metric.value.trim() !== "" ? metric.value : "unobserved";
+  const score = metric.observed && Number.isFinite(metric.score) ? metric.score : 0;
+  return { score, value };
 };
 
 const toScores = (
@@ -648,6 +643,34 @@ const buildCoverageDiagnostics = (
   };
 };
 
+const buildTieredCoverageDiagnostics = (core: CoreMetrics): CoverageDiagnostics => {
+  const maps = buildTieredMetricMaps(core);
+  return {
+    core: {
+      voice: buildCoverage(
+        TIERED_DOMAIN_METRICS.voice,
+        maps.voice as unknown as Record<string, GeminiObservedMetric>,
+        true,
+      ),
+      language: buildCoverage(
+        TIERED_DOMAIN_METRICS.language,
+        maps.language as unknown as Record<string, GeminiObservedMetric>,
+        true,
+      ),
+      narrative: buildCoverage(
+        TIERED_DOMAIN_METRICS.narrative,
+        maps.narrative as unknown as Record<string, GeminiObservedMetric>,
+        true,
+      ),
+      visual_edit_sound: buildCoverage(
+        TIERED_DOMAIN_METRICS.visual_edit_sound,
+        maps.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>,
+        true,
+      ),
+    },
+  };
+};
+
 const summarize = (
   domain: DomainKey,
   domainName: string,
@@ -679,6 +702,16 @@ const normalizeBeatRole = (label: string): BeatRole | undefined => {
   return undefined;
 };
 
+const mapKeyMomentRole = (type: string): BeatRole | undefined => {
+  const lower = type.toLowerCase();
+  if (lower === "hook") return "hook";
+  if (lower === "payoff") return "payoff";
+  if (lower === "cta") return "cta";
+  if (lower === "peak") return "escalation";
+  if (lower === "twist") return "break";
+  return undefined;
+};
+
 const toBeatSegments = (
   beats: GeminiMultimodalResponse["narrative"]["beats"],
   devices?: GeminiMultimodalResponse["narrative"]["devices"],
@@ -693,6 +726,23 @@ const toBeatSegments = (
         ?.filter((d) => d.timestamp >= beat.start && d.timestamp <= beat.end)
         .map((d) => d.type) ?? [],
   }));
+
+const toBeatSegmentsFromSkeleton = (skeleton: VideoSkeleton): BeatSegment[] => {
+  if (!skeleton.keyMoments || skeleton.keyMoments.length === 0) return [];
+  const chapterMap = new Map(skeleton.chapters.map((chapter) => [chapter.id, chapter]));
+  return skeleton.keyMoments.map((moment) => {
+    const chapter = chapterMap.get(moment.chapterId);
+    const startSeconds = moment.timestamp;
+    const endSeconds = chapter ? Math.min(chapter.endSeconds, startSeconds + 1) : startSeconds + 1;
+    return {
+      label: moment.description || moment.type,
+      role: mapKeyMomentRole(moment.type),
+      startSeconds,
+      endSeconds,
+      devices: [],
+    };
+  });
+};
 
 const buildDomainProfile = (
   domain: DomainKey,
@@ -788,6 +838,136 @@ const buildProfiles = (
   return { voice, language, narrative, visual, editing, sound };
 };
 
+type TieredMetricMaps = {
+  voice: Record<string, GeminiObservedMetric>;
+  language: Record<string, GeminiObservedMetric>;
+  narrative: Record<string, GeminiObservedMetric>;
+  visual: Record<string, GeminiObservedMetric>;
+  editing: Record<string, GeminiObservedMetric>;
+  sound: Record<string, GeminiObservedMetric>;
+  visual_edit_sound: Record<string, GeminiObservedMetric>;
+};
+
+const buildTieredMetricMaps = (core: CoreMetrics): TieredMetricMaps => {
+  const voice = {
+    speaking_rate: toObservedMetric(core.voice.speakingRate),
+    filler_rate: toObservedMetric(core.voice.fillerRate),
+    pauses: toObservedMetric(core.voice.pauseUsage),
+    loudness_range: toObservedMetric(core.voice.loudnessRange),
+    pitch_variation: toObservedMetric(core.voice.pitchVariation),
+    clarity: toObservedMetric(core.voice.clarity),
+    warmth: toObservedMetric(core.voice.warmth),
+  };
+
+  const language = {
+    concreteness: toObservedMetric(core.language.concreteness),
+    metaphor_density: toObservedMetric(core.language.metaphorDensity),
+    references: toObservedMetric(core.language.references),
+    humor: toObservedMetric(core.language.humor),
+    teaching_vs_riffing: toObservedMetric(core.language.teachingVsRiffing),
+    story_presence: toObservedMetric(core.language.storyPresence),
+  };
+
+  const narrative = {
+    structure_clarity: toObservedMetric(core.narrative.structureClarity),
+    hooks: toObservedMetric(core.narrative.hookPresence),
+    transition_clarity: toObservedMetric(core.narrative.transitionQuality),
+    payoff_delivery: toObservedMetric(core.narrative.payoffDelivery),
+  };
+
+  const visual = {
+    environment_stability: toObservedMetric(core.visual.environmentStability),
+    movement: toObservedMetric(core.visual.movement),
+    expression: toObservedMetric(core.visual.expression),
+  };
+
+  const editing = {
+    cut_rate: toObservedMetric(core.visual.cutRate),
+  };
+
+  const sound = {
+    music_coverage: toObservedMetric(core.sound.musicCoverage),
+    music_balance: toObservedMetric(core.sound.musicBalance),
+    sfx_density: toObservedMetric(core.sound.sfxDensity),
+    silence_for_emphasis: toObservedMetric(core.sound.silenceUsage),
+  };
+
+  const visual_edit_sound = {
+    environment_stability: visual.environment_stability,
+    movement: visual.movement,
+    expression: visual.expression,
+    cut_rate: editing.cut_rate,
+    music_coverage: sound.music_coverage,
+    music_balance: sound.music_balance,
+    sfx_density: sound.sfx_density,
+    silence_for_emphasis: sound.silence_for_emphasis,
+  };
+
+  return { voice, language, narrative, visual, editing, sound, visual_edit_sound };
+};
+
+const buildTieredProfiles = (
+  core: CoreMetrics,
+  axisDetails: Record<string, AxisDetail>,
+): MultimodalProfiles => {
+  const maps = buildTieredMetricMaps(core);
+  const voice = buildDomainProfile(
+    "voice",
+    "Voice",
+    [...TIERED_DOMAIN_METRICS.voice],
+    maps.voice,
+    axisDetails,
+  );
+  const language = buildDomainProfile(
+    "language",
+    "Language",
+    [...TIERED_DOMAIN_METRICS.language],
+    maps.language,
+    axisDetails,
+  );
+  const narrative = buildDomainProfile(
+    "narrative",
+    "Narrative",
+    [...TIERED_DOMAIN_METRICS.narrative],
+    maps.narrative,
+    axisDetails,
+  );
+  const visual = buildDomainProfile(
+    "visual",
+    "Visual",
+    [...TIERED_DOMAIN_METRICS.visual],
+    maps.visual,
+    axisDetails,
+  );
+  const editing = buildDomainProfile(
+    "editing",
+    "Editing",
+    [...TIERED_DOMAIN_METRICS.editing],
+    maps.editing,
+    axisDetails,
+  );
+
+  const soundHighlights: string[] = [];
+  const musicCoverageValue = normalizeMetricValue(maps.sound.music_coverage?.value);
+  if (musicCoverageValue && musicCoverageValue.toLowerCase() !== "unobserved") {
+    soundHighlights.push(`Music coverage ~${musicCoverageValue}`);
+  }
+  const musicBalanceValue = normalizeMetricValue(maps.sound.music_balance?.value);
+  if (musicBalanceValue && musicBalanceValue.toLowerCase() !== "unobserved") {
+    soundHighlights.push(`Music balance: ${musicBalanceValue}`);
+  }
+  const sound = buildDomainProfile(
+    "sound",
+    "Sound",
+    [...TIERED_DOMAIN_METRICS.sound],
+    maps.sound,
+    axisDetails,
+    soundHighlights.length ? soundHighlights : undefined,
+  );
+
+  return { voice, language, narrative, visual, editing, sound };
+};
+
 const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<string, number> => ({
   voice: unobserved(
     BASE_DOMAIN_METRICS.voice as unknown as string[],
@@ -806,6 +986,19 @@ const collectUnobservedCounts = (response: GeminiMultimodalResponse): Record<str
     response.visual_edit_sound as unknown as Record<string, GeminiObservedMetric>,
   ).length,
 });
+
+const collectTieredUnobservedCounts = (core: CoreMetrics): Record<string, number> => {
+  const maps = buildTieredMetricMaps(core);
+  return {
+    voice: unobserved(TIERED_DOMAIN_METRICS.voice as unknown as string[], maps.voice).length,
+    language: unobserved(TIERED_DOMAIN_METRICS.language as unknown as string[], maps.language).length,
+    narrative: unobserved(TIERED_DOMAIN_METRICS.narrative as unknown as string[], maps.narrative).length,
+    visual_edit_sound: unobserved(
+      TIERED_DOMAIN_METRICS.visual_edit_sound as unknown as string[],
+      maps.visual_edit_sound,
+    ).length,
+  };
+};
 
 const mapMetric = (metric: GeminiRichMetric | undefined, fallback: ScoredMetric): ScoredMetric => {
   if (!metric) return fallback;
@@ -1439,10 +1632,60 @@ export const buildMultimodalResult = (input: {
   };
 };
 
+const buildTieredResult = (input: {
+  skeleton: VideoSkeleton;
+  coreMetrics: CoreMetrics;
+  perChapterMetrics: ChapterCoreMetrics[];
+}): MultimodalAnalysisResult => {
+  const axisDetails: Record<string, AxisDetail> = {};
+  const profiles = buildTieredProfiles(input.coreMetrics, axisDetails);
+  const unobservedCounts = collectTieredUnobservedCounts(input.coreMetrics);
+  const coverage = buildTieredCoverageDiagnostics(input.coreMetrics);
+  const beats = toBeatSegmentsFromSkeleton(input.skeleton);
+
+  return {
+    profiles,
+    beats: beats.length > 0 ? beats : undefined,
+    axisDetails,
+    skeleton: input.skeleton,
+    coreMetrics: input.coreMetrics,
+    perChapterMetrics: input.perChapterMetrics,
+    diagnostics: {
+      unobservedCounts,
+      coverage,
+      salvage: { attempted: false },
+    },
+  };
+};
+
 export const analyzeVideoMultimodal = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
+  useTieredAnalysis?: boolean;
+  skeleton?: VideoSkeleton;
 }): Promise<MultimodalAnalysisResult> => {
+  const useTieredAnalysis = input.useTieredAnalysis ?? false;
+  if (useTieredAnalysis && input.skeleton) {
+    const perChapterMetrics = await analyzeCoreChapters({
+      youtubeUrl: input.youtubeUrl,
+      skeleton: input.skeleton,
+      config: input.config,
+    });
+    const coreMetrics =
+      perChapterMetrics.length > 0
+        ? aggregateCoreMetrics(perChapterMetrics, input.skeleton)
+        : buildUnobservedCoreMetrics();
+    return buildTieredResult({
+      skeleton: input.skeleton,
+      coreMetrics,
+      perChapterMetrics,
+    });
+  }
+
+  if (useTieredAnalysis && !input.skeleton) {
+    console.warn("Tiered analysis requested without skeleton; falling back to legacy multimodal path.");
+  }
+
   const passMode = input.config?.multimodalPassMode ?? "full";
   const advancedMetricsEnabled = passMode !== "core" && input.config?.advancedMetricsEnabled !== false;
 

@@ -26,6 +26,8 @@ export type GoldenSummary = {
   generatedAt: string;
   run: GoldenRunTotals;
   coverage: GoldenCoverageSummary;
+  analysisMode?: "legacy" | "tiered";
+  tier1ObservedPct?: number;
 };
 
 export type GoldenBaseline = GoldenSummary & {
@@ -147,7 +149,12 @@ export const compareGoldenSummaries = (
   };
 
   compareCoverage("core", baseline.coverage.core, summary.coverage.core);
-  compareCoverage("advanced", baseline.coverage.advanced, summary.coverage.advanced);
+  const baselineMode = baseline.analysisMode ?? "legacy";
+  const summaryMode = summary.analysisMode ?? "legacy";
+  const compareAdvanced = baselineMode !== "tiered" && summaryMode !== "tiered";
+  if (compareAdvanced) {
+    compareCoverage("advanced", baseline.coverage.advanced, summary.coverage.advanced);
+  }
 
   return { failures, maxCoverageDropPct };
 };

@@ -13,12 +13,14 @@
  *   npm run test:pipeline -- --bucket=medium  # Test only medium bucket
  *   npm run test:pipeline -- --video=test_long_20min  # Test specific video
  *   npm run test:pipeline -- --dry-run  # Show what would be tested
+ *   npm run test:pipeline -- --tiered   # Run tiered core analysis
  */
 
 import * as fs from "fs";
 import * as path from "path";
 import { getAppConfig } from "../src/lib/config";
 import { analyzeVideoMultimodal, type MultimodalAnalysisResult } from "../src/lib/analysis/geminiMultimodalAnalyzer";
+import { runStructurePass } from "../src/lib/analysis/structurePass";
 
 // ============ Types ============
 
@@ -97,12 +99,19 @@ function loadTestVideos(): TestVideosConfig {
   return JSON.parse(raw);
 }
 
-function parseArgs(): { bucket?: string; video?: string; dryRun: boolean; verbose: boolean } {
+function parseArgs(): {
+  bucket?: string;
+  video?: string;
+  dryRun: boolean;
+  verbose: boolean;
+  tiered: boolean;
+} {
   const args = process.argv.slice(2);
   let bucket: string | undefined;
   let video: string | undefined;
   let dryRun = false;
   let verbose = false;
+  let tiered = false;
   
   for (const arg of args) {
     if (arg.startsWith("--bucket=")) {
@@ -113,10 +122,12 @@ function parseArgs(): { bucket?: string; video?: string; dryRun: boolean; verbos
       dryRun = true;
     } else if (arg === "--verbose" || arg === "-v") {
       verbose = true;
+    } else if (arg === "--tiered") {
+      tiered = true;
     }
   }
   
-  return { bucket, video, dryRun, verbose };
+  return { bucket, video, dryRun, verbose, tiered };
 }
 
 function formatDuration(ms: number): string {
@@ -192,7 +203,12 @@ function validateResult(result: MultimodalAnalysisResult, video: TestVideo, thre
 
 // ============ Main Test Function ============
 
-async function testVideo(video: TestVideo, config: ReturnType<typeof getAppConfig>, thresholds: TestVideosConfig["thresholds"]): Promise<TestResult> {
+async function testVideo(
+  video: TestVideo,
+  config: ReturnType<typeof getAppConfig>,
+  thresholds: TestVideosConfig["thresholds"],
+  tiered: boolean,
+): Promise<TestResult> {
   console.log(`\n  Testing: ${video.title}`);
   console.log(`  URL: ${video.youtubeUrl}`);
   console.log(`  Duration: ${video.durationSeconds}s (${video.bucket})`);
@@ -214,9 +230,14 @@ async function testVideo(video: TestVideo, config: ReturnType<typeof getAppConfi
   
   try {
     // Run the analysis
+    const structureResult = tiered
+      ? await runStructurePass({ youtubeUrl: video.youtubeUrl }, { config })
+      : null;
     const analysisResult = await analyzeVideoMultimodal({
       youtubeUrl: video.youtubeUrl,
       config,
+      useTieredAnalysis: tiered,
+      skeleton: structureResult?.skeleton,
     });
     
     result.totalLatencyMs = Date.now() - startTime;
@@ -272,7 +293,7 @@ async function main() {
   console.log("  CreatorSight Analysis Pipeline Tests");
   console.log("===========================================\n");
   
-  const { bucket, video, dryRun, verbose } = parseArgs();
+  const { bucket, video, dryRun, verbose, tiered } = parseArgs();
   const testConfig = loadTestVideos();
   const appConfig = getAppConfig();
   
@@ -299,6 +320,7 @@ async function main() {
   console.log(`Buckets: ${[...new Set(videosToTest.map(v => v.bucket))].join(", ")}`);
   console.log(`Analysis mode: ${appConfig.analysisMode}`);
   console.log(`Advanced metrics: ${appConfig.advancedMetricsEnabled !== false ? "enabled" : "disabled"}`);
+  console.log(`Tiered analysis: ${tiered ? "enabled" : "disabled"}`);
   
   if (dryRun) {
     console.log("\n[DRY RUN] Would test these videos:");
@@ -312,7 +334,7 @@ async function main() {
   const results: TestResult[] = [];
   
   for (const videoToTest of videosToTest) {
-    const result = await testVideo(videoToTest, appConfig, testConfig.thresholds);
+    const result = await testVideo(videoToTest, appConfig, testConfig.thresholds, tiered);
     results.push(result);
     
     // Small delay between tests to avoid rate limiting

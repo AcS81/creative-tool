@@ -164,6 +164,7 @@ const baseFingerprintShape = {
         )
         .optional(),
       axisDetails: z.record(z.string(), axisDetailSchema).optional(),
+      perChapterMetrics: z.array(z.record(z.string(), z.any())).optional(),
     })
     .optional(),
   performanceProfile: performanceProfileSchema.optional(),

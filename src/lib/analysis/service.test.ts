@@ -12,9 +12,13 @@ vi.mock("./geminiMultimodalAnalyzer", () => ({
   analyzeVideoMultimodal: (...args: any[]) => mockAnalyzeVideoMultimodal(...args),
 }));
 
-vi.mock("./structurePass", () => ({
-  runStructurePass: (...args: any[]) => mockRunStructurePass(...args),
-}));
+vi.mock("./structurePass", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./structurePass")>();
+  return {
+    ...actual,
+    runStructurePass: (...args: any[]) => mockRunStructurePass(...args),
+  };
+});
 
 function mockDomain(label: string, base: number): DomainProfile {
   return {
@@ -187,6 +191,39 @@ describe("analyzeVideo service", () => {
     expect(result.diagnostics?.advancedMetricsDefaulted).toBe(false);
     expect(result.fingerprint.prosodyArc.paceMeanWpm.value).toBe("180 wpm");
     expect(result.fingerprint.prosodyArc.paceMeanWpm.observed).toBe(true);
+  });
+
+  it("passes tiered analysis inputs and stores per-chapter metrics", async () => {
+    setupStructurePass();
+    mockAnalyzeVideoMultimodal.mockResolvedValue({
+      profiles: {
+        voice: mockDomain("Voice", 60),
+        language: mockDomain("Language", 65),
+        narrative: mockDomain("Narrative", 70),
+        visual: mockDomain("Visual", 55),
+        editing: mockDomain("Editing", 62),
+        sound: mockDomain("Sound", 58),
+      },
+      axisDetails: {},
+      perChapterMetrics: [{ chapterId: "ch1" } as any],
+      diagnostics: {
+        unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
+      },
+    });
+
+    const result = await analyzeVideo(
+      { videoId: "abc-tiered" },
+      { config: { ...baseConfig, useTieredAnalysis: true } },
+    );
+
+    expect(mockAnalyzeVideoMultimodal).toHaveBeenCalledWith(
+      expect.objectContaining({
+        useTieredAnalysis: true,
+        skeleton: expect.any(Object),
+      }),
+    );
+    expect(result.diagnostics?.analysisPath).toBe("gemini-v2-tiered");
+    expect(result.fingerprint.supporting?.perChapterMetrics?.length).toBe(1);
   });
 
   it("throws when v1 is requested after decommissioning", async () => {
