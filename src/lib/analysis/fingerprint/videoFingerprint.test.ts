@@ -31,7 +31,7 @@ describe("videoFingerprint builder", () => {
     const fingerprint = buildVideoFingerprint(profiles, {
       supporting: { beats: [{ startSeconds: 0, endSeconds: 10, label: "hook", devices: [] }] },
     });
-    expect(fingerprint.version).toBe("1.3.0");
+    expect(fingerprint.version).toBe("1.4.0");
     expect(fingerprint.hasPerformanceData).toBe(false);
     expect(fingerprint.supporting?.beats?.length).toBe(1);
     expect(fingerprint.cognitiveLoad.loadPerSecond.score).toBe(0);

@@ -5,10 +5,21 @@ import { runStructurePass } from "../src/lib/analysis/structurePass";
 import { buildVideoFingerprint, computeMetaAxesFromProfiles } from "../src/lib/analysis/fingerprint/videoFingerprint";
 import type { AppConfig } from "../src/lib/config";
 import type { FingerprintPerDomain } from "../src/lib/types/fingerprint";
+import type { AdvancedFingerprintMetrics } from "../src/lib/types";
 import { buildDefaultAdvancedMetrics } from "../src/lib/analysis/fingerprint/defaults";
 import { BASE_DOMAIN_METRICS } from "../src/lib/analysis/metricRegistry";
 import { FINGERPRINT_SCHEMA_VERSION } from "../src/lib/schemas/fingerprintContract";
 import { FINGERPRINT_SCHEMA_HASH } from "../src/lib/schemas/fingerprintSchemaHash";
+import { buildUnobservedCoreMetrics } from "../src/lib/analysis/aggregation";
+import { executeAdvancedPass } from "../src/lib/analysis/advancedPass";
+import { mergeAdvancedSegments, isObservedMetric } from "../src/lib/analysis/advancedMapping";
+import { planAdvancedAnalysis } from "../src/lib/analysis/advancedPlanner";
+import {
+  buildAdvancedPassConfig,
+  buildAdvancedPlannerConfig,
+  resolveAdvancedStrategy,
+} from "../src/lib/analysis/advancedStrategy";
+import type { SegmentAdvancedMetrics } from "../src/lib/analysis/types/advancedMetrics";
 import {
   buildCoverageSummary,
   buildGoldenSetHash,
@@ -56,6 +67,12 @@ type CoverageDiagnostics = {
   advanced?: Record<string, CoverageStat>;
 };
 
+const DEFAULT_ADVANCED_MAX_SEGMENTS = 5;
+const DEFAULT_ADVANCED_SEGMENT_MAX_SECONDS = 120;
+const DEFAULT_ADVANCED_MAX_TIMELINE_POINTS = 25;
+const DEFAULT_ADVANCED_MAX_PASS_COST_USD = 0.25;
+const DEFAULT_ADVANCED_MAX_PASS_DURATION_MS = 180000;
+
 const DEFAULT_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.json");
 const SAMPLE_GOLDEN_SET_PATH = path.resolve(process.cwd(), "scripts/golden-set.sample.json");
 const DEFAULT_SUMMARY_PATH = path.resolve(process.cwd(), "scripts/golden-set.summary.json");
@@ -68,10 +85,23 @@ const getArgValue = (flag: string) => {
   return args[idx + 1];
 };
 
+const parseOptionalBoolean = (raw: string | undefined) => {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+};
+
+const parseOptionalInt = (raw: string | undefined) => {
+  if (!raw) return undefined;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
 const WRITE_BASELINE = hasFlag("--write-baseline");
 const WRITE_SUMMARY = hasFlag("--write-summary");
 const SKIP_BASELINE_CHECK = hasFlag("--skip-baseline-check");
-const USE_TIERED = hasFlag("--tiered");
+const USE_SELECTIVE_ADVANCED = hasFlag("--selective-advanced");
+const USE_TIERED = hasFlag("--tiered") || USE_SELECTIVE_ADVANCED;
 const BASELINE_PATH = getArgValue("--baseline-path") ?? path.resolve(
   process.cwd(),
   `scripts/golden-set.baseline.v${FINGERPRINT_SCHEMA_VERSION}.json`,
@@ -85,6 +115,14 @@ const MAX_COVERAGE_DROP_PCT = Number.isFinite(maxCoverageDropValue)
 const minTier1ObservedArg = getArgValue("--min-tier1-observed");
 const minTier1ObservedValue = minTier1ObservedArg ? Number.parseFloat(minTier1ObservedArg) : NaN;
 const MIN_TIER1_OBSERVED_PCT = Number.isFinite(minTier1ObservedValue) ? minTier1ObservedValue : 90;
+const minTier2ObservedArg = getArgValue("--min-tier2-observed");
+const minTier2ObservedValue = minTier2ObservedArg ? Number.parseFloat(minTier2ObservedArg) : NaN;
+const MIN_TIER2_OBSERVED_PCT = Number.isFinite(minTier2ObservedValue) ? minTier2ObservedValue : 75;
+const maxTimelinePointsArg = getArgValue("--max-timeline-points");
+const maxTimelinePointsValue = maxTimelinePointsArg ? Number.parseInt(maxTimelinePointsArg, 10) : NaN;
+const MAX_TIMELINE_POINTS = Number.isFinite(maxTimelinePointsValue)
+  ? maxTimelinePointsValue
+  : Number.parseInt(process.env.MAX_TIMELINE_POINTS ?? "", 10) || DEFAULT_ADVANCED_MAX_TIMELINE_POINTS;
 
 const loadGoldenSet = (): {
   sourcePath: string;
@@ -298,13 +336,10 @@ const toFingerprintDomains = (
 });
 
 const shouldWarnAdvancedMetric = (
-  analysis: Awaited<ReturnType<typeof analyzeVideoMultimodal>>,
+  advancedCoverage: Record<string, { available?: boolean; missing?: string[] }> | undefined,
   section: string,
   metricKey: string,
 ) => {
-  const advancedCoverage = analysis.diagnostics.coverage?.advanced as
-    | Record<string, { available?: boolean; missing?: string[] }>
-    | undefined;
   const sectionStat = advancedCoverage?.[section];
   if (!sectionStat || !sectionStat.available) return true;
   if (metricKey && sectionStat.missing?.includes(metricKey)) return true;
@@ -315,19 +350,130 @@ const warn = (message: string) => {
   console.warn(`WARN: ${message}`);
 };
 
-const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<typeof analyzeVideoMultimodal>>) => {
+const collectSegmentMetrics = (segment: SegmentAdvancedMetrics) => {
+  return [
+    ...Object.values(segment.prosodyArc ?? {}),
+    ...Object.values(segment.languageTexture ?? {}),
+    ...Object.values(segment.narrativeArc ?? {}),
+    ...Object.values(segment.visualEditAlignment ?? {}),
+  ];
+};
+
+const computeSegmentObservedPct = (segments: SegmentAdvancedMetrics[] | undefined) => {
+  if (!segments || segments.length === 0) {
+    return { observedPct: 0, observedSegments: 0, totalSegments: 0 };
+  }
+  let observedSegments = 0;
+  for (const segment of segments) {
+    const observed = collectSegmentMetrics(segment).some(isObservedMetric);
+    if (observed) observedSegments += 1;
+  }
+  const totalSegments = segments.length;
+  const observedPct = Math.round((observedSegments / totalSegments) * 100);
+  return { observedPct, observedSegments, totalSegments };
+};
+
+const buildSegmentCoverage = (segments: SegmentAdvancedMetrics[] | undefined) => {
+  if (!segments || segments.length === 0) return undefined;
+  const coverage: Record<string, CoverageStat> = {};
+  const addMetric = (section: string, metric: unknown) => {
+    if (!metric || typeof metric !== "object") return;
+    const entry = coverage[section] ?? { observed: 0, total: 0, observedPct: 0, available: true };
+    entry.total += 1;
+    if (isObservedMetric(metric as any)) {
+      entry.observed += 1;
+    }
+    coverage[section] = entry;
+  };
+
+  for (const segment of segments) {
+    for (const metric of Object.values(segment.prosodyArc ?? {})) addMetric("prosodyArc", metric);
+    for (const metric of Object.values(segment.languageTexture ?? {})) addMetric("languageTexture", metric);
+    for (const metric of Object.values(segment.narrativeArc ?? {})) addMetric("narrativeArc", metric);
+    for (const metric of Object.values(segment.visualEditAlignment ?? {})) addMetric("visualEditAlignment", metric);
+  }
+
+  for (const entry of Object.values(coverage)) {
+    entry.observedPct = entry.total === 0 ? 0 : Math.round((entry.observed / entry.total) * 100);
+  }
+
+  return coverage;
+};
+
+const collectSegmentTimelineLengths = (segments: SegmentAdvancedMetrics[] | undefined) => {
+  if (!segments) return [] as number[];
+  const lengths: number[] = [];
+  for (const segment of segments) {
+    for (const metric of collectSegmentMetrics(segment)) {
+      const timeline = (metric as { timeline?: unknown }).timeline;
+      if (Array.isArray(timeline)) lengths.push(timeline.length);
+    }
+  }
+  return lengths;
+};
+
+const computeCoverageObservedPct = (coverage: Record<string, CoverageStat> | undefined) => {
+  if (!coverage) return 0;
+  const totals = Object.values(coverage).reduce(
+    (acc, entry) => {
+      acc.observed += entry.observed;
+      acc.total += entry.total;
+      return acc;
+    },
+    { observed: 0, total: 0 },
+  );
+  return totals.total === 0 ? 0 : Math.round((totals.observed / totals.total) * 100);
+};
+
+const collectTimelineLengths = (metrics: Record<string, unknown> | object | undefined) => {
+  if (!metrics) return [] as number[];
+  const lengths: number[] = [];
+  for (const metric of Object.values(metrics)) {
+    if (!metric || typeof metric !== "object") continue;
+    const timeline = (metric as { timeline?: unknown }).timeline;
+    if (Array.isArray(timeline)) {
+      lengths.push(timeline.length);
+    }
+  }
+  return lengths;
+};
+
+const checkExpectations = (
+  video: GoldenVideo,
+  analysis: Awaited<ReturnType<typeof analyzeVideoMultimodal>>,
+  advancedMetrics: AdvancedFingerprintMetrics,
+  advancedCoverage: Record<string, { available?: boolean; missing?: string[] }> | undefined,
+  advancedSegments?: SegmentAdvancedMetrics[],
+) => {
   const failures: string[] = [];
-  const adv = analysis.advancedMetrics ?? buildDefaultAdvancedMetrics();
+  const adv = advancedMetrics;
   const beats = analysis.beats ?? [];
+  const hookSegment = advancedSegments?.find((segment) => segment.segmentType === "hook");
+  const hookSecondsFromAdvanced = toNumber(hookSegment?.narrativeArc?.timeToHookSeconds?.value);
   const firstHook = beats.find((b) => b.role === "hook") ?? beats[0];
   const axisDetails = analysis.axisDetails;
+  const timelineLengths = [
+    ...collectTimelineLengths(adv.prosodyArc),
+    ...collectTimelineLengths(adv.languageTexture),
+    ...collectTimelineLengths(adv.narrativeArc),
+    ...collectTimelineLengths(adv.visualEditAlignment),
+    ...collectTimelineLengths(adv.modalityBalance),
+    ...collectTimelineLengths(adv.cognitiveLoad),
+  ];
+  const longestTimeline = Math.max(0, ...timelineLengths);
+  if (longestTimeline > MAX_TIMELINE_POINTS) {
+    failures.push(`timeline length ${longestTimeline} > max ${MAX_TIMELINE_POINTS}`);
+  }
 
   if (video.expected.maxHookSeconds) {
-    const hookSeconds = firstHook?.startSeconds ?? toNumber(adv.narrativeArc.timeToHookSeconds.value);
+    const hookSeconds =
+      hookSecondsFromAdvanced ??
+      firstHook?.startSeconds ??
+      toNumber(adv.narrativeArc.timeToHookSeconds.value);
     if (hookSeconds === undefined || hookSeconds > video.expected.maxHookSeconds) {
       const shouldWarn =
         !firstHook &&
-        shouldWarnAdvancedMetric(analysis, "narrativeArc", "timeToHookSeconds");
+        shouldWarnAdvancedMetric(advancedCoverage, "narrativeArc", "timeToHookSeconds");
       if (shouldWarn) {
         warn(`hookSeconds=${hookSeconds ?? "unobserved"} > ${video.expected.maxHookSeconds}`);
       } else {
@@ -339,7 +485,7 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
   if (video.expected.minSilenceSpans) {
     const spans = adv.visualEditAlignment.silenceForEmphasisFidelity.spans ?? [];
     if (spans.length < video.expected.minSilenceSpans) {
-      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "silenceForEmphasisFidelity")) {
+      if (shouldWarnAdvancedMetric(advancedCoverage, "visualEditAlignment", "silenceForEmphasisFidelity")) {
         warn(`silence spans ${spans.length} < ${video.expected.minSilenceSpans}`);
       } else {
         failures.push(`silence spans ${spans.length} < ${video.expected.minSilenceSpans}`);
@@ -351,7 +497,7 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
     const counts = adv.languageTexture.audienceAddressFrequency.counts;
     const total = (counts?.direct ?? 0) + (counts?.rhetorical ?? 0);
     if (total < video.expected.minAudienceAddresses) {
-      if (shouldWarnAdvancedMetric(analysis, "languageTexture", "audienceAddressFrequency")) {
+      if (shouldWarnAdvancedMetric(advancedCoverage, "languageTexture", "audienceAddressFrequency")) {
         warn(`audience addresses ${total} < ${video.expected.minAudienceAddresses}`);
       } else {
         failures.push(`audience addresses ${total} < ${video.expected.minAudienceAddresses}`);
@@ -397,7 +543,7 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
 
   if (video.expected.entropyTimelineRequired) {
     if (!adv.visualEditAlignment.visualEntropy.timeline?.length) {
-      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "visualEntropy")) {
+      if (shouldWarnAdvancedMetric(advancedCoverage, "visualEditAlignment", "visualEntropy")) {
         warn("missing visualEntropy timeline");
       } else {
         failures.push("missing visualEntropy timeline");
@@ -407,7 +553,7 @@ const checkExpectations = (video: GoldenVideo, analysis: Awaited<ReturnType<type
 
   if (video.expected.cutTimelineRequired) {
     if (!adv.visualEditAlignment.cutRateRefinement.timeline?.length) {
-      if (shouldWarnAdvancedMetric(analysis, "visualEditAlignment", "cutRateRefinement")) {
+      if (shouldWarnAdvancedMetric(advancedCoverage, "visualEditAlignment", "cutRateRefinement")) {
         warn("missing cutRateRefinement timeline");
       } else {
         failures.push("missing cutRateRefinement timeline");
@@ -455,9 +601,24 @@ async function run() {
     youtubeApiKey: process.env.YOUTUBE_API_KEY ?? "dev",
     performanceEnabled: false,
     advancedMetricsEnabled: true,
+    advancedMaxSegments: DEFAULT_ADVANCED_MAX_SEGMENTS,
+    advancedSegmentMaxSeconds: DEFAULT_ADVANCED_SEGMENT_MAX_SECONDS,
+    advancedMaxTimelinePoints: MAX_TIMELINE_POINTS,
+    advancedMaxPassCostUsd: DEFAULT_ADVANCED_MAX_PASS_COST_USD,
+    advancedMaxPassDurationMs: DEFAULT_ADVANCED_MAX_PASS_DURATION_MS,
     structurePassEnabled: true,
     structurePassTimeoutMs: 30000,
-    geminiResponseSchemaEnabled: false,
+    geminiMultimodalCoreModel: process.env.GEMINI_MULTIMODAL_CORE_MODEL,
+    geminiMultimodalAdvancedAudioModel: process.env.GEMINI_MULTIMODAL_ADV_AUDIO_MODEL,
+    geminiMultimodalAdvancedVisualModel: process.env.GEMINI_MULTIMODAL_ADV_VISUAL_MODEL,
+    geminiMultimodalSalvageModel: process.env.GEMINI_MULTIMODAL_SALVAGE_MODEL,
+    geminiMultimodalTimeoutMs: parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS),
+    geminiMultimodalTimeoutMsCore: parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_CORE),
+    geminiMultimodalTimeoutMsAdvanced: parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_ADVANCED),
+    geminiMultimodalTimeoutMsSalvage: parseOptionalInt(process.env.GEMINI_MULTIMODAL_TIMEOUT_MS_SALVAGE),
+    geminiResponseSchemaEnabled: parseOptionalBoolean(process.env.GEMINI_RESPONSE_SCHEMA_ENABLED) ?? false,
+    showArchetypeFeatures: false,
+    showReferenceLibrary: false,
   };
 
   if (sourcePath !== "none") {
@@ -485,22 +646,93 @@ async function run() {
         useTieredAnalysis: USE_TIERED,
         skeleton: structureResult?.skeleton,
       });
+      let advancedSegments: SegmentAdvancedMetrics[] | undefined;
+      let mergedAdvanced = analysis.advancedMetrics;
+
+      if (USE_SELECTIVE_ADVANCED && structureResult?.skeleton) {
+        const strategy = resolveAdvancedStrategy(structureResult.skeleton.durationSeconds);
+        const plannerConfig = buildAdvancedPlannerConfig(config, strategy);
+        const passConfig = buildAdvancedPassConfig(config, strategy);
+        const coreInput = analysis.coreMetrics
+          ? { aggregated: analysis.coreMetrics, perChapterMetrics: analysis.perChapterMetrics }
+          : buildUnobservedCoreMetrics();
+        const plan = planAdvancedAnalysis(structureResult.skeleton, coreInput, plannerConfig);
+        const advancedResult = await executeAdvancedPass(
+          plan,
+          {
+            youtubeUrl: video.url,
+            skeleton: structureResult.skeleton,
+            config,
+          },
+          passConfig,
+        );
+        advancedSegments = advancedResult.segments;
+        mergedAdvanced = mergeAdvancedSegments(advancedSegments);
+      }
+
+      if (!mergedAdvanced) {
+        mergedAdvanced = buildDefaultAdvancedMetrics();
+      }
       const perDomain = toFingerprintDomains(analysis.profiles);
       const fingerprint = buildVideoFingerprint(perDomain, {
         metaAxes: computeMetaAxesFromProfiles(perDomain),
         supporting: { beats: analysis.beats, axisDetails: analysis.axisDetails },
-        advancedMetrics: analysis.advancedMetrics ?? buildDefaultAdvancedMetrics(),
+        advancedMetrics: mergedAdvanced,
       });
       const summary = summarize(video, fingerprint.supporting?.axisDetails);
-      const failures = checkExpectations(video, analysis);
+      const segmentCoverage = buildSegmentCoverage(advancedSegments);
       const coverage = analysis.diagnostics.coverage ?? buildFallbackCoverage(analysis.diagnostics.unobservedCounts);
+      const advancedCoverage = coverage.advanced ?? segmentCoverage;
+      const failures = checkExpectations(
+        video,
+        analysis,
+        mergedAdvanced,
+        advancedCoverage,
+        advancedSegments,
+      );
+      const advancedObservedPct = computeCoverageObservedPct(advancedCoverage);
+      const segmentObserved = computeSegmentObservedPct(advancedSegments);
+      const longestSegmentTimeline = Math.max(0, ...collectSegmentTimelineLengths(advancedSegments));
       console.log(`Status: ok unobserved=${JSON.stringify(analysis.diagnostics.unobservedCounts)}`);
       if (structureResult && structureResult.source !== "gemini") {
         warn(`structure pass fallback used (${structureResult.source})`);
       }
       console.log(formatCoverageGroup("Coverage (core):", coverage.core));
-      if (coverage.advanced) {
-        console.log(formatCoverageGroup("Coverage (advanced):", coverage.advanced));
+      if (advancedCoverage) {
+        console.log(formatCoverageGroup("Coverage (advanced):", advancedCoverage));
+      }
+      if (USE_SELECTIVE_ADVANCED) {
+        if (!advancedSegments || advancedSegments.length === 0) {
+          failures.push("Selective advanced pass returned no segments");
+        } else if (segmentObserved.observedPct < MIN_TIER2_OBSERVED_PCT) {
+          failures.push(
+            `Tier 2 observed rate ${segmentObserved.observedPct}% below target ${MIN_TIER2_OBSERVED_PCT}%`,
+          );
+        }
+        if (longestSegmentTimeline > MAX_TIMELINE_POINTS) {
+          failures.push(
+            `segment timeline length ${longestSegmentTimeline} > max ${MAX_TIMELINE_POINTS}`,
+          );
+        }
+        const hookSegment = advancedSegments?.find((segment) => segment.segmentType === "hook");
+        const endingSegment = advancedSegments?.find((segment) => segment.segmentType === "ending");
+        if (!hookSegment) {
+          failures.push("Missing hook segment in selective advanced pass");
+        } else {
+          const paceTimeline = hookSegment.prosodyArc?.paceVariabilityPct?.timeline ?? [];
+          if (paceTimeline.length === 0) {
+            failures.push("Hook segment missing pace variability timeline");
+          }
+        }
+        if (!endingSegment) {
+          failures.push("Missing ending segment in selective advanced pass");
+        } else if (!isObservedMetric(endingSegment.narrativeArc?.endingResolutionScore)) {
+          failures.push("Ending segment missing observed endingResolutionScore");
+        }
+      } else if (advancedCoverage && advancedObservedPct < MIN_TIER2_OBSERVED_PCT) {
+        failures.push(
+          `Tier 2 observed rate ${advancedObservedPct}% below target ${MIN_TIER2_OBSERVED_PCT}%`,
+        );
       }
       console.log(
         `Sound -> musicCoverage: ${summary.musicCoverage}, musicChanges: ${summary.musicChanges}; ` +
@@ -521,7 +753,7 @@ async function run() {
         passCount += 1;
       }
       addCoverageAggregate(coverageAggregateCore, coverage.core);
-      addCoverageAggregate(coverageAggregateAdvanced, coverage.advanced);
+      addCoverageAggregate(coverageAggregateAdvanced, advancedCoverage);
     } catch (error) {
       console.error(`Failed for ${video.url}:`, error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
@@ -547,6 +779,7 @@ async function run() {
   }
 
   const tier1ObservedPct = computeAggregateObservedPct(coverageAggregateCore);
+  const tier2ObservedPct = computeAggregateObservedPct(coverageAggregateAdvanced);
   const summary: GoldenSummary = {
     schemaVersion: FINGERPRINT_SCHEMA_VERSION,
     schemaHash: FINGERPRINT_SCHEMA_HASH,
@@ -568,6 +801,7 @@ async function run() {
           : undefined,
     },
     tier1ObservedPct,
+    tier2ObservedPct,
   };
 
   console.log("\n=== Golden set compact summary ===");
@@ -619,6 +853,12 @@ async function run() {
   if (tier1ObservedPct > 0 && tier1ObservedPct < MIN_TIER1_OBSERVED_PCT) {
     console.error(
       `Tier 1 observed rate ${tier1ObservedPct}% below target ${MIN_TIER1_OBSERVED_PCT}%.`,
+    );
+    process.exitCode = 1;
+  }
+  if (tier2ObservedPct > 0 && tier2ObservedPct < MIN_TIER2_OBSERVED_PCT) {
+    console.error(
+      `Tier 2 observed rate ${tier2ObservedPct}% below target ${MIN_TIER2_OBSERVED_PCT}%.`,
     );
     process.exitCode = 1;
   }

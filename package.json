@@ -28,6 +28,7 @@
     "probe:ingestion": "tsx scripts/probe-multimodal-ingestion.ts",
     "eval:golden": "tsx scripts/run-multimodal-golden.ts",
     "golden:multimodal": "tsx scripts/run-multimodal-golden.ts",
+    "golden:advanced-value": "tsx scripts/validate-advanced-value.ts",
     "visual:check": "tsx scripts/visual-check.ts",
     "worker": "tsx scripts/analysis-worker.ts"
   },
@@ -43,6 +44,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "eslint-config-prettier": "^10.1.8",

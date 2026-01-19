@@ -1,5 +1,13 @@
 import type { AdvancedFingerprintMetrics, ScoredMetric, SecondOrderSummary } from "../../types";
 
+/**
+ * @deprecated This function is maintained for backward compatibility with the fingerprint schema.
+ * New code should use `computeSecondOrderScores` from `derivedScores.ts` which works with
+ * the new tiered architecture and provides better fallback handling.
+ * 
+ * This function computes second-order scores from advanced metrics only (no core metrics or derived scores).
+ * It returns ScoredMetric format for compatibility with AdvancedFingerprintMetrics.secondOrder.
+ */
 type AdvancedWithoutSecondOrder = Omit<AdvancedFingerprintMetrics, "secondOrder">;
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -39,10 +47,21 @@ const deriveSecondOrderMetric = (
   if (!entries.every(([metric]) => isMetricObserved(metric))) {
     return unobservedMetric();
   }
-  const score = weightedAverage(...entries.map(([metric, weight]) => [metric.score, weight]));
+  const pairs = entries.map(([metric, weight]) => [metric.score, weight] as [number, number]);
+  const score = weightedAverage(...pairs);
   return derivedMetric(score);
 };
 
+/**
+ * @deprecated Use `computeSecondOrderScores` from `derivedScores.ts` instead.
+ * This function is kept for backward compatibility with legacy fingerprint schema.
+ * 
+ * Computes second-order scores from advanced metrics only.
+ * For new tiered analysis, use the version in derivedScores.ts which:
+ * - Works with core metrics and derived scores
+ * - Provides better fallback handling
+ * - Returns DerivedScore format (stored in fingerprint.derivedScores)
+ */
 export const computeSecondOrderScores = (metrics: AdvancedWithoutSecondOrder): SecondOrderSummary => {
   const alignmentScore = deriveSecondOrderMetric([
     [metrics.prosodyArc.emphasisAlignmentScore, 0.3],

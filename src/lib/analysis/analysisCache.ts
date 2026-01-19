@@ -12,9 +12,16 @@ type AnalysisConfigPayload = {
   analysisVersion: AppConfig["analysisVersion"];
   multimodalPassMode: AppConfig["multimodalPassMode"] | null;
   advancedMetricsEnabled: boolean;
+  advancedMaxSegments: number;
+  advancedSegmentMaxSeconds: number;
+  advancedMaxTimelinePoints: number;
+  advancedMaxPassCostUsd: number;
+  advancedMaxPassDurationMs: number;
   structurePassEnabled: boolean;
   structurePassTimeoutMs: number;
   geminiResponseSchemaEnabled: boolean;
+  advancedSchemaStrategy: "inherit" | "strict" | "optional";
+  advancedResponseFormat: "full" | "compact";
   models: {
     core: string | null;
     advancedAudio: string | null;
@@ -38,9 +45,16 @@ export const buildAnalysisConfigSignature = (config: AppConfig): AnalysisConfigS
     analysisVersion: config.analysisVersion,
     multimodalPassMode: config.multimodalPassMode ?? null,
     advancedMetricsEnabled: config.advancedMetricsEnabled,
+    advancedMaxSegments: config.advancedMaxSegments,
+    advancedSegmentMaxSeconds: config.advancedSegmentMaxSeconds,
+    advancedMaxTimelinePoints: config.advancedMaxTimelinePoints,
+    advancedMaxPassCostUsd: config.advancedMaxPassCostUsd,
+    advancedMaxPassDurationMs: config.advancedMaxPassDurationMs,
     structurePassEnabled: config.structurePassEnabled,
     structurePassTimeoutMs: config.structurePassTimeoutMs,
     geminiResponseSchemaEnabled: config.geminiResponseSchemaEnabled ?? false,
+    advancedSchemaStrategy: config.advancedSchemaStrategy ?? "inherit",
+    advancedResponseFormat: config.advancedResponseFormat ?? "full",
     models: {
       core: config.geminiMultimodalCoreModel ?? null,
       advancedAudio: config.geminiMultimodalAdvancedAudioModel ?? null,

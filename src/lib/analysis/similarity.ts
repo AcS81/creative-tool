@@ -70,7 +70,7 @@ const collectAxisDetails = (fingerprint?: VideoFingerprintJson) => {
   const combined: Record<string, { observed?: boolean }> = {};
   for (const profile of Object.values(fingerprint.perDomain)) {
     if (!profile.axisDetails) continue;
-    for (const [key, detail] of Object.entries(profile.axisDetails)) {
+    for (const [key, detail] of Object.entries(profile.axisDetails) as [string, { observed?: boolean }][]) {
       if (!combined[key]) combined[key] = detail;
     }
   }
@@ -155,7 +155,7 @@ export const distanceOnMetaAxes = (
   const secondOrderPairs = SECOND_ORDER_KEYS.map((key) => {
     const targetMetric = options?.targetFingerprint?.secondOrder?.[key];
     const candidateMetric = options?.candidateFingerprint?.secondOrder?.[key];
-    if (!isObservedMetric(targetMetric) || !isObservedMetric(candidateMetric)) return null;
+    if (!targetMetric || !candidateMetric || !isObservedMetric(targetMetric) || !isObservedMetric(candidateMetric)) return null;
     const targetValue = secondOrderStats ? normalizeValue(targetMetric.score, secondOrderStats[key]) : targetMetric.score;
     const candidateValue = secondOrderStats
       ? normalizeValue(candidateMetric.score, secondOrderStats[key])

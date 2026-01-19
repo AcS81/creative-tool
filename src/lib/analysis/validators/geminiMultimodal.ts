@@ -152,14 +152,14 @@ const advancedModalityBalanceSchema = z.object(buildRichMetricFields(ADVANCED_ME
 
 const advancedCognitiveLoadSchema = z.object(buildRichMetricFields(ADVANCED_METRIC_SECTIONS.cognitiveLoad));
 
-const advancedMetricsSchema: z.ZodType<GeminiAdvancedMetrics> = z.object({
+const advancedMetricsSchema = z.object({
   prosodyArc: advancedProsodyArcSchema,
   languageTexture: advancedLanguageTextureSchema,
   narrativeArc: advancedNarrativeArcSchema,
   visualEditAlignment: advancedVisualEditAlignmentSchema,
   modalityBalance: advancedModalityBalanceSchema,
   cognitiveLoad: advancedCognitiveLoadSchema,
-});
+}) as unknown as z.ZodType<GeminiAdvancedMetrics>;
 
 const advancedSectionSchemaMap: Record<AdvancedSectionKey, z.ZodTypeAny> = {
   prosodyArc: advancedProsodyArcSchema,
@@ -170,7 +170,7 @@ const advancedSectionSchemaMap: Record<AdvancedSectionKey, z.ZodTypeAny> = {
   cognitiveLoad: advancedCognitiveLoadSchema,
 };
 
-export const GeminiMultimodalResponseSchema: z.ZodType<GeminiMultimodalResponse> = z
+export const GeminiMultimodalResponseSchema = z
   .object({
     voice: voiceSchema,
     language: languageSchema,
@@ -178,7 +178,7 @@ export const GeminiMultimodalResponseSchema: z.ZodType<GeminiMultimodalResponse>
     visual_edit_sound: visualEditSoundSchema,
     advanced_metrics: advancedMetricsSchema.optional(),
   })
-  .passthrough();
+  .passthrough() as unknown as z.ZodType<GeminiMultimodalResponse>;
 
 export class InvalidGeminiResponseError extends Error {
   readonly issues: string[];

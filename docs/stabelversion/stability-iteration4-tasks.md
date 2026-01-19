@@ -24,6 +24,12 @@ From the stability refactor PRD, this iteration implements **Tier 3: Derived Sco
 - Comprehensive error handling and retry logic
 - Pipeline-wide diagnostics and observability
 
+**Note**: Iteration 3 added compact response mode for Tier 2, which returns scores + anchor points instead of full timelines. Tier 3 derived computation must handle both:
+- **Full mode**: Timelines provided directly by Gemini
+- **Compact mode**: Timelines interpolated locally from anchor points
+
+Both produce the same `RichMetric` shape, so derived computation should be agnostic to the source.
+
 Files to create:
 - `src/lib/analysis/derivedScores.ts`
 - `src/lib/analysis/errorHandling.ts`
@@ -47,7 +53,7 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create or extend `src/lib/analysis/types/derivedScores.ts` with:
+- [x] Create or extend `src/lib/analysis/types/derivedScores.ts` with:
   - `DerivedScores` interface containing:
     - `metaAxes`: voiceIntensity, conceptualDepth, narrativeStructureStrength, visualDynamism, productionPolish
     - `alignment`: audioVisualAlignment, beatsEditsAlignment, prosodySemanticAlignment, overallAlignment
@@ -64,9 +70,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Types compile and match refactor spec
-- [ ] All derived metrics represented
-- [ ] observed flag supported for each
+- [x] Types compile and match refactor spec
+- [x] All derived metrics represented
+- [x] observed flag supported for each
 
 ---
 
@@ -78,7 +84,7 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/derivedScores.ts` with:
+- [x] Create `src/lib/analysis/derivedScores.ts` with:
   - `computeMetaAxes(coreMetrics: CoreMetrics): MetaAxes`
   - Formulas:
     - `voiceIntensity = avg(speakingRate.score, loudnessRange.score, pitchVariation.score)`
@@ -95,9 +101,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Meta axes computed correctly from sample data
-- [ ] Unobserved inputs handled gracefully
-- [ ] Unit tests verify formulas
+- [x] Meta axes computed correctly from sample data
+- [x] Unobserved inputs handled gracefully
+- [x] Unit tests verify formulas
 
 ---
 
@@ -106,29 +112,35 @@ Files to modify:
 **Context**
 
 - Stability Refactor Part 3.5: Cross-modal alignment
+- Iteration 3 introduced compact response mode where timelines are interpolated from anchors
 
 **Goals**
 
-- [ ] Add to `derivedScores.ts`:
+- [x] Add to `derivedScores.ts`:
   - `computeAlignmentScores(core: CoreMetrics, advanced?: AdvancedMetrics): AlignmentScores`
   - Metrics:
     - `audioVisualAlignment`: correlate voice emphasis with visual changes
     - `beatsEditsAlignment`: correlate narrative moments with cuts
     - `prosodySemanticAlignment`: correlate stress with important words
     - `overallAlignment`: weighted average
-  - Use timeline data from Tier 2 when available
+  - Use timeline data from Tier 2 when available (works with both full and compact/interpolated timelines)
   - Fall back to heuristics from Tier 1 scores when Tier 2 missing
+- [x] Handle timeline quality variance:
+  - Compact mode timelines have fewer anchor points → lower correlation precision
+  - Weight alignment confidence by timeline density
 
 **Constraints**
 
 - Must work without Tier 2 data (reduced accuracy)
+- Must work with interpolated timelines (compact mode)
 - Correlation computation should be efficient
 
 **Acceptance Criteria**
 
-- [ ] Alignment scores computed from available data
-- [ ] Works with and without Tier 2
-- [ ] Unit tests for both scenarios
+- [x] Alignment scores computed from available data
+- [x] Works with and without Tier 2
+- [x] Works with both full and compact response formats
+- [x] Unit tests for all scenarios
 
 ---
 
@@ -140,7 +152,7 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add to `derivedScores.ts`:
+- [x] Add to `derivedScores.ts`:
   - `computeBalanceScores(core: CoreMetrics, skeleton: VideoSkeleton): BalanceScores`
   - `computeCognitiveLoadScores(core: CoreMetrics, advanced?: AdvancedMetrics): CognitiveLoadScores`
   - Balance metrics:
@@ -150,7 +162,7 @@ Files to modify:
   - Cognitive load metrics:
     - `averageLoad`, `peakLoad`, `loadVariance`, `overloadMoments`
     - Use Tier 2 `cognitiveLoadSpikes` if available
-- [ ] Implement `computeSecondOrderScores(all inputs)`:
+- [x] Implement `computeSecondOrderScores(all inputs)`:
   - Aggregate alignment, drift, decay, balance, timing
 
 **Constraints**
@@ -160,9 +172,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Balance scores reasonable for sample data
-- [ ] Cognitive load computed with/without Tier 2
-- [ ] Second-order scores aggregate correctly
+- [x] Balance scores reasonable for sample data
+- [x] Cognitive load computed with/without Tier 2
+- [x] Second-order scores aggregate correctly
 
 ---
 
@@ -176,14 +188,14 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/errorHandling.ts` with:
+- [x] Create `src/lib/analysis/errorHandling.ts` with:
   - `AnalysisError` class extending Error with:
     - `type: 'structure' | 'core' | 'advanced' | 'derived' | 'gemini' | 'timeout' | 'validation'`
     - `recoverable: boolean`
     - `fallbackAvailable: boolean`
   - `withRetry<T>(fn, config): Promise<T | null>` utility
   - `RetryConfig` type: `{ maxRetries, backoffMs, timeoutMs }`
-- [ ] Define retry configurations per pass:
+- [x] Define retry configurations per pass:
   - Structure: 2 retries, 1000ms backoff
   - Core (per chapter): 1 retry, 500ms backoff
   - Advanced (per segment): 1 retry, 500ms backoff
@@ -195,9 +207,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Error types cover all failure modes
-- [ ] Retry logic works correctly
-- [ ] Backoff timing correct
+- [x] Error types cover all failure modes
+- [x] Retry logic works correctly
+- [x] Backoff timing correct
 
 ---
 
@@ -209,11 +221,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Implement fallback generators:
+- [x] Implement fallback generators:
   - `buildFallbackSkeleton(duration)`: duration-based default chapters
   - `buildFallbackCoreMetrics(skeleton)`: neutral scores with observed:false
   - `buildFallbackDerivedScores()`: neutral scores with observed:false
-- [ ] Integrate fallbacks into pass functions:
+- [x] Integrate fallbacks into pass functions:
   - Structure pass → fallback skeleton on failure
   - Core chapter → mark chapter unobserved, continue with others
   - Advanced segment → mark segment unobserved, continue
@@ -226,9 +238,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] All fallback generators produce valid data
-- [ ] Passes use fallbacks on failure
-- [ ] Output clearly indicates fallback usage
+- [x] All fallback generators produce valid data
+- [x] Passes use fallbacks on failure
+- [x] Output clearly indicates fallback usage
 
 ---
 
@@ -240,12 +252,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify analysis orchestration to:
+- [x] Modify analysis orchestration to:
   - Catch errors at each tier boundary
   - Log errors with full context
   - Continue to next tier with available data
   - Aggregate errors in diagnostics
-- [ ] Add `AnalysisResult.diagnostics`:
+- [x] Add `AnalysisResult.diagnostics`:
   - `errors: AnalysisError[]`
   - `warnings: string[]`
   - `fallbacksUsed: string[]`
@@ -258,9 +270,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Pipeline completes even with tier failures
-- [ ] Diagnostics include all errors and fallbacks
-- [ ] Logging provides debugging context
+- [x] Pipeline completes even with tier failures
+- [x] Diagnostics include all errors and fallbacks
+- [x] Logging provides debugging context
 
 ---
 
@@ -271,19 +283,25 @@ Files to modify:
 **Context**
 
 - Stability Refactor Part 7: Observability
+- Iteration 3 added `advancedSchemaStrategy` and `advancedResponseFormat` config options
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/pipelineDiagnostics.ts` with:
+- [x] Create `src/lib/analysis/pipelineDiagnostics.ts` with:
   - `PassResult` type: `{ success, durationMs, tokensUsed, costUsd, errorMessage?, retryCount }`
   - `PipelineDiagnostics` type aggregating all pass results
   - `buildPipelineDiagnostics(passes): PipelineDiagnostics`
-- [ ] Add coverage computation:
+- [x] Add coverage computation:
   - `tier1Observed`: % of Tier 1 metrics observed
   - `tier2Observed`: % of Tier 2 metrics observed (when requested)
   - `tier3Computed`: % of Tier 3 metrics computable
-- [ ] Add cost aggregation:
+- [x] Add cost aggregation:
   - Total tokens, total cost, per-pass breakdown
+- [x] Track Tier 2 configuration used:
+  - `advancedSchemaStrategy`: 'inherit' | 'strict' | 'optional'
+  - `advancedResponseFormat`: 'full' | 'compact'
+  - `schemaRejectionCount`: number of schema rejections before fallback
+  - `timelineInterpolated`: boolean (true if compact mode was used)
 
 **Constraints**
 
@@ -292,9 +310,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Diagnostics capture all pass results
-- [ ] Coverage percentages accurate
-- [ ] Cost tracking complete
+- [x] Diagnostics capture all pass results
+- [x] Coverage percentages accurate
+- [x] Cost tracking complete
+- [x] Tier 2 config options tracked for debugging
 
 ---
 
@@ -306,11 +325,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/service.ts`:
+- [x] Modify `src/lib/analysis/service.ts`:
   - Collect PassResult from each tier
   - Build complete PipelineDiagnostics
   - Include in AnalyzeVideoResult
-- [ ] Update `AnalyzeVideoResult.diagnostics`:
+- [x] Update `AnalyzeVideoResult.diagnostics`:
   - Add `structurePass`, `corePass`, `advancedPasses[]`, `derivedComputation`
   - Add `overallCoverage`
   - Add `totalCostUsd`, `totalDurationMs`
@@ -322,9 +341,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] All diagnostic data in result
-- [ ] Backward compatibility maintained
-- [ ] UI can access diagnostics
+- [x] All diagnostic data in result
+- [x] Backward compatibility maintained
+- [x] UI can access diagnostics
 
 ---
 
@@ -333,17 +352,24 @@ Files to modify:
 **Context**
 
 - Production debugging and monitoring
+- Iteration 3 added compact response mode that should be tracked
 
 **Goals**
 
-- [ ] Enhance logging throughout pipeline:
+- [x] Enhance logging throughout pipeline:
   - Log pass start/end with timing
   - Log errors with full context
   - Log retry attempts
   - Log fallback activations
-- [ ] Structure logs for observability:
+  - Log schema strategy and response format used for Tier 2
+- [x] Structure logs for observability:
   - Include videoId, passName, duration, success
+  - For Tier 2: include responseFormat, schemaStrategy, anchorsReceived, timelinesGenerated
   - Use consistent format for parsing
+- [x] Log compact mode metrics:
+  - Number of anchor points received per metric
+  - Timeline points generated after interpolation
+  - Interpolation quality indicators
 
 **Constraints**
 
@@ -352,9 +378,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] All passes logged
-- [ ] Errors include context
-- [ ] Logs parseable for monitoring
+- [x] All passes logged
+- [x] Errors include context
+- [x] Logs parseable for monitoring
+- [x] Compact mode configuration and results logged
 
 ---
 
@@ -368,11 +395,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/schemas/fingerprint.ts`:
+- [x] Modify `src/lib/schemas/fingerprint.ts`:
   - Add `derivedScores?: DerivedScores` to fingerprint
   - Update Zod validation for new structure
   - Ensure backward compatibility (derived scores optional)
-- [ ] Update fingerprint version:
+- [x] Update fingerprint version:
   - Increment to indicate schema change
   - Add migration notes
 
@@ -383,9 +410,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Schema accepts derived scores
-- [ ] Old fingerprints still valid
-- [ ] Version incremented
+- [x] Schema accepts derived scores
+- [x] Old fingerprints still valid
+- [x] Version incremented
 
 ---
 
@@ -397,11 +424,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/service.ts`:
+- [x] Modify `src/lib/analysis/service.ts`:
   - Add derived score computation after core/advanced
   - Call `computeDerivedScores(skeleton, coreMetrics, advancedMetrics)`
   - Include derived scores in fingerprint
-- [ ] Handle missing inputs:
+- [x] Handle missing inputs:
   - Compute what's possible
   - Mark unobservable scores
 
@@ -412,9 +439,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Derived scores computed in pipeline
-- [ ] Fingerprint includes derived scores
-- [ ] Works with partial Tier 1/2 data
+- [x] Derived scores computed in pipeline
+- [x] Fingerprint includes derived scores
+- [x] Works with partial Tier 1/2 data
 
 ---
 
@@ -426,11 +453,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/fingerprint/secondOrder.ts`:
+- [x] Modify `src/lib/analysis/fingerprint/secondOrder.ts`:
   - Import and use new derived score functions
   - Deprecate or remove duplicate logic
   - Ensure alignment with new tiered architecture
-- [ ] Ensure existing second-order tests pass:
+- [x] Ensure existing second-order tests pass:
   - Update test expectations if needed
   - Add tests for new computation paths
 
@@ -441,9 +468,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Second-order module uses new functions
-- [ ] Tests pass
-- [ ] No duplicate computation logic
+- [x] Second-order module uses new functions
+- [x] Tests pass
+- [x] No duplicate computation logic
 
 ---
 

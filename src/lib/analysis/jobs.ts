@@ -17,8 +17,19 @@ import {
   type MultimodalAdvancedPayload,
   type MultimodalCorePayload,
 } from "./geminiMultimodalAnalyzer";
+import { planAdvancedAnalysis } from "./advancedPlanner";
+import {
+  executeAdvancedPass,
+  type AdvancedPassDiagnostics,
+  type AdvancedPassResult,
+} from "./advancedPass";
+import { buildAdvancedPassConfig, buildAdvancedPlannerConfig, resolveAdvancedStrategy } from "./advancedStrategy";
 import { isJobClaimable, resolveResumePlan, type AnalysisStage } from "./jobUtils";
 import { buildFallbackSkeleton, runStructurePass } from "./structurePass";
+import { buildUnobservedCoreMetrics } from "./aggregation";
+import type { AdvancedAnalysisPlan } from "./advancedPlanner";
+import type { SegmentAdvancedMetrics } from "./types/advancedMetrics";
+import type { ChapterCoreMetrics, CoreMetrics } from "./types/coreMetrics";
 import type { VideoSkeleton } from "./types/skeleton";
 
 const DEFAULT_MAX_ATTEMPTS = 3;
@@ -134,6 +145,44 @@ type StructurePassPayload = {
   structureSource?: "gemini" | "fallback";
   structureError?: string;
   structureDurationMs?: number;
+};
+
+type TieredCorePayload = {
+  coreMetrics: CoreMetrics;
+  perChapterMetrics: ChapterCoreMetrics[];
+};
+
+type AdvancedStagePayload = {
+  advancedPlan?: AdvancedAnalysisPlan;
+  advancedMetrics?: SegmentAdvancedMetrics[];
+  advancedDiagnostics?: AdvancedPassDiagnostics;
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null;
+
+const isLegacyAdvancedPayload = (value: unknown): value is MultimodalAdvancedPayload => {
+  if (!isRecord(value)) return false;
+  return "mergedAdvanced" in value || "salvage" in value || "advancedParse" in value;
+};
+
+const resolveTieredCorePayload = (value: unknown): TieredCorePayload | null => {
+  if (!isRecord(value)) return null;
+  const coreMetrics = value.coreMetrics ?? value.aggregated;
+  const perChapterMetrics = value.perChapterMetrics ?? value.perChapter;
+  if (!coreMetrics || !Array.isArray(perChapterMetrics)) return null;
+  return {
+    coreMetrics: coreMetrics as CoreMetrics,
+    perChapterMetrics: perChapterMetrics as ChapterCoreMetrics[],
+  };
+};
+
+const resolveAdvancedStagePayload = (value: unknown): AdvancedStagePayload | null => {
+  if (!isRecord(value)) return null;
+  if (!("advancedPlan" in value || "advancedMetrics" in value || "advancedDiagnostics" in value)) {
+    return null;
+  }
+  return value as AdvancedStagePayload;
 };
 
 const updateStage = async (analysisId: string, leaseOwner: string, stage: AnalysisStage) => {
@@ -300,7 +349,9 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
   let ingestionPreflight: IngestionPreflight | undefined;
   let structurePayload: StructurePassPayload | null = null;
   let corePayload: MultimodalCorePayload | null = null;
+  let tieredCorePayload: TieredCorePayload | null = null;
   let advancedPayload: MultimodalAdvancedPayload | null = null;
+  let selectiveAdvancedPayload: AdvancedStagePayload | null = null;
 
   try {
     analysis = await prisma.videoAnalysis.findUnique({
@@ -314,6 +365,7 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
     requestConfig = applyDurationTimeouts(buildRequestConfig(config, analysis.passMode), analysis.durationSeconds);
     configSignature = buildAnalysisConfigSignature(requestConfig);
     const advancedMetricsEnabled = (requestConfig.multimodalPassMode ?? "full") !== "core" && requestConfig.advancedMetricsEnabled !== false;
+    const useTieredAnalysis = requestConfig.useTieredAnalysis ?? false;
 
     const configUpdate = {
       analysisVersion: requestConfig.analysisVersion,
@@ -328,13 +380,27 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
     if (structurePayload && !structurePayload.skeleton) {
       structurePayload = null;
     }
-    corePayload = safeParseJson<MultimodalCorePayload>(analysis.coreMetricsJson);
-    if (corePayload && !corePayload.parsed) {
-      corePayload = null;
+    const rawCorePayload = safeParseJson<unknown>(analysis.coreMetricsJson);
+    if (isRecord(rawCorePayload) && "parsed" in rawCorePayload) {
+      corePayload = rawCorePayload as MultimodalCorePayload;
+      if (!corePayload.parsed) {
+        corePayload = null;
+      }
     }
-    advancedPayload = safeParseJson<MultimodalAdvancedPayload>(analysis.advancedMetricsJson);
+    tieredCorePayload = resolveTieredCorePayload(rawCorePayload);
+
+    const rawAdvancedPayload = safeParseJson<unknown>(analysis.advancedMetricsJson);
+    advancedPayload = isLegacyAdvancedPayload(rawAdvancedPayload) ? rawAdvancedPayload : null;
+    selectiveAdvancedPayload = advancedPayload ? null : resolveAdvancedStagePayload(rawAdvancedPayload);
 
     const hasStructure = Boolean(structurePayload?.skeleton) || Boolean(corePayload?.parsed);
+    const hasAdvanced =
+      Boolean(advancedPayload) ||
+      Boolean(
+        selectiveAdvancedPayload?.advancedPlan ||
+          selectiveAdvancedPayload?.advancedDiagnostics ||
+          (selectiveAdvancedPayload?.advancedMetrics?.length ?? 0) > 0,
+      );
 
     const resumePlan = resolveResumePlan({
       storedConfigHash: analysis.analysisConfigHash,
@@ -344,7 +410,7 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
       hasStructure,
       hasIngestion: Boolean(ingestionPreflight),
       hasCore: Boolean(corePayload?.parsed),
-      hasAdvanced: Boolean(advancedPayload),
+      hasAdvanced,
       advancedMetricsEnabled,
     });
 
@@ -376,7 +442,9 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
       }
       ingestionPreflight = undefined;
       corePayload = null;
+      tieredCorePayload = null;
       advancedPayload = null;
+      selectiveAdvancedPayload = null;
     } else {
       const updated = await prisma.videoAnalysis.updateMany({
         where: { id: analysis.id, leaseOwner },
@@ -524,6 +592,7 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
         }
 
         corePayload = await runMultimodalCore({ youtubeUrl, config: requestConfig });
+        tieredCorePayload = null;
         const saved = await completeStage(analysis.id, leaseOwner, {
           coreMetricsJson: JSON.stringify(corePayload),
           ...configUpdate,
@@ -539,10 +608,6 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
       }
 
       if (advancedMetricsEnabled && !resumePlan.useAdvanced) {
-        if (!corePayload?.parsed) {
-          throw new GeminiApiError("InvalidResponse", "Missing core analysis payload.");
-        }
-
         const stageOk = await updateStage(analysis.id, leaseOwner, "advanced");
         if (!stageOk) {
           logEvent("warn", "analysis_job_orphaned", {
@@ -553,22 +618,106 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
           return;
         }
 
-        advancedPayload = await runMultimodalAdvanced({
-          youtubeUrl,
-          config: requestConfig,
-          coreParsed: corePayload.parsed,
-        });
-        const saved = await completeStage(analysis.id, leaseOwner, {
-          advancedMetricsJson: JSON.stringify(advancedPayload),
-          ...configUpdate,
-        });
-        if (saved.count === 0) {
-          logEvent("warn", "analysis_job_orphaned", {
-            analysisId: analysis.id,
-            videoId: analysis.youtubeVideoId,
-            stage: "advanced_store",
+        if (useTieredAnalysis) {
+          const skeleton =
+            structurePayload?.skeleton ??
+            buildFallbackSkeleton({
+              durationSeconds: analysis.durationSeconds,
+            });
+          const coreInput = tieredCorePayload
+            ? { aggregated: tieredCorePayload.coreMetrics, perChapterMetrics: tieredCorePayload.perChapterMetrics }
+            : buildUnobservedCoreMetrics();
+          const durationSeconds = skeleton.durationSeconds || analysis.durationSeconds;
+          const advancedStrategy = resolveAdvancedStrategy(durationSeconds);
+          const plannerConfig = buildAdvancedPlannerConfig(requestConfig, advancedStrategy);
+          const advancedPlan = planAdvancedAnalysis(skeleton, coreInput, plannerConfig);
+          const passConfig = buildAdvancedPassConfig(requestConfig, advancedStrategy);
+          const advancedStartedAt = Date.now();
+          let advancedResult: AdvancedPassResult;
+
+          try {
+            advancedResult = await executeAdvancedPass(advancedPlan, {
+              youtubeUrl,
+              skeleton,
+              config: requestConfig,
+            }, passConfig);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Selective advanced pass failed.";
+            logEvent("warn", "analysis_advanced_failed", {
+              analysisId: analysis.id,
+              videoId: analysis.youtubeVideoId,
+              stage: "advanced_execute",
+              errorMessage: message,
+            });
+            advancedResult = {
+              segments: [],
+              diagnostics: {
+                segmentsPlanned: advancedPlan.segments.length,
+                segmentsCompleted: 0,
+                segmentsFailed: advancedPlan.segments.length,
+                totalDurationMs: Date.now() - advancedStartedAt,
+                estimatedCostUsd: 0,
+              },
+            };
+          }
+
+          selectiveAdvancedPayload = {
+            advancedPlan,
+            advancedMetrics: advancedResult.segments,
+            advancedDiagnostics: advancedResult.diagnostics,
+          };
+          advancedPayload = null;
+
+          const saved = await completeStage(analysis.id, leaseOwner, {
+            advancedMetricsJson: JSON.stringify(selectiveAdvancedPayload),
+            ...configUpdate,
           });
-          return;
+          if (saved.count === 0) {
+            logEvent("warn", "analysis_job_orphaned", {
+              analysisId: analysis.id,
+              videoId: analysis.youtubeVideoId,
+              stage: "advanced_store",
+            });
+            return;
+          }
+        } else {
+          if (!corePayload?.parsed) {
+            throw new GeminiApiError("InvalidResponse", "Missing core analysis payload.");
+          }
+
+          try {
+            advancedPayload = await runMultimodalAdvanced({
+              youtubeUrl,
+              config: requestConfig,
+              coreParsed: corePayload.parsed,
+            });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Advanced pass failed.";
+            logEvent("warn", "analysis_advanced_failed", {
+              analysisId: analysis.id,
+              videoId: analysis.youtubeVideoId,
+              stage: "advanced_execute",
+              errorMessage: message,
+            });
+            advancedPayload = {
+              mergedAdvanced: undefined,
+              salvage: { attempted: false, reason: message },
+            };
+          }
+
+          selectiveAdvancedPayload = null;
+          const saved = await completeStage(analysis.id, leaseOwner, {
+            advancedMetricsJson: JSON.stringify(advancedPayload),
+            ...configUpdate,
+          });
+          if (saved.count === 0) {
+            logEvent("warn", "analysis_job_orphaned", {
+              analysisId: analysis.id,
+              videoId: analysis.youtubeVideoId,
+              stage: "advanced_store",
+            });
+            return;
+          }
         }
       }
 
@@ -622,6 +771,8 @@ export const runAnalysisJob = async (videoAnalysisId: string, options: { leaseOw
           auth: authContext ?? undefined,
           skeleton: structureSkeleton,
           structurePass,
+          advancedMetrics: selectiveAdvancedPayload?.advancedMetrics,
+          advancedDiagnostics: selectiveAdvancedPayload?.advancedDiagnostics,
         },
       );
 

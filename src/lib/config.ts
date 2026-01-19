@@ -1,6 +1,8 @@
 export type AnalysisMode = "mock" | "gemini";
 export type AnalysisVersion = "v1" | "v2";
 export type MultimodalPassMode = "core" | "full";
+export type AdvancedSchemaStrategy = "inherit" | "strict" | "optional";
+export type AdvancedResponseFormat = "full" | "compact";
 
 export type AppConfig = {
   analysisMode: AnalysisMode;
@@ -9,6 +11,11 @@ export type AppConfig = {
   youtubeApiKey?: string;
   performanceEnabled: boolean;
   advancedMetricsEnabled: boolean;
+  advancedMaxSegments: number;
+  advancedSegmentMaxSeconds: number;
+  advancedMaxTimelinePoints: number;
+  advancedMaxPassCostUsd: number;
+  advancedMaxPassDurationMs: number;
   structurePassEnabled: boolean;
   structurePassTimeoutMs: number;
   useTieredAnalysis?: boolean;
@@ -27,6 +34,10 @@ export type AppConfig = {
   geminiMultimodalTimeoutMsAdvanced?: number;
   geminiMultimodalTimeoutMsSalvage?: number;
   geminiResponseSchemaEnabled?: boolean;
+  advancedSchemaStrategy?: AdvancedSchemaStrategy;
+  advancedResponseFormat?: AdvancedResponseFormat;
+  showArchetypeFeatures: boolean;
+  showReferenceLibrary: boolean;
 };
 
 export class ConfigError extends Error {
@@ -62,6 +73,23 @@ const normalizePassMode = (raw?: string | null): MultimodalPassMode | undefined 
   return undefined;
 };
 
+const normalizeAdvancedSchemaStrategy = (raw?: string | null): AdvancedSchemaStrategy | undefined => {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "inherit") return "inherit";
+  if (normalized === "strict") return "strict";
+  if (normalized === "optional") return "optional";
+  return undefined;
+};
+
+const normalizeAdvancedResponseFormat = (raw?: string | null): AdvancedResponseFormat | undefined => {
+  if (!raw) return undefined;
+  const normalized = raw.trim().toLowerCase();
+  if (normalized === "full") return "full";
+  if (normalized === "compact") return "compact";
+  return undefined;
+};
+
 const parseBoolean = (raw?: string | null) => {
   if (!raw) return false;
   const normalized = raw.trim().toLowerCase();
@@ -74,7 +102,18 @@ const parseOptionalInt = (raw?: string | null) => {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
 };
 
+const parseOptionalFloat = (raw?: string | null) => {
+  if (!raw) return undefined;
+  const parsed = Number.parseFloat(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+};
+
 const DEFAULT_STRUCTURE_PASS_TIMEOUT_MS = 30000;
+const DEFAULT_ADVANCED_MAX_SEGMENTS = 5;
+const DEFAULT_ADVANCED_SEGMENT_MAX_SECONDS = 120;
+const DEFAULT_ADVANCED_MAX_TIMELINE_POINTS = 25;
+const DEFAULT_ADVANCED_MAX_PASS_COST_USD = 0.25;
+const DEFAULT_ADVANCED_MAX_PASS_DURATION_MS = 180000;
 
 export const getAppConfig = (): AppConfig => {
   const analysisMode = normalizeAnalysisMode(process.env.ANALYSIS_MODE);
@@ -115,6 +154,22 @@ export const getAppConfig = (): AppConfig => {
   const rawResponseSchemaFlag = process.env.GEMINI_RESPONSE_SCHEMA_ENABLED;
   const geminiResponseSchemaEnabled =
     typeof rawResponseSchemaFlag === "string" ? parseBoolean(rawResponseSchemaFlag) : false;
+  const advancedSchemaStrategy = normalizeAdvancedSchemaStrategy(process.env.ADVANCED_SCHEMA_STRATEGY);
+  const advancedResponseFormat = normalizeAdvancedResponseFormat(process.env.ADVANCED_RESPONSE_FORMAT);
+  const advancedMaxSegmentsRaw =
+    parseOptionalInt(process.env.MAX_ADVANCED_SEGMENTS) ?? DEFAULT_ADVANCED_MAX_SEGMENTS;
+  const advancedSegmentMaxSecondsRaw =
+    parseOptionalInt(process.env.ADVANCED_SEGMENT_MAX_SECONDS) ?? DEFAULT_ADVANCED_SEGMENT_MAX_SECONDS;
+  const advancedMaxTimelinePointsRaw =
+    parseOptionalInt(process.env.MAX_TIMELINE_POINTS) ?? DEFAULT_ADVANCED_MAX_TIMELINE_POINTS;
+  const advancedMaxPassCostUsd =
+    parseOptionalFloat(process.env.MAX_ADVANCED_PASS_COST_USD) ?? DEFAULT_ADVANCED_MAX_PASS_COST_USD;
+  const advancedMaxPassDurationMs =
+    parseOptionalInt(process.env.MAX_ADVANCED_PASS_DURATION_MS) ?? DEFAULT_ADVANCED_MAX_PASS_DURATION_MS;
+  
+  // Feature flags for deferred features (Stability Iteration 5)
+  const showArchetypeFeatures = parseBoolean(process.env.SHOW_ARCHETYPE_FEATURES);
+  const showReferenceLibrary = parseBoolean(process.env.SHOW_REFERENCE_LIBRARY);
 
   if (analysisMode === "gemini") {
     const missingKeys = [!geminiApiKey && "GEMINI_API_KEY", !youtubeApiKey && "YOUTUBE_API_KEY"].filter(
@@ -166,6 +221,9 @@ export const getAppConfig = (): AppConfig => {
   const multimodalPassMode: MultimodalPassMode =
     passModeFromEnv ?? (advancedMetricsEnabledRaw ? "full" : "core");
   const advancedMetricsEnabled = multimodalPassMode === "core" ? false : advancedMetricsEnabledRaw;
+  const advancedMaxSegments = Math.min(advancedMaxSegmentsRaw, DEFAULT_ADVANCED_MAX_SEGMENTS);
+  const advancedSegmentMaxSeconds = Math.min(advancedSegmentMaxSecondsRaw, DEFAULT_ADVANCED_SEGMENT_MAX_SECONDS);
+  const advancedMaxTimelinePoints = Math.min(advancedMaxTimelinePointsRaw, DEFAULT_ADVANCED_MAX_TIMELINE_POINTS);
   return {
     analysisMode,
     analysisVersion,
@@ -173,6 +231,11 @@ export const getAppConfig = (): AppConfig => {
     youtubeApiKey,
     performanceEnabled,
     advancedMetricsEnabled,
+    advancedMaxSegments,
+    advancedSegmentMaxSeconds,
+    advancedMaxTimelinePoints,
+    advancedMaxPassCostUsd,
+    advancedMaxPassDurationMs,
     structurePassEnabled,
     structurePassTimeoutMs,
     useTieredAnalysis,
@@ -191,5 +254,9 @@ export const getAppConfig = (): AppConfig => {
     geminiMultimodalTimeoutMsAdvanced,
     geminiMultimodalTimeoutMsSalvage,
     geminiResponseSchemaEnabled,
+    advancedSchemaStrategy,
+    advancedResponseFormat,
+    showArchetypeFeatures,
+    showReferenceLibrary,
   };
 };

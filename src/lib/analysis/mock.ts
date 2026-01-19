@@ -50,7 +50,7 @@ export function mockAnalyzeVideo(input: AnalyzeVideoInput): AnalyzeVideoResult {
   });
 
   const fingerprint: VideoFingerprintJson = {
-    version: "1.3.0",
+    version: "1.4.0",
     createdAt: new Date().toISOString(),
     ...buildDefaultAdvancedMetrics(),
     metaAxes: {

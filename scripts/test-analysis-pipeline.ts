@@ -14,6 +14,7 @@
  *   npm run test:pipeline -- --video=test_long_20min  # Test specific video
  *   npm run test:pipeline -- --dry-run  # Show what would be tested
  *   npm run test:pipeline -- --tiered   # Run tiered core analysis
+ *   npm run test:pipeline -- --selective-advanced  # Run tiered core + selective advanced pass
  */
 
 import * as fs from "fs";
@@ -21,6 +22,15 @@ import * as path from "path";
 import { getAppConfig } from "../src/lib/config";
 import { analyzeVideoMultimodal, type MultimodalAnalysisResult } from "../src/lib/analysis/geminiMultimodalAnalyzer";
 import { runStructurePass } from "../src/lib/analysis/structurePass";
+import { executeAdvancedPass } from "../src/lib/analysis/advancedPass";
+import { planAdvancedAnalysis } from "../src/lib/analysis/advancedPlanner";
+import {
+  buildAdvancedPassConfig,
+  buildAdvancedPlannerConfig,
+  resolveAdvancedStrategy,
+} from "../src/lib/analysis/advancedStrategy";
+import { buildUnobservedCoreMetrics } from "../src/lib/analysis/aggregation";
+import type { SegmentCostEstimate } from "../src/lib/analysis/advancedPass";
 
 // ============ Types ============
 
@@ -61,6 +71,7 @@ interface TestResult {
   
   // Timing
   totalLatencyMs: number;
+  advancedLatencyMs?: number;
   
   // Metrics
   observedMetricsPct: number;
@@ -68,7 +79,13 @@ interface TestResult {
   
   // Cost (from diagnostics)
   estimatedCostUsd?: number;
+  advancedCostUsd?: number;
   geminiCalls?: number;
+
+  // Advanced diagnostics
+  advancedSegmentsPlanned?: number;
+  advancedSegmentsCompleted?: number;
+  advancedSegmentEstimates?: SegmentCostEstimate[];
   
   // Coverage from diagnostics
   diagnostics?: {
@@ -105,6 +122,7 @@ function parseArgs(): {
   dryRun: boolean;
   verbose: boolean;
   tiered: boolean;
+  selectiveAdvanced: boolean;
 } {
   const args = process.argv.slice(2);
   let bucket: string | undefined;
@@ -112,6 +130,7 @@ function parseArgs(): {
   let dryRun = false;
   let verbose = false;
   let tiered = false;
+  let selectiveAdvanced = false;
   
   for (const arg of args) {
     if (arg.startsWith("--bucket=")) {
@@ -124,10 +143,12 @@ function parseArgs(): {
       verbose = true;
     } else if (arg === "--tiered") {
       tiered = true;
+    } else if (arg === "--selective-advanced") {
+      selectiveAdvanced = true;
     }
   }
   
-  return { bucket, video, dryRun, verbose, tiered };
+  return { bucket, video, dryRun, verbose, tiered, selectiveAdvanced };
 }
 
 function formatDuration(ms: number): string {
@@ -208,6 +229,7 @@ async function testVideo(
   config: ReturnType<typeof getAppConfig>,
   thresholds: TestVideosConfig["thresholds"],
   tiered: boolean,
+  selectiveAdvanced: boolean,
 ): Promise<TestResult> {
   console.log(`\n  Testing: ${video.title}`);
   console.log(`  URL: ${video.youtubeUrl}`);
@@ -239,8 +261,42 @@ async function testVideo(
       useTieredAnalysis: tiered,
       skeleton: structureResult?.skeleton,
     });
+    let advancedLatencyMs: number | undefined;
+    let advancedCostUsd: number | undefined;
+    let advancedSegmentsPlanned: number | undefined;
+    let advancedSegmentsCompleted: number | undefined;
+    let advancedSegmentEstimates: SegmentCostEstimate[] | undefined;
+    if (selectiveAdvanced && structureResult?.skeleton) {
+      const strategy = resolveAdvancedStrategy(structureResult.skeleton.durationSeconds);
+      const plannerConfig = buildAdvancedPlannerConfig(config, strategy);
+      const passConfig = buildAdvancedPassConfig(config, strategy);
+      const coreInput = analysisResult.coreMetrics
+        ? { aggregated: analysisResult.coreMetrics, perChapterMetrics: analysisResult.perChapterMetrics }
+        : buildUnobservedCoreMetrics();
+      const plan = planAdvancedAnalysis(structureResult.skeleton, coreInput, plannerConfig);
+      const advancedStart = Date.now();
+      const advancedResult = await executeAdvancedPass(
+        plan,
+        {
+          youtubeUrl: video.youtubeUrl,
+          skeleton: structureResult.skeleton,
+          config,
+        },
+        passConfig,
+      );
+      advancedLatencyMs = Date.now() - advancedStart;
+      advancedCostUsd = advancedResult.diagnostics.estimatedCostUsd;
+      advancedSegmentsPlanned = advancedResult.diagnostics.segmentsPlanned;
+      advancedSegmentsCompleted = advancedResult.diagnostics.segmentsCompleted;
+      advancedSegmentEstimates = advancedResult.diagnostics.segmentEstimates;
+    }
     
     result.totalLatencyMs = Date.now() - startTime;
+    result.advancedLatencyMs = advancedLatencyMs;
+    result.advancedCostUsd = advancedCostUsd;
+    result.advancedSegmentsPlanned = advancedSegmentsPlanned;
+    result.advancedSegmentsCompleted = advancedSegmentsCompleted;
+    result.advancedSegmentEstimates = advancedSegmentEstimates;
     
     // Extract metrics
     const metrics = countObservedMetrics(analysisResult);
@@ -263,6 +319,33 @@ async function testVideo(
     const validation = validateResult(analysisResult, video, thresholds);
     result.warnings = validation.warnings;
     result.errors = validation.errors;
+
+    if (selectiveAdvanced && structureResult?.skeleton) {
+      if (advancedLatencyMs !== undefined && advancedLatencyMs > 180000) {
+        result.errors.push(`Advanced pass latency ${formatDuration(advancedLatencyMs)} exceeds 3 minutes`);
+      }
+      if (advancedCostUsd !== undefined && advancedCostUsd > 0.25) {
+        result.warnings.push(`Advanced pass cost ${formatCost(advancedCostUsd)} exceeds $0.25 target`);
+      }
+      if (advancedSegmentEstimates) {
+        for (const estimate of advancedSegmentEstimates) {
+          if (estimate.estimatedCostUsd < 0.02 || estimate.estimatedCostUsd > 0.05) {
+            result.warnings.push(
+              `Segment ${estimate.segmentId} cost ${formatCost(estimate.estimatedCostUsd)} outside $0.02-0.05 target`,
+            );
+          }
+        }
+      }
+      if (
+        advancedSegmentsPlanned !== undefined &&
+        advancedSegmentsCompleted !== undefined &&
+        advancedSegmentsCompleted < advancedSegmentsPlanned
+      ) {
+        result.warnings.push(
+          `Advanced segments completed ${advancedSegmentsCompleted}/${advancedSegmentsPlanned}`,
+        );
+      }
+    }
     
     result.success = result.errors.length === 0;
     
@@ -293,7 +376,8 @@ async function main() {
   console.log("  CreatorSight Analysis Pipeline Tests");
   console.log("===========================================\n");
   
-  const { bucket, video, dryRun, verbose, tiered } = parseArgs();
+  const { bucket, video, dryRun, verbose, tiered, selectiveAdvanced } = parseArgs();
+  const useTiered = tiered || selectiveAdvanced;
   const testConfig = loadTestVideos();
   const appConfig = getAppConfig();
   
@@ -320,7 +404,8 @@ async function main() {
   console.log(`Buckets: ${[...new Set(videosToTest.map(v => v.bucket))].join(", ")}`);
   console.log(`Analysis mode: ${appConfig.analysisMode}`);
   console.log(`Advanced metrics: ${appConfig.advancedMetricsEnabled !== false ? "enabled" : "disabled"}`);
-  console.log(`Tiered analysis: ${tiered ? "enabled" : "disabled"}`);
+  console.log(`Tiered analysis: ${useTiered ? "enabled" : "disabled"}`);
+  console.log(`Selective advanced: ${selectiveAdvanced ? "enabled" : "disabled"}`);
   
   if (dryRun) {
     console.log("\n[DRY RUN] Would test these videos:");
@@ -334,7 +419,7 @@ async function main() {
   const results: TestResult[] = [];
   
   for (const videoToTest of videosToTest) {
-    const result = await testVideo(videoToTest, appConfig, testConfig.thresholds, tiered);
+    const result = await testVideo(videoToTest, appConfig, testConfig.thresholds, useTiered, selectiveAdvanced);
     results.push(result);
     
     // Small delay between tests to avoid rate limiting

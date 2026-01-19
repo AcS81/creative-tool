@@ -6,8 +6,8 @@ import {
   type GeminiMultimodalErrorCode,
   type GeminiMultimodalResult,
 } from "../gemini/client";
-import { aggregateCoreMetrics, buildUnobservedCoreMetrics } from "./aggregation";
-import type { ChapterCoreMetrics, CoreMetrics } from "./types/coreMetrics";
+import { aggregateCoreMetrics, buildFallbackCoreMetrics, buildUnobservedCoreMetrics } from "./aggregation";
+import type { ChapterCoreMetrics, CoreMetrics, SummaryMetric } from "./types/coreMetrics";
 import type { Chapter, VideoSkeleton } from "./types/skeleton";
 
 export type ChapterCoreInput = {
@@ -69,6 +69,47 @@ const coreMetricsSchema = z
   })
   .passthrough();
 
+const CORE_METRIC_ALIASES: Record<
+  keyof CoreMetrics,
+  Record<string, string[]>
+> = {
+  voice: {
+    speakingRate: ["speakingRate", "speaking_rate", "speakingRateWpm", "speaking_rate_wpm"],
+    fillerRate: ["fillerRate", "filler_rate"],
+    pauseUsage: ["pauseUsage", "pause_usage", "pauses"],
+    loudnessRange: ["loudnessRange", "loudness_range"],
+    pitchVariation: ["pitchVariation", "pitch_variation"],
+    clarity: ["clarity"],
+    warmth: ["warmth"],
+  },
+  language: {
+    concreteness: ["concreteness"],
+    metaphorDensity: ["metaphorDensity", "metaphor_density"],
+    references: ["references", "referenceDensity", "reference_density"],
+    humor: ["humor"],
+    teachingVsRiffing: ["teachingVsRiffing", "teaching_vs_riffing"],
+    storyPresence: ["storyPresence", "story_presence"],
+  },
+  narrative: {
+    structureClarity: ["structureClarity", "structure_clarity"],
+    hookPresence: ["hookPresence", "hook_presence", "hooks"],
+    transitionQuality: ["transitionQuality", "transition_clarity"],
+    payoffDelivery: ["payoffDelivery", "payoff_delivery"],
+  },
+  visual: {
+    cutRate: ["cutRate", "cut_rate"],
+    environmentStability: ["environmentStability", "environment_stability"],
+    movement: ["movement"],
+    expression: ["expression"],
+  },
+  sound: {
+    musicCoverage: ["musicCoverage", "music_coverage"],
+    musicBalance: ["musicBalance", "music_balance"],
+    sfxDensity: ["sfxDensity", "sfx_density"],
+    silenceUsage: ["silenceUsage", "silence_usage", "silence_for_emphasis"],
+  },
+};
+
 const summaryMetricJsonSchema = {
   type: "object",
   properties: {
@@ -112,7 +153,17 @@ const coreMetricsJsonSchema = {
   required: ["voice", "language", "narrative", "visual", "sound"],
 };
 
-const coreMetricsJsonSchemaLite = coreMetricsJsonSchema;
+const coreMetricsJsonSchemaLite = {
+  type: "object",
+  properties: {
+    voice: { type: "object" },
+    language: { type: "object" },
+    narrative: { type: "object" },
+    visual: { type: "object" },
+    sound: { type: "object" },
+  },
+  required: ["voice", "language", "narrative", "visual", "sound"],
+};
 
 const systemInstruction = [
   "You are a video analysis engine.",
@@ -134,6 +185,91 @@ export class InvalidCoreMetricsError extends Error {
 const formatIssues = (error: z.ZodError) =>
   error.issues.map((issue) => `${issue.path.join(".") || "root"}: ${issue.message}`);
 
+const buildUnobservedMetric = (): SummaryMetric => ({
+  score: 0,
+  value: "unobserved",
+  observed: false,
+});
+
+const buildUnobservedChapterMetrics = (chapterId: string): ChapterCoreMetrics => ({
+  chapterId,
+  ...buildUnobservedCoreMetrics(),
+});
+
+const clampScore = (value: number) => Math.max(0, Math.min(100, value));
+
+const coerceSummaryMetric = (raw: unknown): SummaryMetric => {
+  if (raw && typeof raw === "object") {
+    const record = raw as Record<string, unknown>;
+    const hasScore = typeof record.score === "number";
+    const rawValue =
+      typeof record.value === "string"
+        ? record.value
+        : typeof record.value === "number"
+          ? String(record.value)
+          : "";
+    const normalizedValue =
+      rawValue.trim() !== "" ? rawValue : hasScore && (record.score as number) > 0 ? String(record.score) : "unobserved";
+    const score = hasScore
+      ? clampScore(record.score as number)
+      : normalizedValue !== "unobserved"
+        ? 50
+        : 0;
+    const observedFlag = typeof record.observed === "boolean" ? record.observed : undefined;
+    const observed = observedFlag ?? (normalizedValue.trim().toLowerCase() !== "unobserved" || score > 0);
+    return {
+      score,
+      value: normalizedValue,
+      observed,
+    };
+  }
+
+  if (typeof raw === "number") {
+    const score = clampScore(raw);
+    return { score, value: String(raw), observed: score > 0 };
+  }
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    const observed = trimmed !== "" && trimmed.toLowerCase() !== "unobserved";
+    return {
+      score: observed ? 50 : 0,
+      value: observed ? trimmed : "unobserved",
+      observed,
+    };
+  }
+
+  return buildUnobservedMetric();
+};
+
+const resolveMetricField = (source: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    if (key in source) return source[key];
+  }
+  return undefined;
+};
+
+const buildCoreMetricsLenient = (raw: unknown): CoreMetrics => {
+  const base = buildUnobservedCoreMetrics();
+  if (!raw || typeof raw !== "object") return base;
+  const record = raw as Record<string, unknown>;
+
+  (Object.keys(base) as Array<keyof CoreMetrics>).forEach((domainKey) => {
+    const section = record[domainKey];
+    if (!section || typeof section !== "object") return;
+    const metrics = section as Record<string, unknown>;
+    const aliases = CORE_METRIC_ALIASES[domainKey];
+    Object.keys(base[domainKey]).forEach((metricKey) => {
+      const candidates = aliases[metricKey] ?? [metricKey];
+      const rawMetric = resolveMetricField(metrics, candidates);
+      if (rawMetric !== undefined) {
+        (base[domainKey] as Record<string, SummaryMetric>)[metricKey] = coerceSummaryMetric(rawMetric);
+      }
+    });
+  });
+
+  return base;
+};
+
 const normalizeCoreMetricsPayload = (raw: unknown): unknown => {
   if (!raw || typeof raw !== "object") return raw;
   const record = raw as Record<string, unknown>;
@@ -148,9 +284,14 @@ const parseCoreMetrics = (raw: unknown): CoreMetrics => {
   const normalized = normalizeCoreMetricsPayload(raw);
   const result = coreMetricsSchema.safeParse(normalized);
   if (!result.success) {
+    const lenient = buildCoreMetricsLenient(normalized);
+    if (lenient) {
+      console.warn("Core metrics validation failed; using lenient parser.", formatIssues(result.error));
+      return lenient;
+    }
     throw new InvalidCoreMetricsError(formatIssues(result.error));
   }
-  return result.data;
+  return result.data as unknown as CoreMetrics;
 };
 
 const resolveTimeoutMs = (config?: AppConfig) =>
@@ -213,6 +354,9 @@ const buildPrompt = (input: ChapterCoreInput, range: ChapterRange) => {
     "- sound: musicCoverage, musicBalance, sfxDensity, silenceUsage",
     'Format: { "domain": { "metric": { "score": number, "value": "short description", "observed": boolean } } }',
     "Mark observed:false if you cannot confidently measure that metric.",
+    'speakingRate.value must include numeric WPM (e.g., "145 wpm").',
+    'musicCoverage.value must include numeric percent (e.g., "35% with music").',
+    'cutRate.value should include numeric seconds per cut (e.g., "4.2s avg").',
     "JSON only.",
   ].join("\n");
 };
@@ -274,7 +418,7 @@ const chunkChapters = <T,>(items: T[], size: number) => {
 export const analyzeCoreMetrics = async (input: CorePassInput): Promise<CoreMetrics> => {
   const completed = await analyzeCoreChapters(input);
   if (completed.length === 0) {
-    return buildUnobservedCoreMetrics();
+    return buildFallbackCoreMetrics(input.skeleton);
   }
 
   return aggregateCoreMetrics(completed, input.skeleton);
@@ -306,11 +450,20 @@ export const analyzeCoreChapters = async (input: CorePassInput): Promise<Chapter
       ),
     );
 
-    for (const result of settled) {
+    settled.forEach((result, index) => {
       if (result.status === "fulfilled") {
         completed.push(result.value);
+        return;
       }
-    }
+      const chapter = batch[index];
+      console.warn(
+        `Core metrics failed for chapter ${chapter?.id ?? "unknown"} (${chapter?.title ?? "unknown"})`,
+        result.reason,
+      );
+      if (chapter?.id) {
+        completed.push(buildUnobservedChapterMetrics(chapter.id));
+      }
+    });
   }
 
   return completed;

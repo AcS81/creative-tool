@@ -1,4 +1,4 @@
-import type { AppConfig } from "../config";
+import type { AppConfig, AdvancedSchemaStrategy } from "../config";
 import type {
   AdvancedFingerprintMetrics,
   AxisDetail,
@@ -497,6 +497,9 @@ const SALVAGE_UNOBSERVED_THRESHOLD_PCT = parsePercent(
 
 const shouldSalvageSection = (stat: CoverageStat) =>
   stat.available && stat.total > 0 && 100 - stat.observedPct >= SALVAGE_UNOBSERVED_THRESHOLD_PCT;
+
+const resolveAdvancedSchemaStrategy = (config?: AppConfig): AdvancedSchemaStrategy =>
+  config?.advancedSchemaStrategy ?? "inherit";
 
 export const multimodalResponseJsonSchema = coreResponseJsonSchema;
 export const multimodalPrompt = corePrompt;
@@ -1027,7 +1030,7 @@ const mapAdvancedMetrics = (
 ): AdvancedFingerprintMetrics | undefined => {
   if (!advanced) return undefined;
   const base = defaults ?? buildDefaultAdvancedMetrics();
-  const mapped: AdvancedFingerprintMetrics = {
+  const mapped = {
     prosodyArc: {
       paceMeanWpm: mapMetric(advanced.prosodyArc?.paceMeanWpm, base.prosodyArc.paceMeanWpm),
       paceVariabilityPct: mapMetric(advanced.prosodyArc?.paceVariabilityPct, base.prosodyArc.paceVariabilityPct),
@@ -1213,8 +1216,7 @@ const mergeAdvancedMetrics = (
     if (!part) continue;
     for (const [key, value] of Object.entries(part)) {
       if (value) {
-        merged[key as AdvancedSectionKey] =
-          value as GeminiAdvancedMetricsPartial[AdvancedSectionKey];
+        (merged as Record<string, unknown>)[key] = value;
       }
     }
   }
@@ -1250,7 +1252,7 @@ const applySalvageMetrics = (
   for (const [key, value] of Object.entries(salvage)) {
     const section = key as AdvancedSectionKey;
     if (shouldReplaceSection(section, merged[section], value as GeminiAdvancedMetricsPartial[AdvancedSectionKey])) {
-      merged[section] = value as GeminiAdvancedMetricsPartial[AdvancedSectionKey];
+      (merged as Record<string, unknown>)[section] = value;
     }
   }
   return Object.keys(merged).length > 0 ? merged : undefined;
@@ -1317,15 +1319,21 @@ const runAdvancedPass = async (input: {
   model?: string;
   timeoutMs?: number;
 }): Promise<AdvancedPassOutcome> => {
+  const schemaStrategy = resolveAdvancedSchemaStrategy(input.config);
+  const useSchema = schemaStrategy !== "optional";
+  const forceResponseSchema = schemaStrategy === "strict";
+  const jsonSchema = useSchema ? input.jsonSchema : undefined;
+  const jsonSchemaFallback = useSchema ? input.jsonSchemaFallback : undefined;
+
   const result = await callGeminiMultimodalJson({
     youtubeUrl: input.youtubeUrl,
     prompt: input.prompt,
     systemInstruction,
-    jsonSchema: input.jsonSchema,
-    jsonSchemaFallback: input.jsonSchemaFallback,
+    jsonSchema,
+    jsonSchemaFallback,
     config: input.config,
     model: input.model,
-    forceResponseSchema: true,
+    forceResponseSchema,
     timeoutMs: input.timeoutMs,
   });
 
@@ -1441,6 +1449,13 @@ const runCorePass = async (input: {
   };
 };
 
+/**
+ * Run the all-at-once multimodal core pass
+ * 
+ * @deprecated This function is part of the deprecated all-at-once analysis path.
+ * Use the tiered approach with structurePass + corePass + advancedPass instead.
+ * Will be removed in a future version.
+ */
 export const runMultimodalCore = async (input: {
   youtubeUrl: string;
   config?: AppConfig;
@@ -1658,6 +1673,15 @@ const buildTieredResult = (input: {
   };
 };
 
+/**
+ * Analyze a video using multimodal Gemini models
+ * 
+ * @deprecated The non-tiered path (useTieredAnalysis=false) is deprecated as of Stability Iteration 5.
+ * Use the tiered analysis path (useTieredAnalysis=true) with skeleton for better stability.
+ * The all-at-once analysis approach will be removed in a future version.
+ * 
+ * Recommended: Use the tiered pipeline in service.ts instead of calling this directly.
+ */
 export const analyzeVideoMultimodal = async (input: {
   youtubeUrl: string;
   config?: AppConfig;

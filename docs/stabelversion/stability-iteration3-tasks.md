@@ -23,6 +23,7 @@ From the stability refactor PRD, this iteration implements **Tier 2: Advanced Me
 - `advancedPlanner.ts` for deciding which segments need analysis
 - Timeline capping and segment length limits
 - Integration with core metrics to guide selection
+- Tier 2 uses existing v1.3 advanced metric sections selectively; cognitive load + modality balance are derived in Tier 3
 
 Files to create:
 - `src/lib/analysis/advancedPass.ts`
@@ -46,27 +47,48 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/types/advancedMetrics.ts` with:
-  - `AdvancedMetricKey` type union (17 metrics listed in refactor doc)
-  - `TimelinePoint` interface: `{ timeSeconds: number, value: number | string, label?: string }`
-  - `AdvancedMetricResult` interface:
-    - `key: AdvancedMetricKey`
-    - `score: number` (0-100)
-    - `value: string` (measurement with unit)
-    - `timeline?: TimelinePoint[]` (max 20-25 points)
-    - `observed: boolean`
+- [x] Create `src/lib/analysis/types/advancedMetrics.ts` with:
+  - `AdvancedSegmentType` union: `'hook' | 'prosody_language' | 'visual_edit' | 'narrative_arc' | 'ending'`
+  - `TimelinePoint` interface: `{ timeSeconds: number, value: number, label?: string }`
+  - `RichMetric` interface (align with v1.3 `ScoredMetric`): `score`, `value`, `observed`, optional `timeline`, `spans`, `items`, `counts`, `proportions`, `trend`
   - `SegmentAdvancedMetrics` interface:
     - `segmentId: string`
     - `chapterId: string`
     - `startSeconds: number`
     - `endSeconds: number`
-    - `metrics: Record<AdvancedMetricKey, AdvancedMetricResult>`
-- [ ] Define metric groupings:
-  - Prosody: paceVariability, energyDrift, emphasisAlignment
-  - Language texture: sentenceCompression, humorTiming, audienceAddress, questionRate
-  - Narrative arc: timeToHook, hookStrength, segmentCohesion, openLoopsResolved, endingResolution
-  - Visual/edit: visualEntropy, cutRefinement, silenceSpans
-  - Cognitive load: cognitiveLoadSpikes, loadDrivers
+    - `segmentType: AdvancedSegmentType`
+    - Sectioned metrics (optional, match v1.3 schema):
+      - `prosodyArc?: Partial<ProsodyArc>`
+      - `languageTexture?: Partial<LanguageTexture>`
+      - `narrativeArc?: Partial<NarrativeArc>`
+      - `visualEditAlignment?: Partial<VisualEditAlignment>`
+- [x] Align Tier 2 metric set to existing v1.3 sections (selective per segment):
+  - Hook (`hook`):
+    - `narrativeArc.timeToHookSeconds`
+    - `narrativeArc.hookStrengthScore`
+    - `prosodyArc.paceVariabilityPct`
+    - `prosodyArc.energyDriftDbPerMin` (map from hook "energyLevel")
+  - Prosody/Language (`prosody_language`):
+    - `prosodyArc.paceVariabilityPct`
+    - `prosodyArc.withinSegmentPaceChangePct`
+    - `prosodyArc.emphasisAlignmentScore`
+    - `prosodyArc.energyDriftDbPerMin`
+    - `languageTexture.sentenceCompressionRatio`
+    - `languageTexture.humorTimingScore`
+    - `languageTexture.audienceAddressFrequency`
+    - `languageTexture.questionRate`
+  - Visual/Edit (`visual_edit`):
+    - `visualEditAlignment.visualEntropy`
+    - `visualEditAlignment.cutRateRefinement`
+    - `visualEditAlignment.silenceForEmphasisFidelity`
+    - `visualEditAlignment.beatsVsEditsAlignment`
+  - Narrative Arc (`narrative_arc`):
+    - `narrativeArc.segmentCohesionDrift`
+    - `narrativeArc.openLoopsUnresolvedRatio` (map from openLoops prompt)
+  - Ending (`ending`):
+    - `narrativeArc.endingResolutionScore`
+    - `openLoopsResolved` used for diagnostics only (no new schema field)
+- [x] Move `modalityBalance` and `cognitiveLoad` to Tier 3 derived scores (Iteration 4); keep defaults in Tier 2
 
 **Constraints**
 
@@ -75,9 +97,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Types compile and are JSON-serializable
-- [ ] All 17 advanced metrics represented
-- [ ] Timeline point limits documented in types
+- [x] Types compile and are JSON-serializable
+- [x] Sectioned metrics align with existing v1.3 fingerprint schema
+- [x] Timeline point limits documented in types
+- [x] Cognitive load and modality balance are not part of Tier 2 types
 
 ---
 
@@ -90,7 +113,7 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/advancedPlanner.ts` with:
+- [x] Create `src/lib/analysis/advancedPlanner.ts` with:
   - `AdvancedAnalysisPlan` interface:
     - `segments: SegmentPlan[]`
     - `totalEstimatedCost: number`
@@ -99,28 +122,34 @@ Files to modify:
     - `chapterId: string`
     - `startSeconds: number`
     - `endSeconds: number`
-    - `metricsToAnalyze: AdvancedMetricKey[]`
+    - `segmentType: AdvancedSegmentType`
     - `reason: string`
     - `priority: 'high' | 'medium' | 'low'`
   - `planAdvancedAnalysis(skeleton, coreMetrics, config): AdvancedAnalysisPlan`
-- [ ] Implement selection rules from refactor doc:
-  - Always analyze hook chapter (hookStrength, timeToHook, paceVariability, energyLevel)
-  - Always analyze conclusion (endingResolution, openLoopsResolved, ctaClarity)
+- [x] Implement selection rules from refactor doc:
+  - Always analyze hook chapter (segmentType `hook`)
+  - If hook chapter duration > 120s, analyze only the first 90 seconds
+  - Always analyze conclusion (segmentType `ending`)
   - Analyze chapters with high cut rate (>70 score) for visual metrics
   - Analyze chapters with low structure clarity (<50 score) for cohesion metrics
+  - Skip chapters with very low observed % from core (`observedPct < 40`)
+  - Prioritize by value: hooks > conclusions > problem areas
+  - Sort by priority and cap at `maxSegments` (default 5)
   - Cap total segments at 5 (configurable)
 
 **Constraints**
 
 - Planning should be deterministic given same inputs
-- Each segment capped at 120 seconds
-- No segment analyzed for more than 5 metrics
+- Each segment capped at 120 seconds (hook cap at 90 seconds)
+- One segmentType per segment plan (no mixed prompts)
 
 **Acceptance Criteria**
 
-- [ ] Planner selects hook and conclusion consistently
-- [ ] Problem chapters trigger relevant metric analysis
-- [ ] Segment count stays within cap
+- [x] Planner selects hook and conclusion consistently
+- [x] Problem chapters trigger relevant metric analysis
+- [x] Hook segments are capped at 90s when chapters are long
+- [x] Low-observation chapters are skipped
+- [x] Segment count stays within cap
 - [ ] Unit tests for various video structures
 
 ---
@@ -135,15 +164,14 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create `src/lib/analysis/advancedPass.ts` with:
+- [x] Create `src/lib/analysis/advancedPass.ts` with:
   - `analyzeSegmentAdvanced(input: SegmentAdvancedInput): Promise<SegmentAdvancedMetrics>`
-  - Input includes: youtubeUrl, segment bounds, metrics to analyze, video context
-  - Uses Gemini with focused prompt per segment
-  - Returns metrics with timelines
-- [ ] Implement the prompt from refactor doc Part 3.4:
+  - Input includes: youtubeUrl, segment bounds, segmentType, video context
+  - Uses Gemini with the prompt template matching `segmentType`
+  - Returns sectioned metrics with timelines
+- [x] Implement prompts from `docs/stabelversion/prompt-templates.md`:
   - Uses videoType and segment context
-  - Specifies exactly which metrics to return
-  - Requests timeline with MAX 20 points
+  - Requests timelines with duration-based caps (10/15/20/25)
   - Instructs observed:false when unable to measure
 
 **Constraints**
@@ -154,10 +182,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Segment analysis returns valid advanced metrics
-- [ ] Timelines are appropriately sized
-- [ ] observed:false used when metrics can't be measured
-- [ ] Unit tests with mocked Gemini
+- [x] Segment analysis returns valid advanced metrics
+- [x] Timelines are appropriately sized
+- [x] observed:false used when metrics can't be measured
+- [x] Unit tests with mocked Gemini
 
 ---
 
@@ -169,12 +197,12 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add `capTimeline(timeline: TimelinePoint[], segmentDuration: number): TimelinePoint[]`:
+- [x] Add `capTimeline(timeline: TimelinePoint[], segmentDuration: number): TimelinePoint[]`:
   - Apply duration-based limits
   - Use intelligent sampling if over limit (not just truncation)
   - Preserve first and last points
   - Preserve local maxima/minima
-- [ ] Add `maxTimelinePoints(segmentDuration: number): number`:
+- [x] Add `maxTimelinePoints(segmentDuration: number): number`:
   - ≤30s: 10 points
   - ≤60s: 15 points
   - ≤120s: 20 points
@@ -187,9 +215,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Timelines capped to correct size
-- [ ] Important points preserved
-- [ ] Unit tests for capping logic
+- [x] Timelines capped to correct size
+- [x] Important points preserved
+- [x] Unit tests for capping logic
 
 ---
 
@@ -201,16 +229,42 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add `executeAdvancedPass(plan: AdvancedAnalysisPlan, input: AdvancedPassInput): Promise<AdvancedPassResult>`:
-  - Execute segment analyses sequentially or with limited parallelism (2-3)
+- [x] Add `executeAdvancedPass(plan: AdvancedAnalysisPlan, input: AdvancedPassInput): Promise<AdvancedPassResult>`:
+  - Execute segment analyses sequentially by default
+  - Consider limited parallelism only for short videos (<5 min) as a later optimization
   - Collect results, handle partial failures
   - Track cost and timing
-- [ ] Add `AdvancedPassResult` type:
+- [x] Add `AdvancedPassResult` type:
   - `segments: SegmentAdvancedMetrics[]`
   - `diagnostics: { segmentsPlanned, segmentsCompleted, segmentsFailed, totalDurationMs, estimatedCostUsd }`
-- [ ] Implement timeout and cost guards:
+- [x] Implement timeout and cost guards:
   - Abort if total pass exceeds 3 minutes
   - Abort if estimated cost exceeds threshold
+- [x] Add `AdvancedPassConfig` and guard logic:
+  - `maxSegments: number`
+  - `maxCostUsd: number`
+  - `maxDurationMs: number`
+
+Implementation sketch (sequential with guards):
+```ts
+const results: SegmentAdvancedMetrics[] = [];
+let totalCost = 0;
+const startedAt = Date.now();
+
+for (const segment of plan.segments) {
+  const estimatedSegmentCost = estimateSegmentCost(segment);
+  if (totalCost + estimatedSegmentCost > config.maxCostUsd) break;
+  if (Date.now() - startedAt > config.maxDurationMs) break;
+
+  try {
+    const result = await analyzeSegmentAdvanced({ segment, timeoutMs: 60000 });
+    results.push(result);
+    totalCost += estimatedSegmentCost;
+  } catch (error) {
+    // Log and continue
+  }
+}
+```
 
 **Constraints**
 
@@ -219,10 +273,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Multiple segments analyzed correctly
-- [ ] Partial failures handled gracefully
-- [ ] Diagnostics track all metrics
-- [ ] Cost and time guards working
+- [x] Multiple segments analyzed correctly
+- [x] Partial failures handled gracefully
+- [x] Diagnostics track all metrics
+- [x] Cost and time guards working
 
 ---
 
@@ -236,11 +290,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/jobs.ts`:
-  - Add `'advanced'` to job stages enum
+- [x] Modify `src/lib/analysis/jobs.ts`:
+  - Extend existing `'advanced'` stage behavior
   - Advanced stage runs after core, is optional
   - Store advanced metrics in job state
-- [ ] Add job state fields:
+- [x] Add job state fields:
   - `advancedPlan?: AdvancedAnalysisPlan`
   - `advancedMetrics?: SegmentAdvancedMetrics[]`
   - `advancedDiagnostics?: AdvancedPassDiagnostics`
@@ -252,9 +306,9 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Jobs progress through advanced stage
-- [ ] Advanced results persisted
-- [ ] Skip logic works when disabled
+- [x] Jobs progress through advanced stage
+- [x] Advanced results persisted
+- [x] Skip logic works when disabled
 
 ---
 
@@ -266,14 +320,14 @@ Files to modify:
 
 **Goals**
 
-- [ ] Modify `src/lib/analysis/service.ts`:
+- [x] Modify `src/lib/analysis/service.ts`:
   - After core pass, call planner to create advanced plan
   - Execute advanced pass based on plan
   - Include advanced metrics in result
-- [ ] Update `AnalyzeVideoResult`:
+- [x] Update `AnalyzeVideoResult`:
   - Add `advancedMetrics?: SegmentAdvancedMetrics[]`
   - Add `diagnostics.advancedPass: PassResult`
-- [ ] Update fingerprint building:
+- [x] Update fingerprint building:
   - Merge advanced metrics into fingerprint where applicable
   - Mark which sections have advanced data
 
@@ -284,10 +338,10 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Advanced pass runs when enabled
-- [ ] Results included in fingerprint
-- [ ] Diagnostics complete
-- [ ] Tests cover with/without advanced
+- [x] Advanced pass runs when enabled
+- [x] Results included in fingerprint
+- [x] Diagnostics complete
+- [x] Tests cover with/without advanced
 
 ---
 
@@ -299,11 +353,11 @@ Files to modify:
 
 **Goals**
 
-- [ ] Create mapping from new advanced metrics to existing fingerprint fields:
-  - Map timeline data to existing `spans` if present
-  - Map scores to existing metric scores
-  - Preserve data that doesn't fit in new items
-- [ ] Update fingerprint builder:
+- [x] Create mapping from new advanced metrics to existing fingerprint fields:
+  - Map segmentType outputs into v1.3 sections (`prosodyArc`, `languageTexture`, `narrativeArc`, `visualEditAlignment`)
+  - Preserve per-segment metrics for diagnostics (do not overwrite with defaults when observed)
+  - Do not merge timelines across segments; pick a primary segment per metric
+- [x] Update fingerprint builder:
   - Accept optional advanced metrics
   - Merge intelligently with core metrics
   - Maintain schema version compatibility
@@ -315,9 +369,51 @@ Files to modify:
 
 **Acceptance Criteria**
 
-- [ ] Advanced data appears in fingerprint
-- [ ] Fingerprint validates
-- [ ] UI displays advanced data when available
+- [x] Advanced data appears in fingerprint
+- [x] Fingerprint validates
+- [x] UI displays advanced data when available
+
+---
+
+### Task 2.4: Define Mapping Examples and Timeline Handling
+
+**Context**
+
+- Mapping is the highest-risk compatibility step for v1.3 consumers
+
+**Goals**
+
+- [x] Add explicit mapping rules with examples:
+  - Hook segment:
+    - `narrativeArc.timeToHookSeconds` from hook prompt timeToHook
+    - `narrativeArc.hookStrengthScore` from hook prompt hookStrength
+    - `prosodyArc.paceVariabilityPct` from hook paceVariability
+    - `prosodyArc.energyDriftDbPerMin` from hook energyLevel
+  - Prosody/Language segment:
+    - Map all prosody metrics into `prosodyArc.*`
+    - Map all language metrics into `languageTexture.*`
+  - Visual/Edit segment:
+    - Map visual metrics into `visualEditAlignment.*`
+  - Narrative arc segment:
+    - Map cohesion/open loops into `narrativeArc.segmentCohesionDrift` and `narrativeArc.openLoopsUnresolvedRatio`
+  - Ending segment:
+    - Map to `narrativeArc.endingResolutionScore`
+    - Use `openLoopsResolved` for diagnostics only (do not create new schema field)
+- [x] Timeline handling:
+  - Do not aggregate timelines across segments
+  - Choose a primary segment per metric (priority: hook > ending > problem areas)
+  - Keep per-segment timelines in `supporting.advancedSegments` (optional, non-breaking) if preserving detail
+- [x] Score aggregation:
+  - Duration-weighted average for scores when multiple segments provide the same metric
+  - `observed: true` if any contributing segment observed the metric
+  - Keep `value` from the primary segment to avoid concatenation
+- [x] Add unit tests for mapping with multiple segments and missing data
+
+**Acceptance Criteria**
+
+- [x] Mapping rules are explicit and tested
+- [x] Timelines remain within caps and are not merged
+- [x] Missing segments fall back to defaults with `observed: false`
 
 ---
 
@@ -331,24 +427,26 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add environment variables:
+- [x] Add environment variables:
   - `ENABLE_ADVANCED_METRICS=true`
   - `MAX_ADVANCED_SEGMENTS=5`
   - `ADVANCED_SEGMENT_MAX_SECONDS=120`
   - `MAX_TIMELINE_POINTS=25`
-- [ ] Update `src/lib/config.ts`:
+  - `MAX_ADVANCED_PASS_COST_USD=0.25`
+  - `MAX_ADVANCED_PASS_DURATION_MS=180000`
+- [x] Update `src/lib/config.ts`:
   - Add advanced pass configuration
   - Add validation for segment/timeline limits
-- [ ] Add runtime strategy selection based on video length:
+- [x] Add runtime strategy selection based on video length:
   - Short videos (< 3 min): full advanced
   - Medium videos (3-10 min): selective advanced
   - Long videos (> 10 min): minimal advanced or skip
 
 **Acceptance Criteria**
 
-- [ ] Config flags control advanced behavior
-- [ ] Duration-based strategy works
-- [ ] Documentation updated
+- [x] Config flags control advanced behavior
+- [x] Duration-based strategy works
+- [x] Documentation updated
 
 ---
 
@@ -360,20 +458,20 @@ Files to modify:
 
 **Goals**
 
-- [ ] Update golden set tests:
+- [x] Update golden set tests:
   - Verify advanced metrics observed when requested
   - Check timeline quality for hook/conclusion
   - Validate metric accuracy against baseline
-- [ ] Target metrics:
+- [x] Target metrics:
   - >75% of segments return observed advanced metrics
   - Timelines within size limits
   - No regressions in hook analysis
 
 **Acceptance Criteria**
 
-- [ ] Golden set includes advanced metric expectations
-- [ ] Tests pass with tiered analysis
-- [ ] Quality targets met
+- [x] Golden set includes advanced metric expectations
+- [x] Tests pass with tiered analysis
+- [x] Quality targets met
 
 ---
 
@@ -385,45 +483,66 @@ Files to modify:
 
 **Goals**
 
-- [ ] Add cost tracking:
+- [x] Add cost tracking:
   - Log estimated cost per segment
   - Track total advanced pass cost
   - Compare to targets
-- [ ] Target costs:
+- [x] Target costs:
   - Per segment: ~$0.02-0.05
   - Total advanced pass: ~$0.10-0.25
-- [ ] Add performance tests:
+- [x] Add performance tests:
   - Advanced pass completes in < 3 minutes
   - No rate limit errors under normal use
 
 **Acceptance Criteria**
 
-- [ ] Cost tracking implemented
-- [ ] Costs within target range
-- [ ] Performance acceptable
+- [x] Cost tracking implemented
+- [x] Costs within target range
+- [x] Performance acceptable
+
+---
+
+### Task 3.4: Validate Advanced Metrics Add Value
+
+**Context**
+
+- Ensure Tier 2 improves insight quality rather than adding noise
+
+**Goals**
+
+- [x] Compare analyses with and without advanced metrics on the golden set
+- [x] Verify advanced metrics contribute actionable insights (not just extra timelines)
+- [x] Spot-check timelines for signal (not flat noise)
+
+**Acceptance Criteria**
+
+- [x] Advanced metrics change at least one insight per video where enabled
+- [x] Timeline signals are non-trivial (not constant/empty)
 
 ---
 
 ## Phase Transition Checklist (Stability Iteration 3)
 
 ### ✅ Phase 0 – Types & Planning
-- [ ] Advanced metric types defined
-- [ ] Planner selects segments correctly
+- [x] Advanced metric types defined
+- [x] Planner selects segments correctly
 
 ### ✅ Phase 1 – Advanced Pass
-- [ ] Segment analysis working
-- [ ] Timeline capping implemented
-- [ ] Orchestration handles partial failures
+- [x] Segment analysis working
+- [x] Timeline capping implemented
+- [x] Orchestration handles partial failures
 
 ### ✅ Phase 2 – Integration
-- [ ] Jobs include advanced stage
-- [ ] Service uses advanced pass
-- [ ] Fingerprint includes advanced data
+- [x] Jobs include advanced stage
+- [x] Service uses advanced pass
+- [x] Fingerprint includes advanced data
+- [x] Mapping rules documented and tested
 
 ### ✅ Phase 3 – Configuration & Testing
-- [ ] Config flags working
-- [ ] Golden set validated
-- [ ] Costs within targets
+- [x] Config flags working
+- [x] Golden set validated
+- [x] Costs within targets
+- [x] Advanced metrics value validated
 
 ---
 

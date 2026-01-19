@@ -17,7 +17,7 @@ describe("mockAnalyzeVideo", () => {
 
   it("validates fingerprint shape", () => {
     const result = mockAnalyzeVideo({ videoId: "valid123" });
-    expect(result.fingerprint.version).toBe("1.3.0");
+    expect(result.fingerprint.version).toBe("1.4.0");
     expect(result.fingerprint.perDomain.voiceProfile.scores[0].value).toBeGreaterThanOrEqual(0);
     expect(result.fingerprint.prosodyArc.emphasisAlignmentScore.observed).toBe(true);
     expect(result.fingerprint.cognitiveLoad.loadPerSecond.timeline?.length).toBeGreaterThan(0);

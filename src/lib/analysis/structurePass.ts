@@ -148,6 +148,89 @@ export const buildFallbackSkeleton = (input: FallbackInput): VideoSkeleton => {
 const systemInstruction =
   "You are a video structure analyzer. Your job is to understand how a video is organized, not to measure or score anything.";
 
+const structurePassJsonSchema = {
+  type: "object",
+  properties: {
+    durationSeconds: { type: "number" },
+    videoType: {
+      type: "string",
+      enum: [
+        "tutorial",
+        "essay",
+        "vlog",
+        "reaction",
+        "interview",
+        "documentary",
+        "entertainment",
+        "other",
+      ],
+    },
+    topicSummary: { type: "string" },
+    chapters: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          id: { type: "string" },
+          title: { type: "string" },
+          startSeconds: { type: "number" },
+          endSeconds: { type: "number" },
+          summary: { type: "string" },
+          chapterType: {
+            type: "string",
+            enum: ["intro", "hook", "body", "example", "tangent", "conclusion", "cta", "outro"],
+          },
+        },
+        required: ["id", "title", "startSeconds", "endSeconds", "summary", "chapterType"],
+      },
+    },
+    keyMoments: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          type: { type: "string", enum: ["hook", "peak", "twist", "payoff", "cta"] },
+          timestamp: { type: "number" },
+          chapterId: { type: "string" },
+          description: { type: "string" },
+        },
+        required: ["type", "timestamp", "chapterId", "description"],
+      },
+    },
+    contentMix: {
+      type: "object",
+      properties: {
+        talkingHeadPct: { type: "number" },
+        brollPct: { type: "number" },
+        graphicsPct: { type: "number" },
+        screencastPct: { type: "number" },
+        otherPct: { type: "number" },
+      },
+      required: ["talkingHeadPct", "brollPct", "graphicsPct", "screencastPct", "otherPct"],
+    },
+    analysisHints: {
+      type: "object",
+      properties: {
+        hasMusic: { type: "boolean" },
+        hasSFX: { type: "boolean" },
+        hasOnScreenText: { type: "boolean" },
+        hasMultipleSpeakers: { type: "boolean" },
+        primaryLanguage: { type: "string" },
+        estimatedComplexity: { type: "string", enum: ["low", "medium", "high"] },
+      },
+      required: [
+        "hasMusic",
+        "hasSFX",
+        "hasOnScreenText",
+        "hasMultipleSpeakers",
+        "primaryLanguage",
+        "estimatedComplexity",
+      ],
+    },
+  },
+  required: ["durationSeconds", "videoType", "topicSummary", "chapters", "keyMoments", "contentMix", "analysisHints"],
+};
+
 const MAX_DESCRIPTION_WORDS = 15;
 
 const truncateWords = (value: string, maxWords: number) => {
@@ -272,10 +355,11 @@ RULES:
 1. ${chapterRule}
 2. If YouTube chapters are provided above, use those titles (merge or trim to fit).
 3. ${keyMomentRule}
-4. All descriptions under 15 words. Chapter summaries are one sentence.
-5. contentMix percentages must sum to 100.
-6. Timestamps are seconds from start.
-7. JSON only, no prose.`;
+4. If a clear hook appears in the first 15 seconds, mark that as the hook keyMoment.
+5. All descriptions under 15 words. Chapter summaries are one sentence.
+6. contentMix percentages must sum to 100.
+7. Timestamps are seconds from start.
+8. JSON only, no prose.`;
 };
 
 export const runStructurePass = async (
@@ -303,9 +387,11 @@ export const runStructurePass = async (
   }, timeoutMs);
 
   try {
+    const jsonSchema = options.config?.geminiResponseSchemaEnabled ? structurePassJsonSchema : undefined;
     const result = await callGeminiTextJson({
       prompt,
       systemInstruction,
+      jsonSchema,
       signal: controller.signal,
       config: options.config,
     });

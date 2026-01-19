@@ -71,7 +71,7 @@ const isAxisObserved = (axis: keyof MetaAxes, fingerprint?: VideoFingerprintJson
   return hasNonZero || hasObservedDetail;
 };
 
-const advancedInsights = (fingerprint?: VideoFingerprintJson): string[] => {
+export const advancedInsights = (fingerprint?: VideoFingerprintJson): string[] => {
   if (!fingerprint) return [];
   const bullets: string[] = [];
 

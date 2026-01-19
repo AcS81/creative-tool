@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../gemini/client", () => ({
   callGeminiTextJson: vi.fn(),
@@ -77,11 +77,20 @@ const baseConfig: AppConfig = {
   youtubeApiKey: "yt",
   performanceEnabled: false,
   advancedMetricsEnabled: true,
+  advancedMaxSegments: 5,
+  advancedSegmentMaxSeconds: 120,
+  advancedMaxTimelinePoints: 25,
+  advancedMaxPassCostUsd: 0.25,
+  advancedMaxPassDurationMs: 180000,
   analysisV2MultimodalEnabled: true,
   structurePassEnabled: true,
   structurePassTimeoutMs: DEFAULT_STRUCTURE_PASS_TIMEOUT_MS,
   geminiResponseSchemaEnabled: false,
 };
+
+beforeEach(() => {
+  vi.mocked(callGeminiTextJson).mockClear();
+});
 
 describe("runStructurePass", () => {
   it("returns validated skeleton and includes prompt guidance", async () => {

@@ -20,6 +20,12 @@ npm run test:pipeline:40min   # 40-minute video
 npm run test:pipeline:short   # All short videos
 npm run test:pipeline:medium  # All medium videos
 npm run test:pipeline:long    # All long videos
+
+# Golden set (advanced metrics + baseline comparisons)
+npm run golden:multimodal
+
+# Pipeline test with selective advanced pass (Tier 2)
+npm run test:pipeline -- --selective-advanced
 ```
 
 ---
@@ -58,6 +64,13 @@ GEMINI_API_KEY=your_key_here
 YOUTUBE_API_KEY=your_key_here  # Optional but recommended
 ANALYSIS_MODE=gemini
 ENABLE_ANALYSIS_V2_MULTIMODAL=true
+
+# Optional: advanced pass caps (Tier 2)
+MAX_ADVANCED_SEGMENTS=5
+ADVANCED_SEGMENT_MAX_SECONDS=120
+MAX_TIMELINE_POINTS=25
+MAX_ADVANCED_PASS_COST_USD=0.25
+MAX_ADVANCED_PASS_DURATION_MS=180000
 ```
 
 ### 2. Check Database
@@ -198,6 +211,37 @@ A test **FAILS** if:
 | **Latency** | Total time to complete | < 3min for 10min video |
 | **Observed %** | % of metrics with data | > 85% |
 | **Cost** | Estimated Gemini API cost | < $0.15 for 10min video |
+
+---
+
+## Golden Set (Advanced Metrics)
+
+Use the golden set to validate advanced metrics coverage, timelines, and baseline drift:
+
+```bash
+# Run full golden set (advanced metrics on)
+npm run golden:multimodal
+
+# Use tiered core-only mode (skips advanced metrics)
+npm run golden:multimodal -- --tiered
+
+# Use tiered core + selective advanced pass (Tier 2)
+npm run golden:multimodal -- --selective-advanced
+
+# Override minimum observation thresholds
+npm run golden:multimodal -- --min-tier1-observed 90 --min-tier2-observed 75
+
+# Override max timeline points for validation
+npm run golden:multimodal -- --max-timeline-points 25
+
+# Compare insights + timeline signal with/without advanced metrics
+npm run golden:advanced-value
+```
+
+Notes:
+- The golden set enforces Tier 2 observation rate and timeline size limits when advanced metrics are enabled.
+- Use `--selective-advanced` to validate the selective Tier 2 pass from Stability Iteration 3.
+- Baseline comparisons use `scripts/golden-set.baseline.v1.3.0.json` unless overridden.
 | **Gemini Calls** | Number of API requests | ~6-8 for 10min video |
 
 ---

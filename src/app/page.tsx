@@ -25,6 +25,11 @@ import { DomainBadges } from "../components/DomainBadges";
 import { AdvancedCoaching } from "../components/AdvancedCoaching";
 import { ObservationStatus } from "../components/ObservationStatus";
 import { AnalysisLoadingState } from "../components/AnalysisLoadingState";
+import { AnalysisProgress } from "../components/AnalysisProgress";
+import { StreamingResults } from "../components/StreamingResults";
+import type { VideoSkeleton } from "../lib/analysis/types/skeleton";
+import type { CoreMetrics } from "../lib/analysis/types/coreMetrics";
+import { FEATURE_FLAGS } from "../lib/featureFlags";
 
 type NearestReference = { creatorId: string; displayName: string; distance: number };
 type AnalyzeJobStatus = "pending" | "running" | "complete" | "failed";
@@ -62,6 +67,8 @@ type AnalyzeResponse = {
     thumbnailUrl?: string;
   };
   diagnostics?: AnalyzeVideoResult["diagnostics"];
+  skeleton?: VideoSkeleton;
+  coreMetrics?: CoreMetrics;
 };
 
 type AnalyzeJobResponse = {
@@ -72,6 +79,8 @@ type AnalyzeJobResponse = {
   analysisStage?: string;
   stageStartedAt?: string;
   leaseHeartbeatAt?: string;
+  skeleton?: VideoSkeleton;
+  coreMetrics?: CoreMetrics;
 };
 
 type RecentAnalysisSummary = {
@@ -219,6 +228,9 @@ function HomeContent() {
   const [jobStage, setJobStage] = useState<string | null>(null);
   const [jobHeartbeatAt, setJobHeartbeatAt] = useState<string | null>(null);
   const [jobId, setJobId] = useState<string | null>(null);
+  const [jobStartedAt, setJobStartedAt] = useState<Date | null>(null);
+  const [partialSkeleton, setPartialSkeleton] = useState<VideoSkeleton | null>(null);
+  const [partialCoreMetrics, setPartialCoreMetrics] = useState<CoreMetrics | null>(null);
   const activeJobRef = useRef<string | null>(null);
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -406,6 +418,9 @@ function HomeContent() {
           setJobStage(null);
           setJobHeartbeatAt(null);
           setJobId(null);
+          setJobStartedAt(null);
+          setPartialSkeleton(null);
+          setPartialCoreMetrics(null);
           activeJobRef.current = null;
           return;
         }
@@ -420,6 +435,9 @@ function HomeContent() {
           setJobStage(null);
           setJobHeartbeatAt(null);
           setJobId(null);
+          setJobStartedAt(null);
+          setPartialSkeleton(null);
+          setPartialCoreMetrics(null);
           activeJobRef.current = null;
           return;
         }
@@ -429,6 +447,14 @@ function HomeContent() {
           setJobStage(body.analysisStage ?? null);
           setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
           setJobId(body.videoAnalysisId);
+          
+          // Update partial results for progressive loading
+          if (body.skeleton && !partialSkeleton) {
+            setPartialSkeleton(body.skeleton);
+          }
+          if (body.coreMetrics && !partialCoreMetrics) {
+            setPartialCoreMetrics(body.coreMetrics);
+          }
         }
 
         if ("status" in body && body.status === "failed") {
@@ -440,6 +466,9 @@ function HomeContent() {
           setJobStage(null);
           setJobHeartbeatAt(null);
           setJobId(null);
+          setJobStartedAt(null);
+          setPartialSkeleton(null);
+          setPartialCoreMetrics(null);
           activeJobRef.current = null;
           return;
         }
@@ -451,6 +480,9 @@ function HomeContent() {
         setJobStage(null);
         setJobHeartbeatAt(null);
         setJobId(null);
+        setJobStartedAt(null);
+        setPartialSkeleton(null);
+        setPartialCoreMetrics(null);
         activeJobRef.current = null;
         return;
       }
@@ -474,13 +506,16 @@ function HomeContent() {
         setJobStage(null);
         setJobHeartbeatAt(null);
         setJobId(null);
+        setJobStartedAt(null);
+        setPartialSkeleton(null);
+        setPartialCoreMetrics(null);
         activeJobRef.current = null;
         return;
       }
 
       await new Promise((resolve) => setTimeout(resolve, pollDelayMs));
     }
-  }, [refreshHistory]);
+  }, [refreshHistory, partialSkeleton, partialCoreMetrics]);
 
   const runAnalysis = async (targetUrl: string, passMode?: "core" | "full") => {
     setError(null);
@@ -491,6 +526,9 @@ function HomeContent() {
     setJobStage(null);
     setJobHeartbeatAt(null);
     setJobId(null);
+    setJobStartedAt(null);
+    setPartialSkeleton(null);
+    setPartialCoreMetrics(null);
 
     if (!isValidYouTubeUrl(targetUrl)) {
       setError("Please enter a valid YouTube URL.");
@@ -501,6 +539,7 @@ function HomeContent() {
 
     try {
       setLoading(true);
+      setJobStartedAt(new Date());
       setLastSubmittedUrl(targetUrl);
       setLastPassMode(passMode);
       setUrl(targetUrl);
@@ -566,6 +605,15 @@ function HomeContent() {
       setJobStage(body.analysisStage ?? null);
       setJobHeartbeatAt(body.leaseHeartbeatAt ?? null);
       setJobId(body.videoAnalysisId);
+      
+      // Update partial results for progressive loading
+      if ("skeleton" in body && body.skeleton) {
+        setPartialSkeleton(body.skeleton);
+      }
+      if ("coreMetrics" in body && body.coreMetrics) {
+        setPartialCoreMetrics(body.coreMetrics);
+      }
+      
       void pollAnalysisJob(body.videoAnalysisId, passMode);
     } catch {
       setError("Could not analyze this URL. Please try again.");
@@ -915,14 +963,27 @@ function HomeContent() {
       )}
 
       {loading && (
-        <AnalysisLoadingState
-          active={loading}
-          passMode={lastPassMode}
-          currentStage={jobStage}
-          lastHeartbeatAt={jobHeartbeatAt}
-          stalled={jobStalled}
-          onResume={jobStalled ? handleResumeJob : undefined}
-        />
+        <>
+          <AnalysisProgress
+            active={loading}
+            passMode={lastPassMode}
+            currentStage={jobStage}
+            skeleton={partialSkeleton}
+            lastHeartbeatAt={jobHeartbeatAt}
+            stalled={jobStalled}
+            onResume={jobStalled ? handleResumeJob : undefined}
+            startedAt={jobStartedAt}
+          />
+          
+          {(partialSkeleton || partialCoreMetrics) && (
+            <StreamingResults
+              skeleton={partialSkeleton}
+              coreMetrics={partialCoreMetrics}
+              fingerprint={null}
+              currentStage={jobStage}
+            />
+          )}
+        </>
       )}
 
       {!loading && error && !result && (
@@ -1008,38 +1069,70 @@ function HomeContent() {
             {activeTab === "overview" && (
               <div className="space-y-6">
                 <div className="grid gap-4 md:grid-cols-[1.4fr,1fr]">
-                  <div className="cs-panel flex flex-col gap-3 p-4 shadow-sm md:flex-row md:items-center md:gap-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10 text-lg font-bold text-accent">
-                        {result.overallArchetype.slice(0, 2).toUpperCase()}
+                  {/* Archetype section - hidden by default, deferred for stability */}
+                  {FEATURE_FLAGS.SHOW_ARCHETYPE_FEATURES && (
+                    <div className="cs-panel flex flex-col gap-3 p-4 shadow-sm md:flex-row md:items-center md:gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-accent/10 text-lg font-bold text-accent">
+                          {result.overallArchetype.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <p className="cs-kicker text-[10px]">Overall archetype</p>
+                          <p className="text-xl font-semibold text-foreground">
+                            {result.overallArchetype}
+                          </p>
+                          <p className="text-xs text-muted">Analysis ID: {result.videoAnalysisId}</p>
+                        </div>
                       </div>
+                      <div className="flex flex-wrap gap-2" role="status" aria-live="polite">
+                        <Chip label={`Voice: ${result.fingerprint.perDomain.voiceProfile.primaryArchetype}`} />
+                        <Chip
+                          label={`Delivery: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
+                        />
+                        <Chip
+                          label={`Narrative: ${result.fingerprint.perDomain.narrativeProfile.primaryArchetype}`}
+                        />
+                        <Chip
+                          label={`Visual: ${result.fingerprint.perDomain.visualProfile.primaryArchetype}`}
+                        />
+                        <Chip
+                          label={`Editing: ${result.fingerprint.perDomain.editingProfile.primaryArchetype}`}
+                        />
+                        <Chip
+                          label={`Sound: ${result.fingerprint.perDomain.soundProfile.primaryArchetype}`}
+                        />
+                        {diagnosticChips.length ? (
+                          <div className="flex flex-wrap items-center gap-2">
+                            {diagnosticChips.map((chip, idx) => (
+                              <span
+                                key={`${chip?.label}-${idx}`}
+                                className={`cs-pill text-[11px] ${
+                                  chip?.tone === "success"
+                                    ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                                    : "bg-surface-strong text-muted"
+                                }`}
+                              >
+                                {chip?.label}
+                              </span>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Simplified overview card when archetypes hidden */}
+                  {!FEATURE_FLAGS.SHOW_ARCHETYPE_FEATURES && (
+                    <div className="cs-panel flex flex-col gap-3 p-4 shadow-sm">
                       <div>
-                        <p className="cs-kicker text-[10px]">Overall archetype</p>
+                        <p className="cs-kicker text-[10px]">Analysis complete</p>
                         <p className="text-xl font-semibold text-foreground">
-                          {result.overallArchetype}
+                          Video Fingerprint
                         </p>
                         <p className="text-xs text-muted">Analysis ID: {result.videoAnalysisId}</p>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2" role="status" aria-live="polite">
-                      <Chip label={`Voice: ${result.fingerprint.perDomain.voiceProfile.primaryArchetype}`} />
-                      <Chip
-                        label={`Delivery: ${result.fingerprint.perDomain.languageProfile.primaryArchetype}`}
-                      />
-                      <Chip
-                        label={`Narrative: ${result.fingerprint.perDomain.narrativeProfile.primaryArchetype}`}
-                      />
-                      <Chip
-                        label={`Visual: ${result.fingerprint.perDomain.visualProfile.primaryArchetype}`}
-                      />
-                      <Chip
-                        label={`Editing: ${result.fingerprint.perDomain.editingProfile.primaryArchetype}`}
-                      />
-                      <Chip
-                        label={`Sound: ${result.fingerprint.perDomain.soundProfile.primaryArchetype}`}
-                      />
                       {diagnosticChips.length ? (
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap gap-2">
                           {diagnosticChips.map((chip, idx) => (
                             <span
                               key={`${chip?.label}-${idx}`}
@@ -1055,7 +1148,7 @@ function HomeContent() {
                         </div>
                       ) : null}
                     </div>
-                  </div>
+                  )}
                   {result.metadata ? (
                     <div className="cs-panel flex gap-3 p-4 shadow-sm">
                       {result.metadata.thumbnailUrl ? (
@@ -1116,7 +1209,7 @@ function HomeContent() {
                         <li key={idx}>{insight}</li>
                       ))}
                       {(!result.insights || result.insights.length === 0) && (
-                        <li className="text-muted">Not enough reference data yet.</li>
+                        <li className="text-muted">Analysis insights based on your video metrics.</li>
                       )}
                     </ul>
                     {result.fingerprint.hasPerformanceData && result.fingerprint.performanceProfile && (
@@ -1142,23 +1235,46 @@ function HomeContent() {
                       </div>
                     )}
                   </div>
-                  <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
-                    <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
-                    <div className="grid gap-3">
-                      {result.nearestReferences.map((ref) => (
-                        <div
-                          key={ref.creatorId}
-                          className="rounded-md border border-border bg-surface-strong p-3 shadow-sm"
-                        >
-                          <p className="text-base font-semibold">{ref.displayName}</p>
-                          <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
-                        </div>
-                      ))}
-                      {result.nearestReferences.length === 0 && (
-                        <p className="text-sm text-muted">No reference data available yet.</p>
-                      )}
+                  
+                  {/* Reference library - hidden by default, deferred for stability */}
+                  {FEATURE_FLAGS.SHOW_REFERENCE_LIBRARY && (
+                    <div className="space-y-3 rounded-md border border-border bg-surface p-4 shadow-sm">
+                      <p className="text-sm font-semibold text-muted">Nearest reference creators</p>
+                      <div className="grid gap-3">
+                        {result.nearestReferences.map((ref) => (
+                          <div
+                            key={ref.creatorId}
+                            className="rounded-md border border-border bg-surface-strong p-3 shadow-sm"
+                          >
+                            <p className="text-base font-semibold">{ref.displayName}</p>
+                            <p className="text-xs text-muted">Distance: {ref.distance.toFixed(2)}</p>
+                          </div>
+                        ))}
+                        {result.nearestReferences.length === 0 && (
+                          <p className="text-sm text-muted">No reference data available yet.</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
+                  
+                  {/* Coming soon placeholder for reference library */}
+                  {!FEATURE_FLAGS.SHOW_REFERENCE_LIBRARY && FEATURE_FLAGS.SHOW_COMING_SOON_PLACEHOLDERS && (
+                    <div className="space-y-3 rounded-md border-2 border-dashed border-border bg-surface-strong/30 p-4 shadow-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">📚</span>
+                        <p className="text-sm font-semibold text-muted">Reference Library</p>
+                      </div>
+                      <p className="text-sm text-muted">
+                        Compare your style to top creators in your niche.
+                      </p>
+                      <div className="rounded-lg bg-accent/5 px-3 py-2">
+                        <p className="text-xs font-semibold text-accent">Coming soon</p>
+                        <p className="mt-1 text-xs text-muted">
+                          This feature will be enabled after stability validation.
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
           )}

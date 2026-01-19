@@ -309,6 +309,33 @@ Files to modify:
 
 ---
 
+### Task 2.4: Add Synthetic Beats for Narrative Metrics (if needed)
+
+**Context**
+
+- keyMoments are sparse and may be insufficient for narrative analysis
+- Synthetic beats preserve legacy beat-based expectations
+
+**Goals**
+
+- [ ] Add `beatsFromSkeleton(skeleton: VideoSkeleton): BeatSegment[]`:
+  - Chapter-derived beats for baseline coverage
+  - Key-moment beats for spikes
+- [ ] Use synthetic beats when keyMoments are too sparse
+- [ ] Keep mapping deterministic and schema-compatible
+
+**Constraints**
+
+- Beat format must match existing fingerprint schema
+- Generated beats must be non-overlapping and within duration bounds
+
+**Acceptance Criteria**
+
+- [ ] Narrative metrics still accurate on golden set
+- [ ] Beats populated with reasonable density across chapters
+
+---
+
 ## Phase 3: Testing & Validation
 
 ### Task 3.1: Core Pass Unit Tests
@@ -327,6 +354,11 @@ Files to modify:
 - [x] Add tests for metric registry:
   - Tier helpers return correct metrics
   - No duplicates between tiers
+- [ ] Add edge case tests:
+  - Video with 1 chapter
+  - All metrics unobserved
+  - Chapter analysis timeout
+  - Aggregation with missing middle chapter
 
 **Acceptance Criteria**
 

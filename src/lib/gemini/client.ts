@@ -792,10 +792,11 @@ export const callGeminiMultimodalJson = async (
 
         attempt += 1;
         if (attempt >= maxAttempts) {
-          const errorMessage = lastOutcome.errorMessage
-            ? `${lastOutcome.errorMessage} (after ${maxAttempts} attempts)`
+          const baseErrorMessage = lastOutcome.ok === false ? lastOutcome.errorMessage : undefined;
+          const errorMessage = baseErrorMessage
+            ? `${baseErrorMessage} (after ${maxAttempts} attempts)`
             : `Gemini unavailable after ${maxAttempts} attempts`;
-          return { ...lastOutcome, errorMessage };
+          return { ...lastOutcome, ok: false as const, errorMessage };
         }
 
         logger.warn(

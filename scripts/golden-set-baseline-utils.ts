@@ -28,6 +28,7 @@ export type GoldenSummary = {
   coverage: GoldenCoverageSummary;
   analysisMode?: "legacy" | "tiered";
   tier1ObservedPct?: number;
+  tier2ObservedPct?: number;
 };
 
 export type GoldenBaseline = GoldenSummary & {

@@ -214,8 +214,10 @@ export interface AdvancedFingerprintMetrics {
   secondOrder: SecondOrderSummary;
 }
 
-export type VideoFingerprintVersion = "1.3.0";
-export type LegacyVideoFingerprintVersion = "1.1.0" | "1.2.0";
+import type { DerivedScores } from "../analysis/types/derivedScores";
+
+export type VideoFingerprintVersion = "1.4.0";
+export type LegacyVideoFingerprintVersion = "1.1.0" | "1.2.0" | "1.3.0";
 
 interface VideoFingerprintBase {
   createdAt: string;
@@ -228,9 +230,11 @@ interface VideoFingerprintBase {
     beats?: BeatSegment[];
     axisDetails?: Record<string, AxisDetail>;
     perChapterMetrics?: Array<Record<string, unknown>>;
+    advancedSegments?: Array<Record<string, unknown>>;
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
+  derivedScores?: DerivedScores;
 }
 
 export interface VideoFingerprintJson extends VideoFingerprintBase, AdvancedFingerprintMetrics {

@@ -20,6 +20,13 @@ describe("getAppConfig", () => {
     delete process.env.GEMINI_RESPONSE_SCHEMA_ENABLED;
     delete process.env.ENABLE_STRUCTURE_PASS;
     delete process.env.STRUCTURE_PASS_TIMEOUT_MS;
+    delete process.env.MAX_ADVANCED_SEGMENTS;
+    delete process.env.ADVANCED_SEGMENT_MAX_SECONDS;
+    delete process.env.MAX_TIMELINE_POINTS;
+    delete process.env.MAX_ADVANCED_PASS_COST_USD;
+    delete process.env.MAX_ADVANCED_PASS_DURATION_MS;
+    delete process.env.ADVANCED_SCHEMA_STRATEGY;
+    delete process.env.ADVANCED_RESPONSE_FORMAT;
   });
 
   it("defaults to mock mode and performance disabled", () => {
@@ -29,6 +36,11 @@ describe("getAppConfig", () => {
     expect(config.performanceEnabled).toBe(false);
     expect(config.analysisV2MultimodalEnabled).toBe(false);
     expect(config.advancedMetricsEnabled).toBe(false);
+    expect(config.advancedMaxSegments).toBe(5);
+    expect(config.advancedSegmentMaxSeconds).toBe(120);
+    expect(config.advancedMaxTimelinePoints).toBe(25);
+    expect(config.advancedMaxPassCostUsd).toBe(0.25);
+    expect(config.advancedMaxPassDurationMs).toBe(180000);
     expect(config.geminiResponseSchemaEnabled).toBe(false);
     expect(config.structurePassEnabled).toBe(true);
     expect(config.structurePassTimeoutMs).toBe(30000);
@@ -110,5 +122,20 @@ describe("getAppConfig", () => {
     process.env.STRUCTURE_PASS_TIMEOUT_MS = "45000";
     const config = getAppConfig();
     expect(config.structurePassTimeoutMs).toBe(45000);
+  });
+
+  it("respects advanced pass limits overrides", () => {
+    process.env.MAX_ADVANCED_SEGMENTS = "3";
+    process.env.ADVANCED_SEGMENT_MAX_SECONDS = "90";
+    process.env.MAX_TIMELINE_POINTS = "20";
+    process.env.MAX_ADVANCED_PASS_COST_USD = "0.12";
+    process.env.MAX_ADVANCED_PASS_DURATION_MS = "90000";
+
+    const config = getAppConfig();
+    expect(config.advancedMaxSegments).toBe(3);
+    expect(config.advancedSegmentMaxSeconds).toBe(90);
+    expect(config.advancedMaxTimelinePoints).toBe(20);
+    expect(config.advancedMaxPassCostUsd).toBe(0.12);
+    expect(config.advancedMaxPassDurationMs).toBe(90000);
   });
 });

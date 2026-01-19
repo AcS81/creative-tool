@@ -151,7 +151,7 @@ Files to modify:
 - [x] Chapter count follows duration rules
 - [x] Key moments are sparse and meaningful
 - [x] Unit tests with mocked Gemini responses
-- [ ] Integration test with real Gemini (optional, requires API key)
+- [ ] Integration test with real Gemini (required, requires API key)
 
 ---
 
@@ -176,6 +176,8 @@ Files to modify:
   - Timeout (> 30 seconds)
 - [x] Add `StructurePassResult` type:
   - `{ skeleton: VideoSkeleton, source: 'gemini' | 'fallback', error?: string }`
+- [ ] Add fallback metadata for downstream tiers:
+  - `_fallbackMetadata: { usedFallback: true, reason: string, confidence: 'low' }`
 
 **Constraints**
 
@@ -341,6 +343,7 @@ Files to modify:
 ### ✅ Phase 3 – Configuration & Testing
 - [x] Feature flags working
 - [x] Golden set validation passing
+- [ ] Real Gemini integration test run on sample videos
 
 ---
 

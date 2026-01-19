@@ -4,6 +4,7 @@ import { ADVANCED_METRIC_SECTIONS, SECOND_ORDER_METRICS, type AdvancedSectionKey
 import type { AdvancedFingerprintMetrics, LegacyVideoFingerprintJson, VideoFingerprintJson } from "../types";
 import { FINGERPRINT_SCHEMA_VERSION } from "./fingerprintContract";
 
+const LEGACY_FINGERPRINT_V13 = "1.3.0" as const;
 const LEGACY_FINGERPRINT_V12 = "1.2.0" as const;
 const LEGACY_FINGERPRINT_V11 = "1.1.0" as const;
 
@@ -37,6 +38,46 @@ const metaAxesSchema = z.object({
   narrativeStructureStrength: z.number().min(0).max(100),
   visualDynamism: z.number().min(0).max(100),
   productionPolish: z.number().min(0).max(100),
+});
+
+const derivedScoreSchema = z.object({
+  value: z.number().min(0).max(100),
+  observed: z.boolean(),
+});
+
+const derivedScoresSchema = z.object({
+  metaAxes: z.object({
+    voiceIntensity: derivedScoreSchema,
+    conceptualDepth: derivedScoreSchema,
+    narrativeStructureStrength: derivedScoreSchema,
+    visualDynamism: derivedScoreSchema,
+    productionPolish: derivedScoreSchema,
+  }),
+  alignment: z.object({
+    audioVisualAlignment: derivedScoreSchema,
+    beatsEditsAlignment: derivedScoreSchema,
+    prosodySemanticAlignment: derivedScoreSchema,
+    overallAlignment: derivedScoreSchema,
+  }),
+  balance: z.object({
+    redundancyScore: derivedScoreSchema,
+    complementarityScore: derivedScoreSchema,
+    overRelianceScore: derivedScoreSchema,
+    overallBalance: derivedScoreSchema,
+  }),
+  cognitiveLoad: z.object({
+    averageLoad: derivedScoreSchema,
+    peakLoad: derivedScoreSchema,
+    loadVariance: derivedScoreSchema,
+    overloadMoments: derivedScoreSchema,
+  }),
+  secondOrder: z.object({
+    alignmentScore: derivedScoreSchema,
+    driftScore: derivedScoreSchema,
+    decayScore: derivedScoreSchema,
+    balanceScore: derivedScoreSchema,
+    timingScore: derivedScoreSchema,
+  }),
 });
 
 const segmentSchema = z.object({
@@ -165,10 +206,12 @@ const baseFingerprintShape = {
         .optional(),
       axisDetails: z.record(z.string(), axisDetailSchema).optional(),
       perChapterMetrics: z.array(z.record(z.string(), z.any())).optional(),
+      advancedSegments: z.array(z.record(z.string(), z.any())).optional(),
     })
     .optional(),
   performanceProfile: performanceProfileSchema.optional(),
   hasPerformanceData: z.boolean().optional().default(false),
+  derivedScores: derivedScoresSchema.optional(),
 };
 
 export const fingerprintSchema = z.object({
@@ -176,6 +219,13 @@ export const fingerprintSchema = z.object({
   ...baseFingerprintShape,
   ...advancedMetricsShape,
 });
+
+const legacyFingerprintSchemaV13 = z
+  .object({
+    version: z.literal(LEGACY_FINGERPRINT_V13),
+    ...baseFingerprintShape,
+  })
+  .passthrough();
 
 const legacyFingerprintSchemaV12 = z
   .object({
@@ -192,6 +242,7 @@ const legacyFingerprintSchemaV11 = z
   .passthrough();
 
 export type FingerprintSchema = z.infer<typeof fingerprintSchema>;
+type LegacyFingerprintV13 = z.infer<typeof legacyFingerprintSchemaV13>;
 type LegacyFingerprintV12 = z.infer<typeof legacyFingerprintSchemaV12>;
 type LegacyFingerprintV11 = z.infer<typeof legacyFingerprintSchemaV11>;
 
@@ -224,23 +275,37 @@ const upgradeV11ToV12 = (legacy: LegacyFingerprintV11): LegacyFingerprintV12 => 
   hasPerformanceData: resolveHasPerformanceData(legacy.hasPerformanceData, legacy.performanceProfile),
 });
 
-const upgradeV12ToV13 = (legacy: LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>): VideoFingerprintJson => {
-  const upgraded = {
+const upgradeV12ToV13 = (legacy: LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>): LegacyFingerprintV13 & Partial<AdvancedFingerprintMetrics> => {
+  return {
     ...legacy,
     ...buildDefaultAdvancedSections(pickAdvancedOverrides(legacy)),
-    version: FINGERPRINT_SCHEMA_VERSION,
+    version: LEGACY_FINGERPRINT_V13,
     hasPerformanceData: resolveHasPerformanceData(legacy.hasPerformanceData, legacy.performanceProfile),
   };
-  return fingerprintSchema.parse(upgraded);
+};
+
+const upgradeV13ToV14 = (legacy: LegacyFingerprintV13 & Partial<AdvancedFingerprintMetrics>): VideoFingerprintJson => {
+  const upgraded = {
+    ...legacy,
+    version: FINGERPRINT_SCHEMA_VERSION,
+    // derivedScores is optional, so we don't need to add it here
+    // It will be computed and added during analysis
+  };
+  return fingerprintSchema.parse(upgraded) as unknown as VideoFingerprintJson;
 };
 
 const upgradeLegacyFingerprint = (legacy: LegacyVideoFingerprintJson): VideoFingerprintJson => {
+  if (legacy.version === LEGACY_FINGERPRINT_V13) {
+    return upgradeV13ToV14(legacy as LegacyFingerprintV13 & Partial<AdvancedFingerprintMetrics>);
+  }
   if (legacy.version === LEGACY_FINGERPRINT_V12) {
-    return upgradeV12ToV13(legacy as LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>);
+    const upgradedV13 = upgradeV12ToV13(legacy as LegacyFingerprintV12 & Partial<AdvancedFingerprintMetrics>);
+    return upgradeV13ToV14(upgradedV13);
   }
   if (legacy.version === LEGACY_FINGERPRINT_V11) {
     const upgradedV12 = upgradeV11ToV12(legacy as LegacyFingerprintV11);
-    return upgradeV12ToV13(upgradedV12);
+    const upgradedV13 = upgradeV12ToV13(upgradedV12);
+    return upgradeV13ToV14(upgradedV13);
   }
   throw new Error(`Unsupported fingerprint version: ${legacy.version}`);
 };
@@ -248,10 +313,16 @@ const upgradeLegacyFingerprint = (legacy: LegacyVideoFingerprintJson): VideoFing
 export function validateFingerprint(json: unknown): VideoFingerprintJson {
   const parsed = fingerprintSchema.safeParse(json);
   if (parsed.success) {
-    return {
+    const result = {
       ...parsed.data,
       hasPerformanceData: resolveHasPerformanceData(parsed.data.hasPerformanceData, parsed.data.performanceProfile),
     };
+    return result as unknown as VideoFingerprintJson;
+  }
+
+  const legacyParsedV13 = legacyFingerprintSchemaV13.safeParse(json);
+  if (legacyParsedV13.success) {
+    return upgradeLegacyFingerprint(legacyParsedV13.data as LegacyVideoFingerprintJson);
   }
 
   const legacyParsedV12 = legacyFingerprintSchemaV12.safeParse(json);
@@ -272,5 +343,5 @@ export function validateFingerprint(json: unknown): VideoFingerprintJson {
 
 export function isValidFingerprint(json: unknown): json is VideoFingerprintJson {
   if (fingerprintSchema.safeParse(json).success) return true;
-  return legacyFingerprintSchemaV12.safeParse(json).success || legacyFingerprintSchemaV11.safeParse(json).success;
+  return legacyFingerprintSchemaV13.safeParse(json).success || legacyFingerprintSchemaV12.safeParse(json).success || legacyFingerprintSchemaV11.safeParse(json).success;
 }

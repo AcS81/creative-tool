@@ -1,6 +1,8 @@
 import type { VideoFingerprintJson } from "../types";
 import type { GeminiRequestMetrics, GeminiUsage } from "../gemini/client";
+import type { SegmentAdvancedMetrics } from "./types/advancedMetrics";
 import type { VideoSkeleton } from "./types/skeleton";
+import type { AnalysisError } from "./errorHandling";
 
 export interface AnalyzeVideoInput {
   videoId: string;
@@ -30,10 +32,28 @@ export type PassResult = {
 export interface AnalyzeVideoResult {
   fingerprint: VideoFingerprintJson;
   skeleton: VideoSkeleton;
+  advancedMetrics?: SegmentAdvancedMetrics[];
   overallArchetype: string;
   diagnostics?: {
     source: "mock" | "gemini-v1-text" | "gemini-v2-multimodal" | "gemini-v2-tiered";
     structurePass?: PassResult;
+    corePass?: PassResult;
+    advancedPass?: PassResult;
+    advancedPasses?: PassResult[];
+    derivedComputation?: PassResult;
+    overallCoverage?: {
+      tier1Observed: number;
+      tier2Observed: number;
+      tier3Computed: number;
+    };
+    totalCostUsd?: number;
+    totalDurationMs?: number;
+    tier2Config?: {
+      advancedSchemaStrategy: "inherit" | "strict" | "optional";
+      advancedResponseFormat: "full" | "compact";
+      schemaRejectionCount: number;
+      timelineInterpolated: boolean;
+    };
     hashSeed?: number;
     performanceAttached?: boolean;
     performanceErrorType?: string;
@@ -103,6 +123,10 @@ export interface AnalyzeVideoResult {
     };
     ingestionPreflight?: IngestionPreflight;
     fingerprintLoadError?: FingerprintLoadError;
+    errors?: AnalysisError[];
+    warnings?: string[];
+    fallbacksUsed?: string[];
+    overallSuccess?: boolean;
   };
 }
 

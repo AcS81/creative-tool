@@ -4,6 +4,7 @@ import { Chip } from "./Chip";
 import { DomainScoreBars } from "./DomainScoreBars";
 import { describeArchetype, type DomainKey } from "../lib/archetypes/descriptions";
 import { resolveAxisMetadata } from "../lib/analysis/axisMetadata";
+import { CoverageIndicator } from "./MetricValue";
 
 type AdvancedDetailItem = {
   label: string;

@@ -10,6 +10,7 @@ import type {
   VideoFingerprintJson,
   AdvancedFingerprintMetrics,
 } from "../../types";
+import type { DerivedScores } from "../types/derivedScores";
 import { buildDefaultAdvancedMetrics } from "./defaults";
 import { FINGERPRINT_SCHEMA_VERSION } from "../../schemas/fingerprintContract";
 
@@ -23,10 +24,13 @@ type BuildFingerprintOptions = {
     sceneSegments?: SceneSegment[];
     beats?: BeatSegment[];
     axisDetails?: Record<string, AxisDetail>;
+    perChapterMetrics?: Array<Record<string, unknown>>;
+    advancedSegments?: Array<Record<string, unknown>>;
   };
   performanceProfile?: PerformanceProfile;
   hasPerformanceData?: boolean;
   advancedMetrics?: AdvancedFingerprintMetrics;
+  derivedScores?: DerivedScores;
 };
 
 const clamp = (value: number, min = 0, max = 100) => Math.max(min, Math.min(max, value));
@@ -65,5 +69,6 @@ export const buildVideoFingerprint = (
     supporting: options.supporting,
     performanceProfile: options.performanceProfile,
     hasPerformanceData: options.hasPerformanceData ?? Boolean(options.performanceProfile),
+    derivedScores: options.derivedScores,
   };
 };

@@ -4,9 +4,11 @@ import type { DomainProfile } from "../types";
 import type { AppConfig } from "../config";
 import { ConfigError } from "../config";
 import { buildDefaultAdvancedMetrics } from "./fingerprint/defaults";
+import type { ChapterCoreMetrics, SummaryMetric } from "./types/coreMetrics";
 
 const mockAnalyzeVideoMultimodal = vi.fn();
 const mockRunStructurePass = vi.fn();
+const mockExecuteAdvancedPass = vi.fn();
 
 vi.mock("./geminiMultimodalAnalyzer", () => ({
   analyzeVideoMultimodal: (...args: any[]) => mockAnalyzeVideoMultimodal(...args),
@@ -19,6 +21,10 @@ vi.mock("./structurePass", async (importOriginal) => {
     runStructurePass: (...args: any[]) => mockRunStructurePass(...args),
   };
 });
+
+vi.mock("./advancedPass", () => ({
+  executeAdvancedPass: (...args: any[]) => mockExecuteAdvancedPass(...args),
+}));
 
 function mockDomain(label: string, base: number): DomainProfile {
   return {
@@ -33,6 +39,51 @@ function mockDomain(label: string, base: number): DomainProfile {
   };
 }
 
+const metric = (value = "ok", score = 60, observed = true): SummaryMetric => ({
+  score,
+  value,
+  observed,
+});
+
+const buildChapterMetrics = (chapterId: string): ChapterCoreMetrics => ({
+  chapterId,
+  voice: {
+    speakingRate: metric(),
+    fillerRate: metric(),
+    pauseUsage: metric(),
+    loudnessRange: metric(),
+    pitchVariation: metric(),
+    clarity: metric(),
+    warmth: metric(),
+  },
+  language: {
+    concreteness: metric(),
+    metaphorDensity: metric(),
+    references: metric(),
+    humor: metric(),
+    teachingVsRiffing: metric(),
+    storyPresence: metric(),
+  },
+  narrative: {
+    structureClarity: metric(),
+    hookPresence: metric(),
+    transitionQuality: metric(),
+    payoffDelivery: metric(),
+  },
+  visual: {
+    cutRate: metric(),
+    environmentStability: metric(),
+    movement: metric(),
+    expression: metric(),
+  },
+  sound: {
+    musicCoverage: metric(),
+    musicBalance: metric(),
+    sfxDensity: metric(),
+    silenceUsage: metric(),
+  },
+});
+
 const baseConfig: AppConfig = {
   analysisMode: "gemini",
   analysisVersion: "v2",
@@ -41,6 +92,11 @@ const baseConfig: AppConfig = {
   youtubeApiKey: "yt",
   performanceEnabled: false,
   advancedMetricsEnabled: true,
+  advancedMaxSegments: 5,
+  advancedSegmentMaxSeconds: 120,
+  advancedMaxTimelinePoints: 25,
+  advancedMaxPassCostUsd: 0.25,
+  advancedMaxPassDurationMs: 180000,
   structurePassEnabled: true,
   structurePassTimeoutMs: 30000,
   geminiResponseSchemaEnabled: false,
@@ -50,6 +106,17 @@ describe("analyzeVideo service", () => {
   beforeEach(() => {
     mockAnalyzeVideoMultimodal.mockReset();
     mockRunStructurePass.mockReset();
+    mockExecuteAdvancedPass.mockReset();
+    mockExecuteAdvancedPass.mockResolvedValue({
+      segments: [],
+      diagnostics: {
+        segmentsPlanned: 0,
+        segmentsCompleted: 0,
+        segmentsFailed: 0,
+        totalDurationMs: 0,
+        estimatedCostUsd: 0,
+      },
+    });
   });
 
   afterEach(() => {
@@ -205,7 +272,7 @@ describe("analyzeVideo service", () => {
         sound: mockDomain("Sound", 58),
       },
       axisDetails: {},
-      perChapterMetrics: [{ chapterId: "ch1" } as any],
+      perChapterMetrics: [buildChapterMetrics("ch1")],
       diagnostics: {
         unobservedCounts: { voice: 0, language: 0, narrative: 0, visual_edit_sound: 0 },
       },
@@ -237,7 +304,7 @@ describe("analyzeVideo service", () => {
       { config: { ...baseConfig, analysisMode: "mock" } },
     );
     expect(result.diagnostics?.source).toBe("mock");
-    expect(result.fingerprint.version).toBe("1.3.0");
+    expect(result.fingerprint.version).toBe("1.4.0");
     expect(result.diagnostics?.structurePass?.success).toBe(true);
   });
 });

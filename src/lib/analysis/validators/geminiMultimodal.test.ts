@@ -139,12 +139,12 @@ describe("GeminiMultimodalResponseSchema", () => {
     }
   });
 
-  it("fails when beats array is empty", () => {
+  it("allows an empty beats array", () => {
     const response: any = buildResponse();
     response.narrative.beats = [];
     const result = isGeminiMultimodalResponse(response);
-    expect(result).toBe(false);
-    expect(() => parseGeminiMultimodalJson(response)).toThrow(InvalidGeminiResponseError);
+    expect(result).toBe(true);
+    expect(() => parseGeminiMultimodalJson(response)).not.toThrow();
   });
 
   it("fails when an advanced metric is missing inside advanced_metrics", () => {

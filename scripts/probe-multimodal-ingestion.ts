@@ -87,6 +87,13 @@ async function main() {
     advancedMetricsEnabled: true,
     structurePassEnabled: true,
     structurePassTimeoutMs: 30000,
+    advancedMaxSegments: 5,
+    advancedSegmentMaxSeconds: 120,
+    advancedMaxTimelinePoints: 25,
+    advancedMaxPassCostUsd: 0.25,
+    advancedMaxPassDurationMs: 180000,
+    showArchetypeFeatures: false,
+    showReferenceLibrary: false,
   };
 
   console.log("=== Gemini multimodal call (URL-only ingestion) ===");

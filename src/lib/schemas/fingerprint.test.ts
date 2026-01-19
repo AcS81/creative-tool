@@ -98,7 +98,7 @@ describe("fingerprint schema", () => {
 
   it("accepts a valid fingerprint", () => {
     const validated = validateFingerprint(baseFingerprint);
-    expect(validated.version).toBe("1.3.0");
+    expect(validated.version).toBe("1.4.0");
     expect(validated.perDomain.voiceProfile.primaryArchetype).toContain("Voice");
     expect(validated.hasPerformanceData).toBe(false);
   });
@@ -130,14 +130,14 @@ describe("fingerprint schema", () => {
 
   it("upgrades legacy v1.1 fingerprints to the latest schema", () => {
     const upgraded = validateFingerprint(legacyFingerprintV11);
-    expect(upgraded.version).toBe("1.3.0");
+    expect(upgraded.version).toBe("1.4.0");
     expect(upgraded.hasPerformanceData).toBe(false);
     expect(upgraded.cognitiveLoad.loadPerSecond.observed).toBe(false);
   });
 
   it("upgrades legacy v1.2 fingerprints and fills advanced metrics", () => {
     const upgraded = validateFingerprint(legacyFingerprintV12);
-    expect(upgraded.version).toBe("1.3.0");
+    expect(upgraded.version).toBe("1.4.0");
     expect(upgraded.secondOrder.alignmentScore.score).toBe(0);
     expect(upgraded.modalityBalance.modalityOverReliance.value).toBe("unobserved");
   });

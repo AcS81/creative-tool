@@ -409,6 +409,13 @@ const buildGeminiConfig = (): AppConfig => ({
   structurePassTimeoutMs:
     Number.parseInt(process.env.STRUCTURE_PASS_TIMEOUT_MS ?? "", 10) || DEFAULT_TIMEOUT_MS,
   geminiResponseSchemaEnabled: false,
+  advancedMaxSegments: 5,
+  advancedSegmentMaxSeconds: 120,
+  advancedMaxTimelinePoints: 25,
+  advancedMaxPassCostUsd: 0.25,
+  advancedMaxPassDurationMs: 180000,
+  showArchetypeFeatures: false,
+  showReferenceLibrary: false,
 });
 
 const formatDuration = (ms: number) => {
@@ -491,15 +498,16 @@ async function main() {
     let chapterCount: number | undefined;
     let keyMomentCount: number | undefined;
 
-    if (!validation.success) {
+    if (!validation.success || !validation.data) {
       errors.push(`Schema validation failed: ${validation.error}`);
       flags.chapterStructureOk = false;
       flags.keyMomentsOk = false;
     } else {
-      detectedVideoType = validation.data.videoType;
-      chapterCount = validation.data.chapters.length;
-      keyMomentCount = validation.data.keyMoments.length;
-      const checks = validateSkeleton(validation.data, video);
+      const validData = validation.data;
+      detectedVideoType = validData.videoType;
+      chapterCount = validData.chapters.length;
+      keyMomentCount = validData.keyMoments.length;
+      const checks = validateSkeleton(validData, video);
       errors.push(...checks.errors);
       warnings.push(...checks.warnings);
       flags = checks.flags;

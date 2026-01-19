@@ -61,6 +61,7 @@ The current app covers the PRD MVP features:
 - Alignment & Load preview: mock mode and seeds now surface alignment/drift/balance/timing and cognitive-load timelines (Overview “Alignment & Load” section).
 - Rollback: set `ENABLE_ADVANCED_METRICS=false` to force placeholder alignment/load metrics (schema stays v1.3.0) while keeping the rest of the analysis live.
 - Structure pass control: `ENABLE_STRUCTURE_PASS=false` skips tier 0 and uses fallback skeletons; `STRUCTURE_PASS_TIMEOUT_MS` sets the tier 0 timeout in ms.
+- Advanced pass caps: `MAX_ADVANCED_SEGMENTS`, `ADVANCED_SEGMENT_MAX_SECONDS`, `MAX_TIMELINE_POINTS`, `MAX_ADVANCED_PASS_COST_USD`, `MAX_ADVANCED_PASS_DURATION_MS`.
 
 ### Run in mock mode
 1) Ensure `.env` has `ANALYSIS_MODE=mock`.
@@ -76,9 +77,23 @@ The current app covers the PRD MVP features:
 3) Paste a public YouTube URL and run analysis. If Gemini returns 404, try a different `GEMINI_MODEL` your key can access.
 
 ### Latency and cost expectations
-- Gemini + YouTube mode is variable: core runs are often a few minutes, but full runs (advanced signals + salvage) can take 20–40+ minutes on longer videos.
-- API usage incurs Gemini and YouTube quotas/billing; pick a lighter model (e.g., `gemini-2.5-flash`) if you want lower cost/latency.
-- Pricing reference + cost estimation: see `docs/gemini_pricing.md` (uses Gemini usageMetadata; excludes caching/grounding/storage).
+
+With the 4-tier architecture:
+- **Basic analysis** (Tier 0 + Tier 1): 30-45 seconds, ~$0.10 per video
+- **Full analysis with compact format** (all tiers): 60-75 seconds, ~$0.14 per video
+- **Full analysis with full format** (all tiers): 75-90 seconds, ~$0.22 per video
+
+Performance varies by video length:
+- < 5 min videos: >99% completion rate, ~$0.08-0.12
+- 5-15 min videos: >95% completion rate, ~$0.12-0.18
+- \> 15 min videos: >85% completion rate, ~$0.18-0.28
+
+**Cost optimization:**
+- Use `ADVANCED_RESPONSE_FORMAT=compact` for ~40% cost reduction with <10% accuracy variance
+- Set `ENABLE_ADVANCED_METRICS=false` for basic analysis only (no timelines)
+- Pick lighter models (e.g., `gemini-2.5-flash`) for lower cost/latency
+
+See [docs/gemini_pricing.md](./docs/gemini_pricing.md) for detailed pricing and [docs/stability-architecture.md](./docs/stability-architecture.md) for performance targets.
 
 ### Privacy
 - No raw video is stored or downloaded. The app stores URLs, derived fingerprints, and analysis results. When performance is enabled, only YouTube Analytics metrics are stored; OAuth tokens are encrypted and can be revoked via the UI (Disconnect YouTube) or by deleting token rows.

@@ -50,6 +50,8 @@ export const buildUnobservedCoreMetrics = (): CoreMetrics => ({
   },
 });
 
+export const buildFallbackCoreMetrics = (_skeleton?: VideoSkeleton): CoreMetrics => buildUnobservedCoreMetrics();
+
 const isObservedValue = (value: string) => value.trim() !== "" && value.trim().toLowerCase() !== "unobserved";
 
 const aggregateSummaryMetric = (inputs: WeightedMetricInput[]): SummaryMetric => {
